@@ -30,6 +30,16 @@ final class AppModel {
     }
 
     init(defaults: UserDefaults = .standard) {
+        if Screenshots.isActive {
+            // Sample data in a throwaway store, so screenshots never touch real progress.
+            let scratch = UserDefaults(suiteName: "screenshots") ?? defaults
+            scratch.removePersistentDomain(forName: "screenshots")
+            self.defaults = scratch
+            program = Screenshots.sampleProgram()
+            durationMinutes = WorkoutPlan.defaultDuration
+            openScreenshotScreen()
+            return
+        }
         self.defaults = defaults
         if let data = defaults.data(forKey: Keys.program),
            let saved = try? JSONDecoder().decode(ProgramState.self, from: data) {
@@ -39,6 +49,28 @@ final class AppModel {
         }
         let storedDuration = defaults.integer(forKey: Keys.duration)
         durationMinutes = WorkoutPlan.durationRange.contains(storedDuration) ? storedDuration : WorkoutPlan.defaultDuration
+    }
+
+    /// Picks three groups and goes to the screen named by `-screenshots`.
+    private func openScreenshotScreen() {
+        for key in ["Front", "Hams", "Oblique"] {
+            if let group = Catalog.group(key) { toggle(group) }
+        }
+        switch Screenshots.screen {
+        case "workout":
+            startWorkout()
+            session?.advance(startingRest: true)
+        case "weights":
+            startWorkout()
+            while let current = session, !current.isLastStep {
+                current.advance(startingRest: false)
+            }
+            skipToNext()
+        case "complete":
+            screen = .complete(days: 41)
+        default:
+            break
+        }
     }
 
     // MARK: Home

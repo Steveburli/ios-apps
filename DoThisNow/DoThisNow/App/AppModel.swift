@@ -77,12 +77,38 @@ final class AppModel {
 
         let folder = (try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask,
                                                    appropriateFor: nil, create: true)) ?? FileManager.default.temporaryDirectory
-        fileURL = folder.appendingPathComponent("planner.json")
-        if let data = try? Data(contentsOf: fileURL),
-           let saved = try? JSONDecoder().decode(PlannerState.self, from: data) {
+        fileURL = folder.appendingPathComponent(Screenshots.isActive ? "screenshots.json" : "planner.json")
+        if Screenshots.isActive {
+            var sample = PlannerState()
+            sample.loadExamples(now: now, calendar: calendar)
+            sample.context.timeMinutes = 60
+            state = sample
+            openScreenshotScreen()
+        } else if let data = try? Data(contentsOf: fileURL),
+                  let saved = try? JSONDecoder().decode(PlannerState.self, from: data) {
             state = saved
         } else {
             state = PlannerState()
+        }
+    }
+
+    /// Goes to the screen named by `-screenshots`: now, pick, doing, tasks or day.
+    private func openScreenshotScreen() {
+        switch Screenshots.screen {
+        case "pick":
+            tab = .now
+            go()
+        case "doing":
+            tab = .now
+            go()
+            startCurrentPick()
+        case "tasks":
+            tab = .tasks
+        case "day":
+            tab = .day
+            openDayTab()
+        default:
+            tab = .now
         }
     }
 

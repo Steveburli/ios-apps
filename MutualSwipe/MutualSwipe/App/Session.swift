@@ -54,8 +54,32 @@ final class Session {
     }
 
     init() {
+        if Screenshots.isActive {
+            currentGroupID = Screenshots.groupID
+            players = [Screenshots.groupID: Screenshots.meID]
+            pickerShown = true
+            openScreenshotScreen()
+            return
+        }
         currentGroupID = UserDefaults.standard.string(forKey: Keys.group)
         players = UserDefaults.standard.dictionary(forKey: Keys.players) as? [String: String] ?? [:]
+    }
+
+    /// Goes to the screen named by `-screenshots`: home, swipe, results or card.
+    private func openScreenshotScreen() {
+        let deck = Screenshots.dateDeckID
+        switch Screenshots.screen {
+        case "swipe":
+            path = [deck]
+        case "results":
+            openingTab[deck] = .results
+            path = [deck]
+        case "card":
+            path = [deck]
+            sheet = .card(Screenshots.picnicCardID)
+        default:
+            break
+        }
     }
 
     /// The group on screen: the one picked, else the first.

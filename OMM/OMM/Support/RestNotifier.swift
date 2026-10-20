@@ -6,11 +6,13 @@ enum RestNotifier {
     private static let identifier = "rest-timer"
 
     static func requestPermission() {
+        // No permission prompt over the screenshots.
+        guard !Screenshots.isActive else { return }
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 
     static func schedule(after seconds: Int, title: String, body: String) {
-        guard seconds > 0 else { return }
+        guard seconds > 0, !Screenshots.isActive else { return }
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body

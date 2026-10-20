@@ -11,6 +11,8 @@ enum Notifier {
     private static let reminderLimit = 40
 
     static func requestPermission() {
+        // No permission prompt over the screenshots.
+        guard !Screenshots.isActive else { return }
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
     }
 

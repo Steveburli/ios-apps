@@ -27,7 +27,7 @@ final class CloudStore: CKSyncEngineDelegate {
     /// The group just joined from an invitation, so the UI can switch to it.
     var joinedGroupID: String?
 
-    @ObservationIgnored let container: CKContainer
+    @ObservationIgnored private var cachedContainer: CKContainer?
     @ObservationIgnored private var privateEngine: CKSyncEngine?
     @ObservationIgnored private var sharedEngine: CKSyncEngine?
     @ObservationIgnored private var privateState: CKSyncEngine.State.Serialization?
@@ -46,13 +46,25 @@ final class CloudStore: CKSyncEngineDelegate {
     }
 
     private init() {
-        container = CKContainer(identifier: Self.containerID)
         let folder = (try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask,
                                                    appropriateFor: nil, create: true)) ?? FileManager.default.temporaryDirectory
         fileURL = folder.appendingPathComponent("mutual.json")
+        if Screenshots.isActive {
+            // Unsigned screenshot builds have no iCloud access, so use sample decks instead.
+            loadScreenshotData()
+            return
+        }
         load()
         startEngines()
         Task { await refreshAccountStatus() }
+    }
+
+    /// Made on first use. Screenshot builds never touch it, because they aren't entitled to iCloud.
+    var container: CKContainer {
+        if let cachedContainer { return cachedContainer }
+        let made = CKContainer(identifier: Self.containerID)
+        cachedContainer = made
+        return made
     }
 
     var isSignedIn: Bool {
@@ -292,6 +304,7 @@ final class CloudStore: CKSyncEngineDelegate {
     // MARK: Syncing
 
     func refresh() async {
+        guard !Screenshots.isActive else { return }
         await refreshAccountStatus()
         try? await privateEngine?.fetchChanges()
         try? await sharedEngine?.fetchChanges()
@@ -300,6 +313,7 @@ final class CloudStore: CKSyncEngineDelegate {
     }
 
     func refreshAccountStatus() async {
+        guard !Screenshots.isActive else { return }
         accountStatus = (try? await container.accountStatus()) ?? .couldNotDetermine
     }
 
@@ -615,6 +629,7 @@ final class CloudStore: CKSyncEngineDelegate {
 
     /// Writes the file half a second after the last change.
     private func scheduleSave() {
+        guard !Screenshots.isActive else { return }
         saveTask?.cancel()
         saveTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(500))
@@ -624,11 +639,44 @@ final class CloudStore: CKSyncEngineDelegate {
     }
 
     func writeNow() {
+        guard !Screenshots.isActive else { return }
         let snapshot = Snapshot(groups: Array(groups.values), decks: Array(decks.values), cards: Array(cards.values),
                                 players: Array(players.values), picks: Array(picks.values),
                                 privateState: privateState, sharedState: sharedState)
         if let data = try? JSONEncoder().encode(snapshot) {
             try? data.write(to: fileURL, options: .atomic)
+        }
+    }
+
+    // MARK: Screenshot sample data
+
+    private func loadScreenshotData() {
+        let now = Date()
+        var group = SwipeGroup(id: Screenshots.groupID, ownerName: CKCurrentUserDefaultName, name: "Sam & Alex",
+                               isOwned: true, createdAt: now.addingTimeInterval(-30 * 86_400))
+        group.isShared = true
+        group.participants = ["Alex"]
+        groups = [group.id: group]
+        let sam = Player(id: Screenshots.meID, groupID: group.id, name: "Sam", color: 2, createdAt: now.addingTimeInterval(-900))
+        let alex = Player(id: "alex", groupID: group.id, name: "Alex", color: 3, createdAt: now.addingTimeInterval(-800))
+        players = [sam.id: sam, alex.id: alex]
+        accountStatus = .available
+
+        for sample in Screenshots.decks {
+            let deck = Deck(id: sample.id, groupID: group.id, title: sample.title, kind: sample.kind, blurb: sample.blurb,
+                            createdAt: now.addingTimeInterval(sample.age))
+            decks[deck.id] = deck
+            for (index, item) in sample.cards.enumerated() {
+                let card = Card(id: item.id, groupID: group.id, deckID: deck.id,
+                                draft: CardDraft(title: item.title, subtitle: item.subtitle, details: item.details, tags: item.tags),
+                                order: Double(index), createdAt: deck.createdAt)
+                cards[card.id] = card
+                for (playerID, vote) in [(alex.id, item.alex), (sam.id, item.sam)] {
+                    guard let vote else { continue }
+                    let pick = Pick(groupID: group.id, deckID: deck.id, cardID: card.id, playerID: playerID, vote: vote, updatedAt: now)
+                    picks[pick.id] = pick
+                }
+            }
         }
     }
 }
