@@ -1,0 +1,18 @@
+# Kept on this PC only: the zip for the Mac and the personal App Store guide.
+*.zip
+APP-STORE-GUIDE.md
+
+# Build output
+build/
+DerivedData/
+.build/
+.swiftpm/
+*.xcarchive
+
+# Xcode user state
+xcuserdata/
+*.xcuserstate
+.DS_Store
+
+# The Mac's Team ID override, if used
+scripts/team-id
