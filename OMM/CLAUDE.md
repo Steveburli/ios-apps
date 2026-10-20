@@ -47,11 +47,11 @@ If `xcodebuild` complains about the developer directory, ask the user to run `su
 
 ## Status (2026-10-20)
 
-Written without a compiler and not yet built. The app icon is in place (`Assets.xcassets/AppIcon.appiconset/AppIcon.png`, 1024 × 1024, no alpha).
+The cloud build is green: the app compiles with no errors or warnings, every logic test passes, and the Simulator screenshots have been checked. The team ID (`DSH38XJG4K`) and the app icon are in place. It hasn't run on a real iPhone yet.
 
 ## Next tasks, in order
 
-1. Get the GitHub build green: fix every error and warning it reports.
+1. Keep the GitHub build green after every change.
 2. Have the user ship a TestFlight build (`./scripts/ship.sh OMM` on the Mac). On their iPhone, they should walk through a full 3-group workout at 9 minutes, where rest is 30 seconds:
    - the rest timer, and the notification when the phone is locked during rest
    - **Next Workout** while the timer is running

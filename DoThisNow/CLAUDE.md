@@ -45,11 +45,11 @@ xcodebuild -project DoThisNow.xcodeproj -scheme DoThisNow -destination 'generic/
 
 ## Status (2026-10-20)
 
-Written without a compiler and not yet built. The app icon is in place.
+The cloud build is green: the app compiles with no errors or warnings, every logic test passes, and the Simulator screenshots have been checked. The team ID (`DSH38XJG4K`) and the app icon are in place. It hasn't run on a real iPhone yet.
 
 ## Next tasks, in order
 
-1. Get the GitHub build green. When a logic test fails, decide whether the test or the code is wrong: the expected values were worked out by hand. Fix every error and warning.
+1. Keep the GitHub build green after every change.
 2. Have the user ship a TestFlight build. On their iPhone, they should tap **Try it with example tasks** and check:
    - the Now questions, **Tell me what to do**, **Not now** (with a snooze), **Already done**, **Start**, then pause, +15 min, and finish
    - Tasks: drag between tiers, the check-in cards, editing a task, the swipe actions

@@ -72,11 +72,11 @@ After any change to `Sync/Records.swift`, update this table and redeploy. Produc
 
 ## Status (2026-10-20)
 
-Written without a compiler and not yet built. The app icon is in place. The CloudKit code follows Apple's CKSyncEngine sample, so expect a few API signatures to need fixing.
+The cloud build is green: the app compiles with no errors or warnings, every logic test passes, and the Simulator screenshots (which use sample data, with iCloud off) have been checked. The team ID (`DSH38XJG4K`) and the app icon are in place. iCloud sync and sharing haven't been tried on a real device yet.
 
 ## Next tasks, in order
 
-1. Get the GitHub build green. Most of the risk is in `Sync/CloudStore.swift`: the CKSyncEngine event payloads and `RecordZoneChangeBatch`.
+1. Keep the GitHub build green after every change.
 2. Have the user do the one-time iCloud setup above, including **Deploy Schema Changes**.
 3. Have the user ship a TestFlight build. On one phone, they should:
    - create a deck and add cards, both one at a time and with **Paste a list**
