@@ -133,7 +133,7 @@ struct TasksView: View {
         .scrollContentBackground(.hidden)
         .environment(\.editMode, $editMode)
         .toolbar {
-            ToolbarItem(placement: .principal) {
+            ToolbarItem(placement: .topBarLeading) {
                 if !active.isEmpty {
                     Button(editMode.isEditing ? "Done" : "Reorder") {
                         withAnimation { editMode = editMode.isEditing ? .inactive : .active }

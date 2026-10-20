@@ -56,7 +56,7 @@ struct RootView: View {
     }
 }
 
-/// Each tab's navigation bar: the brand on the left, Settings on the right.
+/// Each tab's navigation bar: the brand in the middle, Settings on the right.
 private struct Screen<Content: View>: View {
     @Environment(AppModel.self) private var model
     @ViewBuilder var content: Content
@@ -67,7 +67,7 @@ private struct Screen<Content: View>: View {
                 .background(Theme.bg.ignoresSafeArea())
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
+                    ToolbarItem(placement: .principal) {
                         HStack(spacing: 9) {
                             Circle()
                                 .fill(Theme.accent)

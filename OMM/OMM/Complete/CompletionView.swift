@@ -5,7 +5,8 @@ struct CompletionView: View {
     let days: Int
 
     var body: some View {
-        ScrollView {
+        GeometryReader { proxy in
+            ScrollView {
             Card {
                 VStack(spacing: 0) {
                     Text("🎉")
@@ -30,9 +31,10 @@ struct CompletionView: View {
                 .frame(maxWidth: .infinity)
             }
             .padding(.horizontal, 12)
-            .padding(.top, 40)
             .frame(maxWidth: 560)
-            .frame(maxWidth: .infinity)
+            // Centered on the screen, but still scrolls with very large text.
+            .frame(maxWidth: .infinity, minHeight: proxy.size.height * 0.85)
+            }
         }
     }
 }

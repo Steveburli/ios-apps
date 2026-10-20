@@ -61,7 +61,7 @@ struct HomeView: View {
         .refreshable { await store.refresh() }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
+            ToolbarItem(placement: .principal) {
                 HStack(spacing: 8) {
                     BrandMark()
                     Text("Mutual")
