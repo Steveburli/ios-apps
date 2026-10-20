@@ -67,6 +67,7 @@ After any change to `Sync/Records.swift`, update this table and redeploy. Produc
 - Code is edited on the user's Windows PC, which has no Swift compiler.
 - Every push to `main` runs `.github/workflows/build.yml` on a GitHub cloud Mac. It runs `swift test` for the package and does an unsigned Simulator build. Read results with `gh run list`, then `gh run download <run id> -n report-MutualSwipe`.
 - Unsigned builds have no iCloud entitlement, so the cloud build only proves the app compiles. Real iCloud testing happens in TestFlight.
+- Each report also holds `screens/` (App Store-size Simulator screenshots: the app is launched with `-screenshots <screen>`, which opens one screen with sample data, see `MutualSwipe/Support/Screenshots.swift`), `app-log.txt`, and any crash reports. Look at the screenshots after UI changes.
 - The user's Mac only signs and uploads, with `./scripts/ship.sh MutualSwipe`.
 
 ## Status (2026-10-20)

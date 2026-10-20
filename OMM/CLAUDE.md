@@ -42,6 +42,7 @@ If `xcodebuild` complains about the developer directory, ask the user to run `su
 
 - Code is edited on the user's Windows PC, which has no Swift compiler.
 - Every push to `main` runs `.github/workflows/build.yml` on a GitHub cloud Mac. It runs `swift test` for the package and does an unsigned Simulator build of the app. Read results with `gh run list`, then `gh run download <run id> -n report-OMM`. The report's `errors.txt` has one line per error, with repo-relative paths.
+- Each report also holds `screens/` (App Store-size Simulator screenshots: the app is launched with `-screenshots <screen>`, which opens one screen with sample data, see `OMM/Support/Screenshots.swift`), `app-log.txt`, and any crash reports. Look at the screenshots after UI changes.
 - The user's Mac only signs and uploads, with `./scripts/ship.sh OMM`. Keep the Mac's part to that one command.
 
 ## Status (2026-10-20)
