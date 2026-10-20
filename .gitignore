@@ -16,3 +16,6 @@ xcuserdata/
 
 # The Mac's Team ID override, if used
 scripts/team-id
+
+# App Store screenshots, copied from the cloud build for uploading
+Screenshots/
