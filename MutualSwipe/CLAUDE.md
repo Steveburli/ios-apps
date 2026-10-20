@@ -74,16 +74,17 @@ After any change to `Sync/Records.swift`, update this table and redeploy. Produc
 
 The cloud build is green: the app compiles with no errors or warnings, every logic test passes, and the Simulator screenshots (which use sample data, with iCloud off) have been checked. The team ID (`DSH38XJG4K`) and the app icon are in place. iCloud sync and sharing haven't been tried on a real device yet.
 
+The one-time iCloud setup above is done. The container exists, the App ID has iCloud (CloudKit, 1 container) and Push on, and the five record types match the table and are deployed to Production. The app uses no CloudKit queries, so no indexes were added.
+
 ## Next tasks, in order
 
 1. Keep the GitHub build green after every change.
-2. Have the user do the one-time iCloud setup above, including **Deploy Schema Changes**.
-3. Have the user ship a TestFlight build. On one phone, they should:
+2. Have the user ship a TestFlight build. On one phone, they should:
    - create a deck and add cards, both one at a time and with **Paste a list**
    - add two names and swipe as each person
    - check the Results tiers, undo, **Clear my swipes** and **Delete deck**
-4. Sync check: add a second Apple ID as a TestFlight tester on another iPhone. Invite that phone from **Groups → Invite people**, accept the link there, swipe on both phones, and confirm Results update within about 30 seconds.
-5. Take the App Store screenshots and submit for review.
+3. Sync check: add a second Apple ID as a TestFlight tester on another iPhone. Invite that phone from **Groups → Invite people**, accept the link there, swipe on both phones, and confirm Results update within about 30 seconds.
+4. Take the App Store screenshots and submit for review.
 
 ## Ideas for later
 
