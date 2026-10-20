@@ -35,7 +35,7 @@ jobs:
           - app: MutualSwipe
             kit: MutualKit
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Show tool versions
         run: |
@@ -67,7 +67,7 @@ jobs:
 
       - name: Upload report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: report-${{ matrix.app }}
           path: report/

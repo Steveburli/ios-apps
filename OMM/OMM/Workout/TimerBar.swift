@@ -67,6 +67,7 @@ private struct ProgressBar: View {
 }
 
 /// What the bar shows for the current rest state.
+@MainActor
 private struct RestStatus {
     enum Tone { case idle, running, done }
 

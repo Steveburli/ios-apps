@@ -415,7 +415,8 @@ final class CloudStore: CKSyncEngineDelegate {
         }
         let sendable = changes.filter { !gone.contains($0) }
         guard !sendable.isEmpty else { return nil }
-        return await CKSyncEngine.RecordZoneChangeBatch(pendingChanges: sendable) { id in records[id] }
+        let batch = records
+        return await CKSyncEngine.RecordZoneChangeBatch(pendingChanges: sendable) { id in batch[id] }
     }
 
     // MARK: Records in and out

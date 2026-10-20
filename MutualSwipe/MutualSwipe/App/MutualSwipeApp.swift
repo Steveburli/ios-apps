@@ -22,6 +22,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         // Silent pushes tell the sync engines when someone else changes a shared deck.
+        // CKSyncEngine handles them itself; the app only has to register.
         application.registerForRemoteNotifications()
         return true
     }
@@ -31,11 +32,6 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         let configuration = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
         configuration.delegateClass = SceneDelegate.self
         return configuration
-    }
-
-    func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
-        await CloudStore.shared.refresh()
-        return .newData
     }
 }
 
