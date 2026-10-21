@@ -1,0 +1,196 @@
+# Builds one app, signs it and uploads it to App Store Connect, where it shows up in
+# TestFlight 10-30 minutes later. No Mac needed. Start it by pushing a tag named
+# testflight-<App>-<number>:
+#
+#   testflight-OMM-1   testflight-DoThisNow-1   testflight-MutualSwipe-1
+#
+# or from the Actions tab with "Run workflow". scripts/ship.sh on a Mac is the fallback.
+#
+# Needs four repository secrets (Settings > Secrets and variables > Actions), the same
+# values as in the say-it-back repo:
+#   APP_STORE_CONNECT_ISSUER_ID       App Store Connect > Users and Access > Integrations
+#   APP_STORE_CONNECT_KEY_IDENTIFIER  the API key's ID, same page
+#   APP_STORE_CONNECT_PRIVATE_KEY     the whole AuthKey_XXXXXXXXXX.p8 file
+#   CERTIFICATE_PRIVATE_KEY           the RSA key the team's Apple Distribution certificate is tied to
+#
+# Signing uses Codemagic's free, open-source command-line tools (no Codemagic account).
+# With the API key they find the Apple Distribution certificate for CERTIFICATE_PRIVATE_KEY
+# and the app's App Store provisioning profile, creating the profile the first time.
+# The app target's Release config reads SHIP_CODE_SIGN_STYLE, SHIP_CODE_SIGN_IDENTITY and
+# SHIP_PROVISIONING_PROFILE, so manual signing here doesn't touch the Swift package targets.
+name: TestFlight
+
+on:
+  push:
+    tags: ["testflight-*"]
+  workflow_dispatch:
+    inputs:
+      app:
+        description: Which app to send to TestFlight
+        type: choice
+        options: [OMM, DoThisNow, MutualSwipe]
+        required: true
+
+concurrency:
+  group: testflight-${{ inputs.app || github.ref_name }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  TEAM_ID: DSH38XJG4K
+
+jobs:
+  ship:
+    name: Build, sign and upload
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APP_STORE_CONNECT_KEY_IDENTIFIER }}
+      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+      CERTIFICATE_PRIVATE_KEY: ${{ secrets.CERTIFICATE_PRIVATE_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Pick the app
+        env:
+          INPUT_APP: ${{ inputs.app }}
+        run: |
+          if [ -n "$INPUT_APP" ]; then
+            app="$INPUT_APP"
+          else
+            # testflight-OMM-3 -> OMM
+            app="${GITHUB_REF_NAME#testflight-}"
+            app="${app%-*}"
+          fi
+          case "$app" in
+            OMM) bundle=com.steveburlison.omm ;;
+            DoThisNow) bundle=com.steveburlison.dothisnow ;;
+            MutualSwipe) bundle=com.steveburlison.mutualswipe ;;
+            *)
+              echo "::error::Unknown app \"$app\". Name the tag testflight-OMM-1, testflight-DoThisNow-1 or testflight-MutualSwipe-1."
+              exit 1 ;;
+          esac
+          echo "APP=$app" >> "$GITHUB_ENV"
+          echo "BUNDLE_ID=$bundle" >> "$GITHUB_ENV"
+          echo "Shipping $app ($bundle)"
+
+      - name: Check the secrets are set
+        run: |
+          missing=()
+          for name in APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_KEY_IDENTIFIER APP_STORE_CONNECT_PRIVATE_KEY CERTIFICATE_PRIVATE_KEY; do
+            [ -n "${!name}" ] || missing+=("$name")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing repository secrets: ${missing[*]}"
+            exit 1
+          fi
+
+      - name: Install the signing tools
+        run: |
+          python3 -m venv "$RUNNER_TEMP/tools"
+          "$RUNNER_TEMP/tools/bin/pip" install --quiet codemagic-cli-tools
+          echo "$RUNNER_TEMP/tools/bin" >> "$GITHUB_PATH"
+
+      - name: Get the signing certificate and profile
+        run: |
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --platform IOS \
+            --type IOS_APP_STORE \
+            --certificate-key=@env:CERTIFICATE_PRIVATE_KEY \
+            --create
+          keychain add-certificates
+
+          # Xcode 16 and later read profiles from a new folder; put the profile in both.
+          old="$HOME/Library/MobileDevice/Provisioning Profiles"
+          new="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+          mkdir -p "$old" "$new"
+          # ls fails when one folder is empty, which is normal; the check below catches "none at all".
+          profile="$(ls -t "$old"/*.mobileprovision "$new"/*.mobileprovision 2>/dev/null | head -1 || true)"
+          if [ -z "$profile" ]; then
+            echo "::error::No provisioning profile was downloaded."
+            exit 1
+          fi
+          cp "$profile" "$old/" 2>/dev/null || true
+          cp "$profile" "$new/" 2>/dev/null || true
+          name="$(security cms -D -i "$profile" | plutil -extract Name raw -o - -)"
+          echo "PROFILE_NAME=$name" >> "$GITHUB_ENV"
+          echo "Using provisioning profile: $name"
+
+      - name: Archive
+        run: |
+          # Every upload needs a new build number. Same format as scripts/ship.sh, in UTC.
+          build_number="$(date -u +%Y%m%d%H%M)"
+          echo "BUILD_NUMBER=$build_number" >> "$GITHUB_ENV"
+          xcodebuild \
+            -project "$APP/$APP.xcodeproj" \
+            -scheme "$APP" \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/$APP.xcarchive" \
+            CURRENT_PROJECT_VERSION="$build_number" \
+            SHIP_CODE_SIGN_STYLE=Manual \
+            SHIP_CODE_SIGN_IDENTITY="Apple Distribution" \
+            SHIP_PROVISIONING_PROFILE="$PROFILE_NAME" \
+            archive 2>&1 | tee archive.log
+
+      - name: Sign and upload to App Store Connect
+        run: |
+          key_dir="$RUNNER_TEMP/private_keys"
+          mkdir -p "$key_dir"
+          key_path="$key_dir/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8"
+          printf '%s\n' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$key_path"
+
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>${TEAM_ID}</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>signingCertificate</key><string>Apple Distribution</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${BUNDLE_ID}</key><string>${PROFILE_NAME}</string>
+            </dict>
+            <key>uploadSymbols</key><true/>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict>
+          </plist>
+          PLIST
+
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/$APP.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$key_path" \
+            -authenticationKeyID "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
+            2>&1 | tee export.log
+
+          {
+            echo "## Uploaded $APP build $BUILD_NUMBER"
+            echo "It appears in TestFlight on the iPhone in about 10-30 minutes, once Apple has processed it."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove the key file
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/private_keys"
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: testflight-logs-${{ env.APP || 'unknown' }}
+          path: |
+            archive.log
+            export.log
+          if-no-files-found: ignore
+          retention-days: 14

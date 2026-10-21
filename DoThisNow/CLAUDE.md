@@ -41,7 +41,7 @@ xcodebuild -project DoThisNow.xcodeproj -scheme DoThisNow -destination 'generic/
 - Code is edited on the user's Windows PC, which has no Swift compiler.
 - Every push to `main` runs `.github/workflows/build.yml` on a GitHub cloud Mac. It runs `swift test` for the package and does an unsigned Simulator build of the app. Read results with `gh run list`, then `gh run download <run id> -n report-DoThisNow`. The report's `errors.txt` has one line per error.
 - Each report also holds `screens/` (App Store-size Simulator screenshots: the app is launched with `-screenshots <screen>`, which opens one screen with sample data, see `DoThisNow/Support/Screenshots.swift`), `app-log.txt`, and any crash reports. Look at the screenshots after UI changes.
-- The user's Mac only signs and uploads, with `./scripts/ship.sh DoThisNow`.
+- TestFlight uploads run in the cloud too: push a tag `testflight-DoThisNow-<n>` and `.github/workflows/testflight.yml` signs and uploads (logs in the `testflight-logs-DoThisNow` artifact). It needs the four signing secrets, the same as the say-it-back repo. `./scripts/ship.sh DoThisNow` on the user's Mac is only a fallback.
 
 ## Status (2026-10-20)
 
@@ -50,7 +50,7 @@ The cloud build is green: the app compiles with no errors or warnings, every log
 ## Next tasks, in order
 
 1. Keep the GitHub build green after every change.
-2. Have the user ship a TestFlight build. On their iPhone, they should tap **Try it with example tasks** and check:
+2. Ship a TestFlight build (tag `testflight-DoThisNow-<n>`; ask the user first). On their iPhone, they should tap **Try it with example tasks** and check:
    - the Now questions, **Tell me what to do**, **Not now** (with a snooze), **Already done**, **Start**, then pause, +15 min, and finish
    - Tasks: drag between tiers, the check-in cards, editing a task, the swipe actions
    - Day: the example soccer game, dragging its purple core, making something "must do" until bedtime gets pushed (the groan and the bubble), and the dinner options

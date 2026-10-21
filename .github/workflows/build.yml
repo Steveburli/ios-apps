@@ -1,6 +1,7 @@
 # Checks every push: runs each app's logic tests and builds the app for the
 # iPhone Simulator. Builds are unsigned, so no Apple account or keys are
-# needed here. Signing and uploading happen on the Mac with scripts/ship.sh.
+# needed here. Signing and uploading happen in testflight.yml (or on a Mac with
+# scripts/ship.sh).
 #
 # Each job leaves a "report-<App>" artifact with errors.txt (one line per
 # compiler error, with repo-relative paths) and the full logs.

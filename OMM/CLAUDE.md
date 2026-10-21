@@ -43,7 +43,7 @@ If `xcodebuild` complains about the developer directory, ask the user to run `su
 - Code is edited on the user's Windows PC, which has no Swift compiler.
 - Every push to `main` runs `.github/workflows/build.yml` on a GitHub cloud Mac. It runs `swift test` for the package and does an unsigned Simulator build of the app. Read results with `gh run list`, then `gh run download <run id> -n report-OMM`. The report's `errors.txt` has one line per error, with repo-relative paths.
 - Each report also holds `screens/` (App Store-size Simulator screenshots: the app is launched with `-screenshots <screen>`, which opens one screen with sample data, see `OMM/Support/Screenshots.swift`), `app-log.txt`, and any crash reports. Look at the screenshots after UI changes.
-- The user's Mac only signs and uploads, with `./scripts/ship.sh OMM`. Keep the Mac's part to that one command.
+- TestFlight uploads run in the cloud too: push a tag `testflight-OMM-<n>` and `.github/workflows/testflight.yml` signs and uploads (logs in the `testflight-logs-OMM` artifact). It needs the four signing secrets, the same as the say-it-back repo. `./scripts/ship.sh OMM` on the user's Mac is only a fallback.
 
 ## Status (2026-10-20)
 
@@ -52,7 +52,7 @@ The cloud build is green: the app compiles with no errors or warnings, every log
 ## Next tasks, in order
 
 1. Keep the GitHub build green after every change.
-2. Have the user ship a TestFlight build (`./scripts/ship.sh OMM` on the Mac). On their iPhone, they should walk through a full 3-group workout at 9 minutes, where rest is 30 seconds:
+2. Ship a TestFlight build (tag `testflight-OMM-<n>`; ask the user first). On their iPhone, they should walk through a full 3-group workout at 9 minutes, where rest is 30 seconds:
    - the rest timer, and the notification when the phone is locked during rest
    - **Next Workout** while the timer is running
    - the weight sheet, including prefill on a second workout

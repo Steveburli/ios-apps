@@ -68,7 +68,7 @@ After any change to `Sync/Records.swift`, update this table and redeploy. Produc
 - Every push to `main` runs `.github/workflows/build.yml` on a GitHub cloud Mac. It runs `swift test` for the package and does an unsigned Simulator build. Read results with `gh run list`, then `gh run download <run id> -n report-MutualSwipe`.
 - Unsigned builds have no iCloud entitlement, so the cloud build only proves the app compiles. Real iCloud testing happens in TestFlight.
 - Each report also holds `screens/` (App Store-size Simulator screenshots: the app is launched with `-screenshots <screen>`, which opens one screen with sample data, see `MutualSwipe/Support/Screenshots.swift`), `app-log.txt`, and any crash reports. Look at the screenshots after UI changes.
-- The user's Mac only signs and uploads, with `./scripts/ship.sh MutualSwipe`.
+- TestFlight uploads run in the cloud too: push a tag `testflight-MutualSwipe-<n>` and `.github/workflows/testflight.yml` signs and uploads (logs in the `testflight-logs-MutualSwipe` artifact). It needs the four signing secrets, the same as the say-it-back repo. `./scripts/ship.sh MutualSwipe` on the user's Mac is only a fallback.
 
 ## Status (2026-10-20)
 
@@ -79,7 +79,7 @@ The one-time iCloud setup above is done. The container exists, the App ID has iC
 ## Next tasks, in order
 
 1. Keep the GitHub build green after every change.
-2. Have the user ship a TestFlight build. On one phone, they should:
+2. Ship a TestFlight build (tag `testflight-MutualSwipe-<n>`; ask the user first). On one phone, they should:
    - create a deck and add cards, both one at a time and with **Paste a list**
    - add two names and swipe as each person
    - check the Results tiers, undo, **Clear my swipes** and **Delete deck**
