@@ -9,7 +9,7 @@
 
 *Where: App Information → Name*
 
-**Your call.** My suggestion:
+**Steve's choice:**
 
 ```text
 Mutual: Decide Together
@@ -17,7 +17,7 @@ Mutual: Decide Together
 
 **23 / 30 characters**
 
-Other names that fit:
+Backups, in this order, if App Store Connect says the name is taken:
 
 | Name | Characters | Note |
 |---|---|---|
@@ -101,7 +101,7 @@ couples,family,friends,group,vote,dinner,movies,restaurants,recipes,date,trip,pl
 *Where: App Information → Category*
 
 - **Primary:** Lifestyle
-- **Secondary (optional):** Entertainment
+- **Secondary:** Entertainment
 
 I'd avoid Social Networking. Mutual has no public feed, and that category invites questions about social features it doesn't have.
 
@@ -122,7 +122,7 @@ I'd avoid Social Networking. Mutual has no public feed, and that category invite
 
 **Expected rating: 4+.** Why: people only see cards made by people they invited into a private group, there's no feed, and links on cards open in Safari, outside the app.
 
-**Two judgment calls for you:**
+**Two judgment calls (Steve chose No for both):**
 
 - **User-Generated Content.** Apple defines it as "the broad distribution of content created by users." Cards are written by users, but they only reach people the group's owner invited, which isn't broad distribution, so I answered No.
 - **Messaging and Chat.** Apple means features that let "users directly communicate with one another," like text or group messaging. Mutual has no messages, only cards and votes, so I answered No.
@@ -133,7 +133,7 @@ Answering Yes to either still gives 4+. The catch is that Yes on User-Generated 
 
 *Where: App Privacy → Get Started*
 
-**Recommended answer:** "No, we do not collect data from this app." Click **Save**, then **Publish** if the button appears.
+**Answer (Steve's choice):** "No, we do not collect data from this app." Click **Save**, then **Publish** if the button appears.
 
 **Why:**
 
@@ -154,13 +154,17 @@ The answer has to change if you ever add the "Ask Claude for ideas" server from 
 https://steveburlison.com/mutual/privacy/
 ```
 
-Make sure the policy says what the listing says: data lives in iCloud, the person who made a group decides who can see it, and you can't read it.
+The policy says what the listing says: data lives in iCloud, only the people invited to a group can see it, and you can't read it.
 
 ## 10. Support URL
 
 *Where: 1.0 Prepare for Submission → Support URL*
 
-TBD — Steve to choose. Apple requires a working web page that has a way to contact you, starting with `https://`.
+```text
+https://steveburlison.com/app-support/
+```
+
+One shared help page for all the apps, with a section for each app and a way to contact you. It has to be online before you submit for review.
 
 ## 11. TestFlight "What to Test"
 

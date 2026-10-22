@@ -86,7 +86,7 @@ workout,exercise,strength,gym,fitness,training,timer,weights,dumbbell,abs,routin
 *Where: App Information → Category*
 
 - **Primary:** Health & Fitness
-- **Secondary (optional):** Lifestyle, or leave it empty
+- **Secondary:** Lifestyle
 
 ## 7. Age rating
 
@@ -103,7 +103,7 @@ workout,exercise,strength,gym,fitness,training,timer,weights,dumbbell,abs,routin
 | Chance-Based Activities | Gambling: **No**. Simulated Gambling: **None**. Contests: **None**. Loot Boxes: **No**. |
 | Age Categories and Override | **Not Applicable** |
 
-**Expected rating: 9+.** Why: the whole app is exercise recommendations, and Apple names "exercise recommendations" as an example of Health or Wellness Topics, which it rates 9+. Everything else is absent.
+**Expected rating: 9+** (Steve is fine with 9+). Why: the whole app is exercise recommendations, and Apple names "exercise recommendations" as an example of Health or Wellness Topics, which it rates 9+. Everything else is absent.
 
 ## 8. App Privacy (the "nutrition label")
 
@@ -127,7 +127,11 @@ https://steveburlison.com/omm/privacy/
 
 *Where: 1.0 Prepare for Submission → Support URL*
 
-TBD — Steve to choose. Apple requires a working web page that has a way to contact you, starting with `https://`.
+```text
+https://steveburlison.com/app-support/
+```
+
+One shared help page for all the apps, with a section for each app and a way to contact you. It has to be online before you submit for review.
 
 ## 11. TestFlight "What to Test"
 

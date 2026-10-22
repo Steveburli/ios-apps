@@ -87,7 +87,7 @@ todo,priorities,focus,procrastination,productivity,schedule,timer,errands,goals,
 *Where: App Information → Category*
 
 - **Primary:** Productivity
-- **Secondary (optional):** Lifestyle
+- **Secondary:** Lifestyle
 
 ## 7. Age rating
 
@@ -128,7 +128,11 @@ https://steveburlison.com/do-this-now/privacy/
 
 *Where: 1.0 Prepare for Submission → Support URL*
 
-TBD — Steve to choose. Apple requires a working web page that has a way to contact you, starting with `https://`.
+```text
+https://steveburlison.com/app-support/
+```
+
+One shared help page for all the apps, with a section for each app and a way to contact you. It has to be online before you submit for review.
 
 ## 11. TestFlight "What to Test"
 
