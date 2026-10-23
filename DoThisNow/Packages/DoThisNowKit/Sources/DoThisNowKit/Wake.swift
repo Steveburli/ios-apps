@@ -158,8 +158,11 @@ public struct AlarmFire: Equatable, Sendable {
 }
 
 extension Engine {
+    /// Events you leave for after noon don't set the wake-up time.
+    static let morningEnds: Double = 12 * 60
+
     /// Works back from the first thing you have to leave for: work (minus
-    /// the commute) or an earlier event. Then the buffer and the morning
+    /// the commute) or an earlier morning event. Then the buffer and the morning
     /// routine, rounded down to five minutes, give the wake-up time, and the
     /// sleep goal gives bedtime. With nothing booked, it's your usual
     /// wake-up time from Settings.
@@ -187,9 +190,11 @@ extension Engine {
             leave = start - travel
             reason = "Work starts at \(formats.time(day, start))"
         }
+        // Only morning events: an evening one doesn't change when you get up.
         let firstEvent = state.events
             .filter { $0.day == day }
             .map { (at: Double($0.arrive ?? $0.start) - Double(max(0, $0.travel)), title: $0.title) }
+            .filter { $0.at < Engine.morningEnds }
             .min { $0.at < $1.at }
         if let firstEvent, firstEvent.at < (leave ?? .infinity) {
             leave = firstEvent.at

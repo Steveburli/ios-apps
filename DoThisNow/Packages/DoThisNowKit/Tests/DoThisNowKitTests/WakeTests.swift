@@ -7,6 +7,11 @@ final class WakeTests: XCTestCase {
         day(10, 15).date(atMinute: minute, calendar: utc)
     }
 
+    /// Times come with a narrow no-break space before AM and PM.
+    private func plain(_ text: String) -> String {
+        text.replacingOccurrences(of: "\u{202F}", with: " ")
+    }
+
     func testAWorkdayWorksBackFromWork() {
         // Work at 9:00, a 30-minute commute (a guess), a 10-minute buffer,
         // and the starter routine: shower 15, dressed 10, breakfast 20, teeth 5.
@@ -15,11 +20,11 @@ final class WakeTests: XCTestCase {
         XCTAssertEqual(plan.commute?.estimate.minutes, 30)
         XCTAssertEqual(plan.routine, 50)
         XCTAssertEqual(plan.wake, 450)
-        XCTAssertEqual(plan.reason, "Work starts at 9:00 AM")
+        XCTAssertEqual(plain(plan.reason), "Work starts at 9:00 AM")
         // Eight hours before 7:30 is 11:30 the night before, and in bed 15 minutes earlier.
         XCTAssertEqual(plan.asleep, -30)
         XCTAssertEqual(plan.inBed, -45)
-        XCTAssertEqual(formats.time(plan.day, plan.inBed), "11:15 PM")
+        XCTAssertEqual(plain(formats.time(plan.day, plan.inBed)), "11:15 PM")
     }
 
     func testYourTimingsChangeTheWakeUpTime() {
@@ -39,7 +44,19 @@ final class WakeTests: XCTestCase {
         XCTAssertEqual(plan.leave, 465)
         XCTAssertNil(plan.commute)
         XCTAssertEqual(plan.wake, 405)
-        XCTAssertEqual(plan.reason, "Leave for Dentist at 7:45 AM")
+        XCTAssertEqual(plain(plan.reason), "Leave for Dentist at 7:45 AM")
+    }
+
+    func testEveningEventsDontChangeTheMorning() {
+        var state = PlannerState()
+        state.events = [
+            PlannerEvent(title: "Book club", day: day(10, 15), start: 1170, end: 1260, minStay: 60, travel: 10),
+            PlannerEvent(title: "Game night", day: day(10, 17), start: 1140, end: 1260, minStay: 60, travel: 10),
+        ]
+        XCTAssertEqual(engine(state).wakePlan(for: day(10, 15)).leave, 510)
+        let saturday = engine(state).wakePlan(for: day(10, 17))
+        XCTAssertNil(saturday.leave)
+        XCTAssertEqual(saturday.wake, 420)
     }
 
     func testADayOffUsesYourUsualWakeUpTime() {

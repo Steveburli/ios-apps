@@ -16,7 +16,7 @@ import AlarmKit
 @MainActor
 enum WakeAlarms {
     /// Set by the alarm's "Scan to stop" button, read when the app opens.
-    static let scanRequestedKey = "scanRequested"
+    nonisolated static let scanRequestedKey = "scanRequested"
     private static let signatureKey = "alarmSignature"
     private static let testKey = "alarmTestUntil"
     private static let notificationPrefix = "wake-alarm-"
