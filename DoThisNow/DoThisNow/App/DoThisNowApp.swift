@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import EventKit
 import DoThisNowKit
 
 @main
@@ -32,6 +33,12 @@ struct RootView: View {
             Screen { DayView() }
                 .tabItem { Label("Day", systemImage: "calendar.day.timeline.left") }
                 .tag(AppModel.Tab.day)
+            Screen { TrackView() }
+                .tabItem { Label("Track", systemImage: "stopwatch") }
+                .tag(AppModel.Tab.track)
+            Screen { WakeView() }
+                .tabItem { Label("Wake", systemImage: "alarm") }
+                .tag(AppModel.Tab.wake)
         }
         .tint(Theme.accent)
         .overlay(alignment: .bottom) {
@@ -46,13 +53,32 @@ struct RootView: View {
             SheetContent(sheet: sheet)
                 .environment(model)
         }
+        .fullScreenCover(item: $model.scanMode) { mode in
+            ScanView(mode: mode)
+                .environment(model)
+        }
         .onReceive(clock) { model.tick($0) }
+        .onReceive(NotificationCenter.default.publisher(for: InboxDropbox.arrived)) { _ in
+            model.takeDroppedTasks()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .EKEventStoreChanged)) { _ in
+            Task { await model.refreshSources() }
+        }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { model.tick(Date()) }
+            if phase == .active {
+                model.tick(Date())
+                model.takeDroppedTasks()
+                model.syncAlarms()
+                Task { await model.refreshSources() }
+            }
         }
         .onChange(of: model.tab) { _, tab in
-            if tab == .day { model.openDayTab() }
+            if tab == .day {
+                model.openDayTab()
+                Task { await model.refreshSources() }
+            }
         }
+        .task { await model.refreshSources() }
     }
 }
 
@@ -115,6 +141,26 @@ private struct SheetContent: View {
             DayItemSheet(chunkID: id)
         case .meal:
             MealSheet()
+        case .schedule(let key):
+            ScheduleSheet(key: key)
+        case .block(let id):
+            BlockSheet(blockID: id)
+        case .inboxSettings:
+            InboxSettingsView()
+        case .activity(let id):
+            ActivitySheet(activityID: id)
+        case .newActivity:
+            ActivityFormView(activity: nil)
+        case .timing(let id):
+            TimingFormView(timing: model.state.timings.first { $0.id == id }, activityID: nil)
+        case .newTiming(let activityID):
+            TimingFormView(timing: nil, activityID: activityID)
+        case .routineStep(let id):
+            RoutineStepForm(stepID: id)
+        case .sleep:
+            SleepSettingsForm()
+        case .alarm:
+            AlarmSettingsView()
         }
     }
 }

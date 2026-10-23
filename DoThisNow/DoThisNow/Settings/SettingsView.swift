@@ -56,7 +56,7 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Text("Your tasks are saved on this iPhone. Nothing is sent anywhere. Deleting the app erases them.")
+                    Text("Your tasks are saved on this iPhone. Nothing is sent anywhere, except that if you connect Google Tasks, the app talks to Google directly to read and tick off your tasks. Deleting the app erases everything.")
                         .font(.footnote)
                         .foregroundStyle(Theme.ink2)
                     if model.state.hasExamples {

@@ -4,5 +4,11 @@
 <dict>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Do This Now shows your reminders in the Inbox so you can drag them onto your day, and ticks them off when you finish them.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>The camera scans the barcode or QR code that turns your wake-up alarm off. Nothing is recorded or saved.</string>
+	<key>NSAlarmKitUsageDescription</key>
+	<string>Do This Now rings your wake-up alarm at the time that fits your morning, even in silent mode.</string>
 </dict>
 </plist>

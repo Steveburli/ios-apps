@@ -340,6 +340,9 @@ public struct Engine {
         for event in plan.live where event.coreStart > n {
             points.append((event.coreStart, event.travel > 0 ? "leave for \(event.title)" : event.title))
         }
+        for block in plan.blocks where !block.done && Double(block.start) > n {
+            points.append((Double(block.start), block.title))
+        }
         if let meal = plan.meal, meal.start > n { points.append((meal.start, "dinner")) }
         if plan.bed > n { points.append((plan.bed, "bedtime")) }
         guard let next = points.filter({ $0.at - n >= 5 }).min(by: { $0.at < $1.at }) else { return nil }

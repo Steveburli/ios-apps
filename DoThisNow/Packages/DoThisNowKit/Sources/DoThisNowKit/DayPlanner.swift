@@ -92,6 +92,8 @@ public struct DayPlan: Sendable {
     public let hardEnd: Double
     public let dayStart: Double
     public let rocks: [TimeSpan]
+    /// The blocks you placed yourself, in time order.
+    public let blocks: [TimeBlock]
     /// Every event that day, including ghosts.
     public let events: [PlannedEvent]
     /// The events that can happen, in the order they were placed.
@@ -161,9 +163,12 @@ public enum DayPlanner {
 
 extension Engine {
     /// The tasks a day should hold: committed ones get placed first, filler
-    /// only goes into gaps.
+    /// only goes into gaps. Tasks you placed on the day yourself are already
+    /// there, and with auto-fill off nothing else is.
     public func dayChunks(_ day: CalendarDay, config: DayConfig) -> (committed: [Chunk], filler: [Chunk]) {
-        let skip = Set(config.skip), must = Set(config.must)
+        guard state.settings.autoFill else { return ([], []) }
+        let pinned = Set(state.blocks.filter { $0.day == day && $0.ref.source == .app }.map(\.ref.id))
+        let skip = Set(config.skip).union(pinned), must = Set(config.must)
         let isToday = day == today
         let dayStartDate = day.startDate(calendar: calendar)
         let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStartDate) ?? dayStartDate
@@ -242,6 +247,8 @@ extension Engine {
         let hardEnd = bed + 180
         let dayStart = isToday ? max(wake, (n / 5).rounded(.up) * 5) : wake
         let config = state.dayConfig(day)
+        let blocks = state.blocks.filter { $0.day == day }.stableSorted { $0.start < $1.start }
+        let blockSpans = blocks.map { TimeSpan(start: Double($0.start), end: Double($0.end)) }
 
         var events: [PlannedEvent] = state.events.filter { $0.day == day }.map { event in
             let windowStart = Double(event.start)
@@ -308,7 +315,7 @@ extension Engine {
         }
 
         func attempt(_ level: Int) -> Attempt {
-            var busy = rocks + doing.map { TimeSpan(start: $0.start, end: $0.end) }
+            var busy = rocks + blockSpans + doing.map { TimeSpan(start: $0.start, end: $0.end) }
             for event in liveSnapshot {
                 busy.append(level == 0 ? TimeSpan(start: event.coreStart, end: event.winEnd + event.travel)
                                        : TimeSpan(start: event.coreStart, end: event.coreEnd))
@@ -343,7 +350,7 @@ extension Engine {
         // Each live event lasts until the next thing starts, up to its window's end.
         var starts = result.items.map(\.start)
         if let meal = result.meal { starts.append(meal.start) }
-        starts += rocks.map(\.start) + liveSnapshot.map(\.coreStart) + doing.map(\.start)
+        starts += rocks.map(\.start) + liveSnapshot.map(\.coreStart) + doing.map(\.start) + blockSpans.map(\.start)
         for i in liveIndices {
             let event = events[i]
             let after = starts.filter { $0 >= event.arrive + event.stay }.min() ?? .infinity
@@ -369,12 +376,12 @@ extension Engine {
 
         let live = liveIndices.map { events[$0] }
         var ends = [bed] + result.items.filter { !$0.filler }.map(\.end) + [result.meal?.end ?? 0]
-        ends += live.map { $0.leave + $0.travel } + doing.map(\.end)
+        ends += live.map { $0.leave + $0.travel } + doing.map(\.end) + blockSpans.map(\.end)
         let sleepStart = min(ends.max() ?? bed, hardEnd)
         let free = DayPlanner.freeSlots(result.busy, from: dayStart, to: bed).reduce(0) { $0 + $1.length }
 
         return DayPlan(day: day, isToday: isToday, now: n, wake: wake, bed: bed, hardEnd: hardEnd, dayStart: dayStart,
-                       rocks: rocks, events: events, live: live, doing: doing, meal: result.meal, mealMode: mealMode,
+                       rocks: rocks, blocks: blocks, events: events, live: live, doing: doing, meal: result.meal, mealMode: mealMode,
                        items: result.items.stableSorted { $0.start < $1.start }, ghosts: result.ghosts,
                        level: result.level, sleepStart: sleepStart, push: max(0, sleepStart - bed), free: free)
     }

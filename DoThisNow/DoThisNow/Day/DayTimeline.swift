@@ -2,11 +2,13 @@ import SwiftUI
 import DoThisNowKit
 
 /// The vertical timeline: 1.3 points per minute, hour lines on the left, and
-/// a block for everything on the day.
+/// a block for everything on the day. Inbox tasks drop onto it, and your own
+/// blocks move with a long press and drag.
 struct DayTimeline: View {
     @Environment(AppModel.self) private var model
     let plan: DayPlan
     let engine: Engine
+    @State private var dropTargeted = false
 
     static let px: CGFloat = 1.3
     static let nowID = "timeline-now"
@@ -16,13 +18,16 @@ struct DayTimeline: View {
     private var range: (start: Double, end: Double) {
         let p = plan
         let start: Double
+        let blockStarts = p.blocks.filter { !p.isToday || Double($0.end) > p.now - 60 }.map { Double($0.start) }
         if p.isToday {
-            start = max((p.wake / 60).rounded(.down) * 60, ((p.now - 60) / 60).rounded(.down) * 60)
+            let early = min(p.wake, blockStarts.min() ?? p.wake)
+            start = max((early / 60).rounded(.down) * 60, ((p.now - 60) / 60).rounded(.down) * 60)
         } else {
-            let earliest = ([p.wake] + p.rocks.map(\.start) + p.events.map(\.coreStart)).min() ?? p.wake
+            let earliest = ([p.wake] + p.rocks.map(\.start) + p.events.map(\.coreStart) + blockStarts).min() ?? p.wake
             start = max(0, (earliest / 60).rounded(.down) * 60)
         }
-        let latest = ([p.sleepStart + 75, start + 240] + p.events.map { $0.winEnd + $0.travel } + p.rocks.map(\.end)).max() ?? start + 240
+        let latest = ([p.sleepStart + 75, start + 240] + p.events.map { $0.winEnd + $0.travel } + p.rocks.map(\.end)
+                      + p.blocks.map { Double($0.end) }).max() ?? start + 240
         return (start, (latest / 60).rounded(.up) * 60)
     }
 
@@ -35,7 +40,16 @@ struct DayTimeline: View {
         .frame(height: height)
         .background(Theme.surface)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.line))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .strokeBorder(dropTargeted ? Theme.block : Theme.line, lineWidth: dropTargeted ? 3 : 1))
+        .dropDestination(for: String.self) { keys, location in
+            guard let key = keys.first ?? model.draggingKey else { return false }
+            let minute = max(0, Reflow.snap(r.start + Double(location.y / Self.px) - 10))
+            model.schedule(key, at: minute, on: plan.day)
+            return true
+        } isTargeted: { targeted in
+            dropTargeted = targeted
+        }
     }
 
     private func y(_ minute: Double, _ r0: Double) -> CGFloat {
@@ -98,6 +112,15 @@ struct DayTimeline: View {
                     itemBlock(item)
                         .placed(width: blockWidth, slot: s, x: gutter)
                         .zIndex(3)
+                }
+            }
+
+            ForEach(plan.blocks) { block in
+                if let s = slot(Double(block.start), Double(block.end), r0) {
+                    blockView(block)
+                        .placed(width: blockWidth, slot: s, x: gutter)
+                        .zIndex(model.draggingBlockID == block.id ? 9 : 4)
+                        .animation(.snappy(duration: 0.18), value: block.start)
                 }
             }
 
@@ -245,6 +268,64 @@ struct DayTimeline: View {
                 .opacity(fade)
                 .zIndex(2)
         }
+    }
+
+    /// A block you placed yourself. Tap for options; touch and hold, then
+    /// drag, to move it.
+    private func blockView(_ block: TimeBlock) -> some View {
+        let f = model.formats
+        let day = plan.day
+        let dragging = model.draggingBlockID == block.id
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        var detail = [f.range(day, Double(block.start), Double(block.end))]
+        if block.done { detail.append("done") } else if block.ref.source != .app { detail.append(block.ref.source.label) }
+
+        return BlockLabel(title: block.title, detail: detail.joined(separator: " · "), trailingPadding: 34)
+            .foregroundStyle(Theme.blockInk)
+            .strikethrough(block.done)
+            .background(Theme.block.opacity(block.done ? 0.45 : 1), in: shape)
+            .overlay(alignment: .trailing) {
+                Group {
+                    if block.done {
+                        Image(systemName: "checkmark").font(.caption.weight(.bold))
+                    } else {
+                        VStack(spacing: 2) {
+                            ForEach(0..<3, id: \.self) { _ in Capsule().frame(width: 14, height: 2) }
+                        }
+                    }
+                }
+                .foregroundStyle(Theme.blockInk.opacity(0.75))
+                .padding(.trailing, 11)
+            }
+            .overlay { if dragging { shape.strokeBorder(Theme.ink, lineWidth: 2) } }
+            .scaleEffect(dragging ? 1.02 : 1)
+            .shadow(color: .black.opacity(dragging ? 0.25 : 0), radius: 10, y: 6)
+            .contentShape(shape)
+            .onTapGesture { model.sheet = .block(block.id) }
+            .gesture(
+                LongPressGesture(minimumDuration: 0.3)
+                    .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .global))
+                    .onChanged { value in
+                        if case .second(true, let drag?) = value {
+                            model.dragBlock(block.id, by: drag.translation.height, pointsPerMinute: Self.px)
+                        }
+                    }
+                    .onEnded { _ in model.endBlockDrag() }
+            )
+            .sensoryFeedback(.impact(weight: .medium), trigger: dragging) { _, now in now }
+            .sensoryFeedback(.selection, trigger: block.start)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(block.title)
+            .accessibilityValue("\(f.range(day, Double(block.start), Double(block.end)))\(block.done ? ", done" : "")")
+            .accessibilityHint("Swipe up or down to move it five minutes. Others move out of its way.")
+            .accessibilityAdjustableAction { direction in
+                switch direction {
+                case .increment: model.nudgeBlock(block.id, by: 5)
+                case .decrement: model.nudgeBlock(block.id, by: -5)
+                @unknown default: break
+                }
+            }
+            .accessibilityAction(named: "Options") { model.sheet = .block(block.id) }
     }
 
     private func itemBlock(_ item: PlanItem) -> some View {

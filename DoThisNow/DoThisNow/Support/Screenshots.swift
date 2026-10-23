@@ -1,7 +1,8 @@
 import Foundation
 
 /// The cloud build launches the app with `-screenshots <screen>` to photograph
-/// each screen with the example tasks: now, pick, doing, tasks or day.
+/// each screen with the example tasks: now, pick, doing, tasks, day, inbox,
+/// track or wake.
 /// Nothing here runs in normal use.
 enum Screenshots {
     static let screen: String? = {

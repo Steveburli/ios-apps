@@ -22,6 +22,9 @@ enum Theme {
     static let softLine = Color(light: 0xE0A06E, dark: 0xA8693A)
     static let jelly = Color(light: 0x7048E8, dark: 0x9676FF, lightAlpha: 0.15, darkAlpha: 0.18)
     static let jellyLine = Color(light: 0x7048E8, dark: 0x9676FF, lightAlpha: 0.48, darkAlpha: 0.55)
+    /// Blocks you placed yourself: firm, but they shove each other.
+    static let block = Color(light: 0x1C7287, dark: 0x3FA6BB)
+    static let blockInk = Color(light: 0xFFFFFF, dark: 0x04161B)
     static let core = Color(light: 0x6842DD, dark: 0x8B6BFF)
     static let coreInk = Color(light: 0xFFFFFF, dark: 0x0F0726)
     static let meal = Color(light: 0xF1D263, dark: 0x7C6A18)

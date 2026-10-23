@@ -57,13 +57,20 @@ extension PlannerState {
     }
 
     /// Ends the timer and logs the time. Returns the message to show.
+    ///
+    /// Finishing a single task also saves how long it took in all, so the
+    /// next estimate for anything with that title can learn from it.
     @discardableResult
     public mutating func endSession(finished: Bool, at now: Date) -> String? {
         guard let session = active else { return nil }
-        let minutes = max(1, Int((session.elapsed(at: now) / 60).rounded()))
+        let elapsed = session.elapsed(at: now)
+        let minutes = max(1, Int((elapsed / 60).rounded()))
         var message = "Logged"
         if !session.bundle {
             if let id = session.taskIDs.first, let task = self.task(id) {
+                if finished && task.kind != .recurring && elapsed >= 60 {
+                    timings.append(Timing(title: task.title, start: session.startedAt, seconds: elapsed + Double(task.spent) * 60))
+                }
                 log.append(LogEntry(taskID: id, at: session.startedAt, minutes: minutes))
                 updateTask(id) { t in
                     t.spent += minutes
@@ -76,6 +83,20 @@ extension PlannerState {
                 message = finished && task.kind != .recurring
                     ? "Done: “\(task.title)”"
                     : "Logged \(TimeText.duration(minutes)) on “\(task.title)”"
+            } else if session.taskIDs.isEmpty {
+                // A task from Reminders, Google Tasks or the Inbox.
+                if finished {
+                    if elapsed >= 60 {
+                        timings.append(Timing(title: session.title, start: session.startedAt, seconds: elapsed))
+                    }
+                    if let ref = session.ref, ref.source == .inbox, let index = inboxItems.firstIndex(where: { $0.id == ref.id }) {
+                        inboxItems[index].done = true
+                        inboxItems[index].doneAt = now
+                    }
+                    message = "Done: “\(session.title)”"
+                } else {
+                    message = "Logged \(TimeText.duration(minutes)) on “\(session.title)”"
+                }
             }
         } else {
             let left = session.taskIDs.filter { !session.ticked.contains($0) }.compactMap { task($0) }
@@ -90,6 +111,9 @@ extension PlannerState {
                 }
             }
             message = "Nice. \(session.ticked.count + (finished ? left.count : 0)) crossed off."
+        }
+        if finished, let blockID = session.blockID {
+            updateBlock(blockID) { $0.done = true }
         }
         active = nil
         return message
@@ -172,6 +196,14 @@ extension PlannerState {
     public mutating func deleteTask(_ id: String) {
         tasks.removeAll { $0.id == id }
         log.removeAll { $0.taskID == id }
+        blocks.removeAll { $0.ref == SourceRef(.app, id) && !$0.done }
+    }
+
+    /// Ticks off every block waiting on a task, when the task gets done some other way.
+    public mutating func finishBlocks(for ref: SourceRef) {
+        for index in blocks.indices where blocks[index].ref == ref {
+            blocks[index].done = true
+        }
     }
 
     public mutating func deleteEvent(_ id: String) {

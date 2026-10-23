@@ -30,6 +30,9 @@ struct DayView: View {
             }
             .onAppear { scrollToNow(proxy) }
             .onChange(of: model.scrollDayToNow) { scrollToNow(proxy) }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                InboxTray(day: day)
+            }
         }
     }
 
@@ -122,7 +125,10 @@ struct DayView: View {
     private var legend: some View {
         FlowLayout(spacing: 10) {
             LegendItem(text: "Work: a rock, can’t move") { RoundedRectangle(cornerRadius: 4).fill(Theme.rock) }
-            LegendItem(text: "Tasks: soft, they flow around") { RoundedRectangle(cornerRadius: 7).fill(Theme.soft) }
+            LegendItem(text: "Your blocks: hold and drag, they bump each other") { RoundedRectangle(cornerRadius: 5).fill(Theme.block) }
+            LegendItem(text: model.state.settings.autoFill ? "Suggestions: soft, they flow around" : "Suggestions: off") {
+                RoundedRectangle(cornerRadius: 7).fill(Theme.soft)
+            }
             LegendItem(text: "Events: drag the solid part to pick when you arrive") { RoundedRectangle(cornerRadius: 4).fill(Theme.core) }
             LegendItem(text: "Jelly: extra time at the event, squeezable") {
                 RoundedRectangle(cornerRadius: 4).fill(Theme.jelly).overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.jellyLine, lineWidth: 1.5))

@@ -300,10 +300,12 @@ public struct PlannerSettings: Codable, Equatable, Sendable {
     /// Suggest a coffee shop once this much computer work piles up.
     public var cafeMinutes = 120
     public var sound = true
+    /// Suggest tasks for the gaps between the blocks you placed yourself.
+    public var autoFill = true
 
     public init() {}
 
-    private enum CodingKeys: String, CodingKey { case wake, bed, dinnerAt, dinner, work, cafeMinutes, sound }
+    private enum CodingKeys: String, CodingKey { case wake, bed, dinnerAt, dinner, work, cafeMinutes, sound, autoFill }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -314,6 +316,7 @@ public struct PlannerSettings: Codable, Equatable, Sendable {
         work = try c.decodeIfPresent(WorkHours.self, forKey: .work) ?? work
         cafeMinutes = try c.decodeIfPresent(Int.self, forKey: .cafeMinutes) ?? cafeMinutes
         sound = try c.decodeIfPresent(Bool.self, forKey: .sound) ?? sound
+        autoFill = try c.decodeIfPresent(Bool.self, forKey: .autoFill) ?? autoFill
     }
 }
 
@@ -378,6 +381,10 @@ public struct ActiveSession: Codable, Equatable, Sendable {
     public var bundle: Bool
     public var ticked: [String] = []
     public var chimed = false
+    /// The block on the Day it was started from.
+    public var blockID: String?
+    /// The task it's for, when it isn't one of Do This Now's own.
+    public var ref: SourceRef?
 
     public init(taskIDs: [String], title: String, planned: Int, startedAt: Date, bundle: Bool) {
         self.taskIDs = taskIDs
@@ -415,12 +422,23 @@ public struct PlannerState: Codable, Equatable, Sendable {
     /// The day the coffee-shop suggestion was dismissed.
     public var cafeDismissed: CalendarDay?
     public var active: ActiveSession?
+    /// Tasks you put on a day yourself.
+    public var blocks: [TimeBlock] = []
+    /// Tasks typed into the Inbox or sent by Shortcuts.
+    public var inboxItems: [InboxItem] = []
+    public var inbox = InboxSettings()
+    /// The Track tab: things you time, their timings, and the stopwatch.
+    public var activities: [Activity] = []
+    public var timings: [Timing] = []
+    public var running: RunningTimer?
+    public var wake = WakeSettings()
     public var updatedAt = Date(timeIntervalSince1970: 0)
 
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
-        case tasks, events, log, days, settings, context, cafeDismissed, active, updatedAt
+        case tasks, events, log, days, settings, context, cafeDismissed, active, blocks, inboxItems, inbox,
+             activities, timings, running, wake, updatedAt
     }
 
     public init(from decoder: Decoder) throws {
@@ -433,6 +451,13 @@ public struct PlannerState: Codable, Equatable, Sendable {
         context = try c.decodeIfPresent(NowContext.self, forKey: .context) ?? NowContext()
         cafeDismissed = try c.decodeIfPresent(CalendarDay.self, forKey: .cafeDismissed)
         active = try c.decodeIfPresent(ActiveSession.self, forKey: .active)
+        blocks = try c.decodeIfPresent([TimeBlock].self, forKey: .blocks) ?? []
+        inboxItems = try c.decodeIfPresent([InboxItem].self, forKey: .inboxItems) ?? []
+        inbox = try c.decodeIfPresent(InboxSettings.self, forKey: .inbox) ?? InboxSettings()
+        activities = try c.decodeIfPresent([Activity].self, forKey: .activities) ?? []
+        timings = try c.decodeIfPresent([Timing].self, forKey: .timings) ?? []
+        running = try c.decodeIfPresent(RunningTimer.self, forKey: .running)
+        wake = try c.decodeIfPresent(WakeSettings.self, forKey: .wake) ?? WakeSettings()
         updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date(timeIntervalSince1970: 0)
     }
 
@@ -464,11 +489,16 @@ public struct PlannerState: Codable, Equatable, Sendable {
         days[day.key] = config
     }
 
-    /// Keeps the saved file small: 150 days of log, 250 finished tasks,
-    /// no past day settings, and events from the last two weeks on.
+    /// Keeps the saved file small: 150 days of log, a year of timings, 250
+    /// finished tasks, no past day settings, events and blocks from the last
+    /// two weeks on, and finished Inbox items from the last month.
     public mutating func prune(now: Date, calendar: Calendar) {
         let cutoff = now.addingTimeInterval(-150 * 86_400)
         log = Array(log.filter { $0.at >= cutoff }.suffix(1500))
+        let timingCutoff = now.addingTimeInterval(-365 * 86_400)
+        timings = Array(timings.filter { $0.start >= timingCutoff }.suffix(3000))
+        let inboxCutoff = now.addingTimeInterval(-30 * 86_400)
+        inboxItems.removeAll { $0.done && ($0.doneAt ?? $0.created) < inboxCutoff }
 
         let finished = tasks.filter { !$0.isActive }
             .sorted { ($0.doneAt ?? .distantPast) > ($1.doneAt ?? .distantPast) }
@@ -484,5 +514,6 @@ public struct PlannerState: Codable, Equatable, Sendable {
         }
         let eventCutoff = today.adding(days: -14, calendar: calendar)
         events.removeAll { $0.day < eventCutoff }
+        blocks.removeAll { $0.day < eventCutoff }
     }
 }

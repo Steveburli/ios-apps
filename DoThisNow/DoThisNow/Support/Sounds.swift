@@ -25,6 +25,42 @@ enum Sounds {
         player?.play()
     }
 
+    private static var alarmPlayer: AVAudioPlayer?
+
+    /// The alarm, over and over, while the scanner waits. It plays even with
+    /// the silent switch on, like the Clock app's alarms.
+    static func startAlarm() {
+        guard alarmPlayer == nil else { return }
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playback)
+        try? session.setActive(true)
+        alarmPlayer = try? AVAudioPlayer(data: WAV.make(samples: makeAlarm(), rate: Int(rate)), fileTypeHint: AVFileType.wav.rawValue)
+        alarmPlayer?.numberOfLoops = -1
+        alarmPlayer?.volume = 1
+        alarmPlayer?.play()
+    }
+
+    static func stopAlarm() {
+        alarmPlayer?.stop()
+        alarmPlayer = nil
+        try? AVAudioSession.sharedInstance().setCategory(.ambient)
+    }
+
+    /// Four quick beeps, alternating 880 and 1175 Hz, then a pause.
+    private static func makeAlarm() -> [Float] {
+        var samples = [Float](repeating: 0, count: Int(1.6 * rate))
+        for beep in 0..<4 {
+            let first = Int(Double(beep) * 0.22 * rate)
+            let frequency = beep % 2 == 0 ? 880.0 : 1175.0
+            for n in 0..<Int(0.15 * rate) where first + n < samples.count {
+                let t = Double(n) / rate
+                let edge = min(1, min(t, 0.15 - t) / 0.01)
+                samples[first + n] = Float(sin(2 * Double.pi * frequency * t) * 0.6 * edge)
+            }
+        }
+        return samples
+    }
+
     /// 660, 880 and 1320 Hz, 0.17 s apart, each fading over half a second.
     private static func makeChime() -> [Float] {
         var samples = [Float](repeating: 0, count: Int(0.9 * rate))

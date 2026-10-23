@@ -73,6 +73,46 @@ extension PlannerState {
                                    minStay: 45, travel: 15, isExample: true))
         events.append(PlannerEvent(title: "Book club", day: due(1), start: 19 * 60 + 30, end: 21 * 60,
                                    minStay: 60, travel: 10, isExample: true))
+
+        // The Inbox, a couple of blocks on today, and a few weeks of timings.
+        func item(_ title: String, minutes: Int?) -> InboxItem {
+            var item = InboxItem(title: title, minutes: minutes, created: ago(1))
+            item.isExample = true
+            return item
+        }
+        let dentist = item("Call the dentist to reschedule", minutes: 10)
+        inboxItems.append(contentsOf: [dentist, item("Renew the car registration", minutes: nil),
+                                       item("Clean out the garage", minutes: nil)])
+
+        func exampleBlock(_ ref: SourceRef, _ title: String, at minute: Int, _ minutes: Int) -> TimeBlock {
+            var block = TimeBlock(ref: ref, title: title, day: today, start: minute, minutes: minutes)
+            block.isExample = true
+            return block
+        }
+        if let laundry = examples.first(where: { $0.title == "Fold the laundry" }) {
+            blocks.append(exampleBlock(SourceRef(.app, laundry.id), laundry.title, at: 17 * 60 + 15, 15))
+        }
+        blocks.append(exampleBlock(SourceRef(.inbox, dentist.id), dentist.title, at: 17 * 60 + 30, 10))
+
+        let timed: [(name: String, symbol: String, minutes: [Double])] = [
+            ("Shower", "shower", [12, 14, 11, 13, 34, 12, 15, 13]),
+            ("Get dressed", "tshirt", [6, 8, 7, 5, 7]),
+            ("Breakfast", "fork.knife", [18, 22, 15, 20, 19, 45]),
+            ("Commute to work", "car", [27, 31, 25, 29, 52, 28]),
+            ("Mow the lawn", "leaf", [48, 55, 50]),
+        ]
+        for (i, entry) in timed.enumerated() {
+            var activity = Activity(name: entry.name, symbol: entry.symbol)
+            activity.isExample = true
+            if entry.name == "Commute to work" { activity.aliases = ["Drive to work"] }
+            activities.append(activity)
+            for (n, minutes) in entry.minutes.enumerated() {
+                let start = ago(Double(n * 2 + 1)).addingTimeInterval(Double(i) * 1200)
+                var timing = Timing(activityID: activity.id, title: entry.name, start: start, seconds: minutes * 60)
+                timing.isExample = true
+                timings.append(timing)
+            }
+        }
     }
 
     public mutating func removeExamples() {
@@ -80,6 +120,12 @@ extension PlannerState {
         tasks.removeAll(where: \.isExample)
         events.removeAll(where: \.isExample)
         log.removeAll { ids.contains($0.taskID) }
+        for activity in activities where activity.isExample {
+            deleteActivity(activity.id)
+        }
+        timings.removeAll(where: \.isExample)
+        inboxItems.removeAll(where: \.isExample)
+        blocks.removeAll { $0.isExample || ($0.ref.source == .app && ids.contains($0.ref.id)) }
         if let active, active.taskIDs.contains(where: { ids.contains($0) }) {
             self.active = nil
         }

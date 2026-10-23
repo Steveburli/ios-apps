@@ -7,7 +7,7 @@ import DoThisNowKit
 @Observable
 @MainActor
 final class AppModel {
-    enum Tab: String { case now, tasks, day }
+    enum Tab: String { case now, tasks, day, track, wake }
     enum NowStep { case ask, pick }
     enum PickPanel { case done, later }
 
@@ -19,6 +19,19 @@ final class AppModel {
         case settings
         case dayItem(String)
         case meal
+        /// An Inbox task, by source key: when and how long.
+        case schedule(String)
+        case block(String)
+        case inboxSettings
+        case activity(String)
+        case newActivity
+        case timing(String)
+        /// A run you forgot to time, for an activity.
+        case newTiming(String)
+        /// A step in the morning routine; nil adds one.
+        case routineStep(String?)
+        case sleep
+        case alarm
 
         var id: String {
             switch self {
@@ -29,8 +42,44 @@ final class AppModel {
             case .settings: return "settings"
             case .dayItem(let id): return "item-" + id
             case .meal: return "meal"
+            case .schedule(let key): return "schedule-" + key
+            case .block(let id): return "block-" + id
+            case .inboxSettings: return "inbox-settings"
+            case .activity(let id): return "activity-" + id
+            case .newActivity: return "new-activity"
+            case .timing(let id): return "timing-" + id
+            case .newTiming(let id): return "new-timing-" + id
+            case .routineStep(let id): return "routine-" + (id ?? "new")
+            case .sleep: return "sleep"
+            case .alarm: return "alarm"
             }
         }
+    }
+
+    /// The full-screen camera: to turn the alarm off, or to save a new code.
+    enum ScanMode: String, Identifiable {
+        case stopAlarm, addCode
+
+        var id: String { rawValue }
+    }
+
+    /// A list in Reminders or Google Tasks.
+    struct SourceList: Identifiable, Hashable {
+        let id: String
+        let name: String
+    }
+
+    /// A block being dragged: where everything was when the drag began.
+    struct BlockDrag {
+        let id: String
+        let original: [TimeBlock]
+        /// The blocks on that day that can be pushed.
+        let movable: [TimeBlock]
+        let start: Int
+        let obstacles: [TimeSpan]
+        let earliest: Int
+        var target: Int
+        let push: Double
     }
 
     struct Toast: Identifiable, Equatable {
@@ -38,7 +87,8 @@ final class AppModel {
         let message: String
     }
 
-    private(set) var state: PlannerState
+    /// Changed only through the actions here and in the AppModel extensions.
+    var state: PlannerState
     /// Moves forward once a minute, so plans and labels stay current.
     private(set) var now: Date
     var tab: Tab {
@@ -57,6 +107,21 @@ final class AppModel {
     private(set) var lastMovedEventID: String?
     /// Set when the Day tab opens, so the timeline scrolls to now.
     var scrollDayToNow = false
+    var scanMode: ScanMode?
+
+    // The Inbox's outside sources, fetched when the Day tab opens.
+    var reminderTasks: [SourceTask] = []
+    var reminderLists: [SourceList] = []
+    var googleTasks: [SourceTask] = []
+    var googleLists: [SourceList] = []
+    var googleSignedIn = false
+    /// Why a source couldn't be read, for the Inbox settings.
+    var sourceProblem: [TaskSource: String] = [:]
+    var inboxOpen = false
+    /// The Inbox task being dragged onto the timeline.
+    var draggingKey: String?
+    var draggingBlockID: String?
+    @ObservationIgnored var blockDrag: BlockDrag?
 
     let formats: Formats
     @ObservationIgnored private var skip: Set<String> = []
@@ -90,9 +155,12 @@ final class AppModel {
         } else {
             state = PlannerState()
         }
+        googleSignedIn = GoogleTasks.shared.isSignedIn
+        takeDroppedTasks()
     }
 
-    /// Goes to the screen named by `-screenshots`: now, pick, doing, tasks or day.
+    /// Goes to the screen named by `-screenshots`: now, pick, doing, tasks, day,
+    /// inbox, track or wake.
     private func openScreenshotScreen() {
         switch Screenshots.screen {
         case "pick":
@@ -107,6 +175,18 @@ final class AppModel {
         case "day":
             tab = .day
             openDayTab()
+        case "inbox":
+            tab = .day
+            openDayTab()
+            inboxOpen = true
+        case "track":
+            tab = .track
+            state.running = RunningTimer(activityID: state.activities.first?.id, title: state.activities.first?.name ?? "Shower",
+                                         startedAt: now.addingTimeInterval(-7 * 60 - 12))
+        case "wake":
+            tab = .wake
+            state.wake.alarm.on = true
+            state.wake.alarm.codes = [WakeCode(name: "Toothpaste", payload: "screenshot")]
         default:
             tab = .now
         }
@@ -130,7 +210,7 @@ final class AppModel {
 
     // MARK: Saving
 
-    private func commit() {
+    func commit() {
         state.updatedAt = Date()
         state.prune(now: Date(), calendar: calendar)
         do {
@@ -140,6 +220,7 @@ final class AppModel {
             show("Couldn’t save just now. Your change will be saved with the next one.")
         }
         Notifier.sync(state, now: Date())
+        syncAlarms()
     }
 
     func show(_ message: String) {
@@ -164,6 +245,7 @@ final class AppModel {
             if state.settings.sound { Sounds.chime() }
             commit()
         }
+        checkAlarm()
     }
 
     func refreshNow() {
@@ -335,6 +417,7 @@ final class AppModel {
     func letGo(_ id: String) {
         let title = state.task(id)?.title ?? ""
         state.letGo(id, now: Date())
+        state.blocks.removeAll { $0.ref == SourceRef(.app, id) && !$0.done }
         commit()
         show("Let go of “\(title)”")
     }
@@ -387,6 +470,7 @@ final class AppModel {
             task.doneAt = date
             task.lastDone = date
         }
+        state.finishBlocks(for: SourceRef(.app, id))
         commit()
         show("Done: “\(state.task(id)?.title ?? "")”")
     }

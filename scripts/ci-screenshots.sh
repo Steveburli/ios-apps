@@ -12,7 +12,7 @@ derived="$2"
 
 case "$app" in
   OMM)         bundle="com.steveburlison.omm";         screens="home workout weights complete" ;;
-  DoThisNow)   bundle="com.steveburlison.dothisnow";   screens="now pick doing tasks day" ;;
+  DoThisNow)   bundle="com.steveburlison.dothisnow";   screens="now pick doing tasks day inbox track wake" ;;
   MutualSwipe) bundle="com.steveburlison.mutualswipe"; screens="home swipe results card" ;;
   *) echo "Unknown app: $app"; exit 1 ;;
 esac
