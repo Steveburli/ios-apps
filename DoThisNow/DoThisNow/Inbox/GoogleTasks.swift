@@ -10,9 +10,10 @@ import DoThisNowKit
 final class GoogleTasks: NSObject, ASWebAuthenticationPresentationContextProviding {
     static let shared = GoogleTasks()
 
-    /// The iOS OAuth client ID from the Google Cloud project. It isn't a
-    /// secret: every app that signs in with Google ships its own.
-    static let clientID = ""
+    /// The iOS OAuth client ID from the Google Cloud project "Do This Now"
+    /// (do-this-now-512600). It isn't a secret: every app that signs in with
+    /// Google ships its own.
+    static let clientID = "284731788910-hgfagsocpck4s3c5prhtc7nh0fdo8t74.apps.googleusercontent.com"
 
     static var isConfigured: Bool {
         !clientID.isEmpty

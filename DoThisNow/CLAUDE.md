@@ -51,7 +51,7 @@ xcodebuild -project DoThisNow.xcodeproj -scheme DoThisNow -destination 'generic/
 
 ## Status (2026-10-23)
 
-Version 1 was uploaded to TestFlight on 2026-10-21. On 2026-10-23 the Inbox, time blocks, Track and Wake tabs were added on the branch `dothisnow/planner-track-wake` (build it with `gh workflow run build.yml --ref <branch>`). `GoogleTasks.clientID` is still empty, so Google sign-in shows "being set up" until a Google Cloud project with an iOS OAuth client (bundle ID com.steveburlison.dothisnow, Tasks API on, scope .../auth/tasks, published so tokens don't expire after 7 days) gives one.
+Version 1 was uploaded to TestFlight on 2026-10-21. On 2026-10-23 and 24, the Inbox, time blocks, Track and Wake tabs were added and merged to main (TestFlight build 202610240029). Google sign-in uses the Google Cloud project "Do This Now" (do-this-now-512600) under the user's personal Gmail: the Tasks API is on, the consent screen asks only for .../auth/tasks, and the iOS OAuth client (bundle ID com.steveburlison.dothisnow) is in `GoogleTasks.clientID`. The consent screen is in Testing with the user's Gmail as the only test user, so Google shows an unverified-app warning and sign-ins last 7 days. Publishing it to production (Branding page: home page, privacy policy, authorized domain steveburlison.com) would stop the weekly sign-in.
 
 ## Next tasks, in order
 
