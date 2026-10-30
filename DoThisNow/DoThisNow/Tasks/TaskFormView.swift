@@ -152,7 +152,7 @@ struct TaskFormView: View {
             .confirmationDialog("Delete this task?", isPresented: $confirmingDelete, titleVisibility: .visible) {
                 Button("Delete", role: .destructive) { model.deleteTask(draft.id) }
             } message: {
-                Text("Its logged time goes too.")
+                Text(draft.reminderID == nil ? "Its logged time goes too." : "Its logged time goes too. The reminder stays in Reminders, but won’t come back here.")
             }
             .onAppear {
                 if original == nil { titleFocused = true }

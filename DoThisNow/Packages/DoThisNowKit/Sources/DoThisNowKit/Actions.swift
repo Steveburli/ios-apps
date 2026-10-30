@@ -193,7 +193,11 @@ extension PlannerState {
 
     // MARK: Lists
 
+    /// A task from Reminders stays out from now on, and the reminder stays put.
     public mutating func deleteTask(_ id: String) {
+        if let reminderID = task(id)?.reminderID {
+            inbox.hidden.append(SourceRef(.reminders, reminderID).key)
+        }
         tasks.removeAll { $0.id == id }
         log.removeAll { $0.taskID == id }
         blocks.removeAll { $0.ref == SourceRef(.app, id) && !$0.done }

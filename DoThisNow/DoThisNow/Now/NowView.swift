@@ -40,6 +40,9 @@ private struct EmptyNowView: View {
             Text("What should I do now?")
                 .font(Theme.hero)
                 .foregroundStyle(Theme.ink)
+            if model.offersReminders {
+                RemindersOfferCard()
+            }
             VStack(alignment: .leading, spacing: 14) {
                 Text("Tell me what’s on your plate. Each time you open this, I’ll ask a few quick questions and pick the one thing to do right now.")
                     .foregroundStyle(Theme.ink)
@@ -76,6 +79,30 @@ private struct EmptyNowView: View {
     ]
 }
 
+/// Offers to bring in your reminders, until you answer.
+private struct RemindersOfferCard: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Use your reminders?")
+                .font(.headline)
+                .foregroundStyle(Theme.ink)
+            Text("Your reminders become tasks here, and finishing one here ticks it off in Reminders. You can leave out lists like groceries.")
+                .foregroundStyle(Theme.ink)
+            FlowLayout {
+                Button("Connect Reminders") {
+                    Task { await model.connectReminders() }
+                }
+                .buttonStyle(.dtn(.primary))
+                Button("Not now") { model.declineReminders() }
+                    .buttonStyle(.dtn())
+            }
+        }
+        .card()
+    }
+}
+
 private struct TimeOption: Identifiable {
     let minutes: Int
     let label: String
@@ -104,6 +131,9 @@ struct AskView: View {
                 .foregroundStyle(Theme.ink)
                 .accessibilityAddTraits(.isHeader)
 
+            if model.offersReminders {
+                RemindersOfferCard()
+            }
             if let happening = engine.eventNow() {
                 EventNowBanner(event: happening.event, leaveNow: happening.leaveNow)
             }

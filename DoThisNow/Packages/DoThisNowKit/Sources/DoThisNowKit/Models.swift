@@ -152,6 +152,10 @@ public struct TaskItem: Codable, Identifiable, Equatable, Sendable {
     public var snoozeUntil: Date?
     public var remindSeen: Bool = false
     public var nudgeUntil: Date?
+    /// The Apple Reminder this task mirrors.
+    public var reminderID: String?
+    /// The reminder is ticked off in Reminders.
+    public var reminderClosed: Bool = false
 
     public init(id: String = newID(), title: String, created: Date) {
         self.id = id
@@ -166,7 +170,7 @@ public struct TaskItem: Codable, Identifiable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case id, title, kind, tier, places, estimate, weekly, minBlock, place, deadline, stakes, binge,
              maxSession, focus, posture, outside, tv, notes, isExample, created, spent, lastDone, done,
-             doneAt, archived, snoozeUntil, remindSeen, nudgeUntil
+             doneAt, archived, snoozeUntil, remindSeen, nudgeUntil, reminderID, reminderClosed
     }
 
     public init(from decoder: Decoder) throws {
@@ -199,6 +203,8 @@ public struct TaskItem: Codable, Identifiable, Equatable, Sendable {
         snoozeUntil = try c.decodeIfPresent(Date.self, forKey: .snoozeUntil)
         remindSeen = try c.decodeIfPresent(Bool.self, forKey: .remindSeen) ?? remindSeen
         nudgeUntil = try c.decodeIfPresent(Date.self, forKey: .nudgeUntil)
+        reminderID = try c.decodeIfPresent(String.self, forKey: .reminderID)
+        reminderClosed = try c.decodeIfPresent(Bool.self, forKey: .reminderClosed) ?? reminderClosed
     }
 }
 

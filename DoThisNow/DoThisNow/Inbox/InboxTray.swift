@@ -70,9 +70,9 @@ struct InboxTray: View {
                     .padding(.horizontal, 16)
 
                     if entries.isEmpty {
-                        Text(model.state.inbox.reminders.on || model.state.inbox.google.on
+                        Text(model.state.inbox.reminders.on
                              ? "Nothing waiting. Everything that passes your filters is on a day already."
-                             : "Nothing waiting. Type something above, or bring in Reminders or Google Tasks with the filter button.")
+                             : "Nothing waiting. Type something above, or bring in Reminders with the filter button.")
                             .font(.footnote)
                             .foregroundStyle(Theme.ink2)
                             .padding(.horizontal, 16)

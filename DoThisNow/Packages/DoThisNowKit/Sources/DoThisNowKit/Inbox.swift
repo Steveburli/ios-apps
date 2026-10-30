@@ -144,10 +144,12 @@ public struct InboxSettings: Codable, Equatable, Sendable {
     public var hidden: [String] = []
     /// Minutes you set by hand, by source key.
     public var minutes: [String: Int] = [:]
+    /// You answered the Now tab's offer to connect Reminders.
+    public var remindersOffered = false
 
     public init() {}
 
-    private enum CodingKeys: String, CodingKey { case app, reminders, google, inbox, hidden, minutes }
+    private enum CodingKeys: String, CodingKey { case app, reminders, google, inbox, hidden, minutes, remindersOffered }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -157,6 +159,7 @@ public struct InboxSettings: Codable, Equatable, Sendable {
         inbox = try c.decodeIfPresent(SourceFilter.self, forKey: .inbox) ?? inbox
         hidden = try c.decodeIfPresent([String].self, forKey: .hidden) ?? []
         minutes = try c.decodeIfPresent([String: Int].self, forKey: .minutes) ?? [:]
+        remindersOffered = try c.decodeIfPresent(Bool.self, forKey: .remindersOffered) ?? false
     }
 
     public subscript(source: TaskSource) -> SourceFilter {

@@ -7,77 +7,86 @@ extension AppModel {
 
     /// Everything the Inbox shows right now, through your filters.
     var inboxEntries: [InboxEntry] {
-        engine.inbox(external: reminderTasks + googleTasks)
+        engine.inbox(external: [])
     }
 
     func inboxEntry(_ key: String) -> InboxEntry? {
         inboxEntries.first { $0.id == key }
     }
 
-    /// Reads Reminders and Google Tasks again, for the sources that are on.
+    /// The Now tab offers to connect Reminders until you answer.
+    var offersReminders: Bool {
+        !Screenshots.isActive && !state.inbox.reminders.on && !state.inbox.remindersOffered
+    }
+
+    /// Reads Reminders again and brings the task list in line with them.
     func refreshSources() async {
         guard !Screenshots.isActive else { return }
         let reminders = RemindersSource.shared
-        if reminders.isAuthorized {
-            reminderLists = reminders.lists()
-            reminderTasks = state.inbox.reminders.on ? await reminders.fetch() : []
-            sourceProblem[.reminders] = nil
-        } else {
-            reminderTasks = []
+        guard reminders.isAuthorized else {
             reminderLists = []
+            return
         }
-
-        let google = GoogleTasks.shared
-        googleSignedIn = google.isSignedIn
-        if googleSignedIn {
-            do {
-                let lists = try await google.lists()
-                googleLists = lists
-                googleTasks = state.inbox.google.on ? try await google.tasks(in: lists) : []
-                sourceProblem[.google] = nil
-            } catch {
-                sourceProblem[.google] = "Couldn’t reach Google Tasks: \(error.localizedDescription)"
-                googleSignedIn = google.isSignedIn
-            }
-        } else {
-            googleTasks = []
-            googleLists = []
+        reminderLists = reminders.lists()
+        let writes = reminderWrites
+        guard let open = await reminders.fetch() else {
+            sourceProblem[.reminders] = "Couldn’t read your reminders just now. I’ll try again next time you open the app."
+            return
+        }
+        // Something was ticked off while reading, so this list is already out of date.
+        if writes != reminderWrites {
+            await refreshSources()
+            return
+        }
+        sourceProblem[.reminders] = nil
+        let before = state.tasks
+        state.syncReminders(open, now: Date(), calendar: calendar)
+        if state.tasks != before {
+            if nowStep == .pick { refreshPicks() }
+            commit()
         }
     }
 
     /// Asks for Reminders access the first time, then turns the source on.
     func connectReminders() async {
         let granted = await RemindersSource.shared.requestAccess()
+        state.inbox.remindersOffered = true
         if granted {
             state.inbox.reminders.on = true
             commit()
             await refreshSources()
         } else {
-            sourceProblem[.reminders] = "Do This Now can’t see your reminders. Turn on Reminders for Do This Now in the Settings app, under Apps."
-        }
-    }
-
-    func connectGoogle() async {
-        do {
-            try await GoogleTasks.shared.signIn()
-            googleSignedIn = true
-            state.inbox.google.on = true
             commit()
-            await refreshSources()
-        } catch GoogleTasks.Failure.cancelled {
-            // Closed the sign-in sheet.
-        } catch {
-            sourceProblem[.google] = "Google sign-in didn’t finish: \(error.localizedDescription)"
+            sourceProblem[.reminders] = "Do This Now can’t see your reminders. Turn on Reminders for Do This Now in the Settings app, under Apps."
+            show("Turn on Reminders for Do This Now in the Settings app, under Apps.")
         }
     }
 
-    func disconnectGoogle() {
-        GoogleTasks.shared.signOut()
-        googleSignedIn = false
-        googleTasks = []
-        googleLists = []
-        state.inbox.google.on = false
+    func declineReminders() {
+        state.inbox.remindersOffered = true
         commit()
+    }
+
+    /// Sends what was finished or brought back here over to Reminders.
+    func pushReminderChanges() {
+        guard !Screenshots.isActive, RemindersSource.shared.isAuthorized else { return }
+        for task in state.remindersToClose {
+            guard let id = task.reminderID else { continue }
+            reminderWrites += 1
+            if RemindersSource.shared.setCompleted(true, id: id) {
+                state.updateTask(task.id) { $0.reminderClosed = true }
+            }
+        }
+        for task in state.remindersToReopen {
+            guard let id = task.reminderID else { continue }
+            reminderWrites += 1
+            let reopened = RemindersSource.shared.setCompleted(false, id: id)
+            state.updateTask(task.id) { t in
+                t.reminderClosed = false
+                // Deleted in Reminders: it's just a task here now.
+                if !reopened { t.reminderID = nil }
+            }
+        }
     }
 
     /// Whether the Day fills the gaps between your blocks with suggestions.
@@ -136,6 +145,7 @@ extension AppModel {
     func unhideAll() {
         state.inbox.hidden = []
         commit()
+        Task { await refreshSources() }
         show("Everything you hid is back in the Inbox")
     }
 
@@ -293,8 +303,8 @@ extension AppModel {
         show("Done: “\(entry.task.title)”")
     }
 
-    /// Marks a task done in the place it came from: Do This Now, the Inbox,
-    /// Reminders or Google Tasks.
+    /// Marks a task done in the place it came from. Tasks that mirror a
+    /// reminder tick it off through `pushReminderChanges`.
     private func completeSource(_ ref: SourceRef, minutes: Int) {
         let now = Date()
         switch ref.source {
@@ -318,19 +328,12 @@ extension AppModel {
             }
             state.finishBlocks(for: ref)
         case .reminders:
-            RemindersSource.shared.complete(ref.id)
-            reminderTasks.removeAll { $0.ref == ref }
+            // A block placed before reminders became tasks.
+            RemindersSource.shared.setCompleted(true, id: ref.id)
             state.finishBlocks(for: ref)
         case .google:
-            googleTasks.removeAll { $0.ref == ref }
+            // Google Tasks is gone, but a saved block can still point at it.
             state.finishBlocks(for: ref)
-            Task {
-                do {
-                    try await GoogleTasks.shared.complete(ref.id)
-                } catch {
-                    show("Done here, but Google Tasks didn’t hear about it. Tick it off there too.")
-                }
-            }
         }
     }
 

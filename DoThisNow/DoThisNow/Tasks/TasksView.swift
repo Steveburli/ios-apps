@@ -284,6 +284,9 @@ private struct TaskRow: View {
         if task.isExample {
             Tag(text: "Example", tone: .example)
         }
+        if task.reminderID != nil {
+            Tag(text: "Reminders")
+        }
     }
 }
 

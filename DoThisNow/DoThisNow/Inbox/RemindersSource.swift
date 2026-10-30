@@ -23,14 +23,18 @@ final class RemindersSource: @unchecked Sendable {
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
-    /// Every reminder that isn't done yet. The Inbox's filters pick from these.
-    func fetch() async -> [SourceTask] {
-        guard isAuthorized else { return [] }
+    /// Every reminder that isn't done yet, or nil if they couldn't be read.
+    func fetch() async -> [SourceTask]? {
+        guard isAuthorized else { return nil }
         let predicate = store.predicateForIncompleteReminders(withDueDateStarting: nil, ending: nil, calendars: nil)
         let calendar = Calendar.current
         return await withCheckedContinuation { continuation in
             store.fetchReminders(matching: predicate) { reminders in
-                let tasks = (reminders ?? []).map { reminder in
+                guard let reminders else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                let tasks = reminders.map { reminder in
                     SourceTask(ref: SourceRef(.reminders, reminder.calendarItemIdentifier),
                                title: reminder.title ?? "",
                                notes: reminder.notes ?? "",
@@ -44,9 +48,26 @@ final class RemindersSource: @unchecked Sendable {
         }
     }
 
-    func complete(_ id: String) {
+    /// Ticks a reminder off, or back on. False if the reminder is gone or couldn't be saved.
+    @discardableResult
+    func setCompleted(_ completed: Bool, id: String) -> Bool {
+        guard let reminder = store.calendarItem(withIdentifier: id) as? EKReminder else { return false }
+        reminder.isCompleted = completed
+        return (try? store.save(reminder, commit: true)) != nil
+    }
+
+    /// Sends an edit made in Do This Now back to the reminder. The due date is
+    /// only touched when its day changed, so a due time isn't lost.
+    func update(_ id: String, title: String, notes: String, deadline: CalendarDay?, calendar: Calendar) {
         guard let reminder = store.calendarItem(withIdentifier: id) as? EKReminder else { return }
-        reminder.isCompleted = true
+        reminder.title = title
+        reminder.notes = notes.isEmpty ? nil : notes
+        let current = reminder.dueDateComponents.flatMap { calendar.date(from: $0) }.map { CalendarDay($0, calendar: calendar) }
+        if current != deadline {
+            reminder.dueDateComponents = deadline.map {
+                calendar.dateComponents([.year, .month, .day], from: $0.startDate(calendar: calendar))
+            }
+        }
         try? store.save(reminder, commit: true)
     }
 

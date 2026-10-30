@@ -6,7 +6,6 @@ import DoThisNowKit
 struct InboxSettingsView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    @State private var connecting = false
 
     var body: some View {
         NavigationStack {
@@ -22,9 +21,8 @@ struct InboxSettingsView: View {
                     Text("When this is on, the Day also fills empty time with suggestions from your priorities. They flow around the blocks you place yourself.")
                 }
 
-                appSection
                 remindersSection
-                googleSection
+                appSection
                 inboxSection
 
                 if !model.state.inbox.hidden.isEmpty {
@@ -38,7 +36,7 @@ struct InboxSettingsView: View {
                 }
             }
             .tint(Theme.accent)
-            .navigationTitle("Inbox sources")
+            .navigationTitle("Task sources")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -62,7 +60,7 @@ struct InboxSettingsView: View {
         } header: {
             Text("Do This Now")
         } footer: {
-            Text("Your own task list, by priority. Someday tasks stay out unless you turn them on.")
+            Text("Which of your tasks show in the Day’s Inbox, by priority. This includes the ones from Reminders. Someday tasks stay out unless you turn them on.")
         }
     }
 
@@ -89,41 +87,7 @@ struct InboxSettingsView: View {
         } header: {
             Text("Apple Reminders")
         } footer: {
-            Text("Turn off lists you never plan, like groceries. Reminders tags aren’t shared with other apps, so to bring in only some reminders, put a word like “plan” in their notes and set it as the keyword.")
-        }
-    }
-
-    private var googleSection: some View {
-        Section {
-            if !GoogleTasks.isConfigured {
-                Text("Google sign-in is being set up and will work in an upcoming version.")
-                    .foregroundStyle(Theme.ink2)
-            } else if model.googleSignedIn {
-                Toggle("Google Tasks", isOn: binding(.google, \.on))
-                if model.state.inbox.google.on {
-                    if !model.googleLists.isEmpty {
-                        ListToggles(source: .google, lists: model.googleLists)
-                    }
-                    FilterRows(source: .google, showsPriority: false)
-                }
-                Button("Sign out of Google", role: .destructive) { model.disconnectGoogle() }
-            } else {
-                Button(connecting ? "Opening Google…" : "Sign in with Google") {
-                    connecting = true
-                    Task {
-                        await model.connectGoogle()
-                        connecting = false
-                    }
-                }
-                .disabled(connecting)
-            }
-            if let problem = model.sourceProblem[.google] {
-                Text(problem).font(.footnote).foregroundStyle(Theme.bad)
-            }
-        } header: {
-            Text("Google Tasks")
-        } footer: {
-            Text("Do This Now reads your open Google tasks and ticks them off when you finish them here. Nothing else in your Google account is touched.")
+            Text("Your reminders become tasks on Now, Tasks and the Day, and finishing one on either side finishes it on the other. Turn off lists you never plan, like groceries. Reminders tags aren’t shared with other apps, so to bring in only some reminders, put a word like “plan” in their notes and set it as the keyword.")
         }
     }
 

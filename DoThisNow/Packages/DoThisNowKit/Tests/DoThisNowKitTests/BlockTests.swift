@@ -157,6 +157,125 @@ final class BlockTests: XCTestCase {
         XCTAssertEqual(engine(state).inbox(external: []).first?.estimate.minutes, 25)
     }
 
+    // MARK: Reminders
+
+    private func reminder(_ id: String, priority: Int = 0, due: CalendarDay? = nil, list: String = "work") -> SourceTask {
+        SourceTask(ref: SourceRef(.reminders, id), title: id, notes: "note", listID: list, listName: list,
+                   due: due?.startDate(calendar: utc), priority: priority)
+    }
+
+    private func syncing(_ open: [SourceTask], _ state: inout PlannerState) {
+        state.syncReminders(open, now: wednesday10am, calendar: utc)
+    }
+
+    func testRemindersBecomeTasksThatNowCanPick() {
+        var state = PlannerState()
+        state.inbox.reminders.on = true
+        syncing([reminder("High", priority: 3, due: day(10, 16)), reminder("Medium", priority: 2), reminder("Low", priority: 1), reminder("None")], &state)
+
+        XCTAssertEqual(state.tasks.map(\.tier), [1, 2, 3, 3])
+        let first = state.tasks[0]
+        XCTAssertEqual(first.reminderID, "High")
+        XCTAssertEqual(first.notes, "note")
+        XCTAssertEqual(first.deadline, day(10, 16))
+        XCTAssertEqual(first.places, [.anywhere])
+
+        var context = NowContext()
+        context.place = .office
+        let picks = engine(state).recommend(context, available: 60, skip: [])
+        XCTAssertTrue(picks.contains { $0.tasks.contains { $0.id == first.id } }, "A reminder can be picked wherever you are")
+    }
+
+    func testSyncingAgainKeepsYourChangesAndTakesTheirs() {
+        var state = PlannerState()
+        state.inbox.reminders.on = true
+        syncing([reminder("Call")], &state)
+        state.updateTask(state.tasks[0].id) { $0.tier = 1 }
+
+        var changed = reminder("Call", priority: 1, due: day(10, 20))
+        changed.title = "Call the bank"
+        syncing([changed], &state)
+
+        XCTAssertEqual(state.tasks.count, 1)
+        XCTAssertEqual(state.tasks[0].title, "Call the bank")
+        XCTAssertEqual(state.tasks[0].deadline, day(10, 20))
+        XCTAssertEqual(state.tasks[0].tier, 1, "Your priority level stays")
+    }
+
+    func testRemindersStayOutWhileTurnedOffOrFilteredOut() {
+        var state = PlannerState()
+        syncing([reminder("Off")], &state)
+        XCTAssertTrue(state.tasks.isEmpty)
+
+        state.inbox.reminders.on = true
+        state.inbox.reminders.hiddenLists = ["groceries"]
+        syncing([reminder("Milk", list: "groceries"), reminder("Call")], &state)
+        XCTAssertEqual(state.tasks.map(\.title), ["Call"])
+
+        state.inbox.reminders.hiddenLists = ["work"]
+        syncing([reminder("Milk", list: "groceries"), reminder("Call")], &state)
+        XCTAssertEqual(state.tasks.map(\.title), ["Milk"], "A list you turn off leaves, and one you turn on arrives")
+    }
+
+    func testTickingOffInRemindersFinishesTheTask() {
+        var state = PlannerState()
+        state.inbox.reminders.on = true
+        syncing([reminder("Call")], &state)
+        let id = state.tasks[0].id
+        state.blocks = [TimeBlock(ref: SourceRef(.app, id), title: "Call", day: day(10, 14), start: 600, minutes: 30)]
+
+        syncing([], &state)
+        XCTAssertTrue(state.tasks[0].done)
+        XCTAssertTrue(state.blocks[0].done)
+        XCTAssertTrue(state.remindersToClose.isEmpty, "Nothing to send back")
+
+        syncing([reminder("Call")], &state)
+        XCTAssertFalse(state.tasks[0].done, "A repeating reminder's next round comes back")
+        XCTAssertTrue(state.remindersToReopen.isEmpty)
+    }
+
+    func testFinishingHereClosesAndRestoringReopens() {
+        var state = PlannerState()
+        state.inbox.reminders.on = true
+        syncing([reminder("Call")], &state)
+        let id = state.tasks[0].id
+
+        state.updateTask(id) { $0.done = true }
+        XCTAssertEqual(state.remindersToClose.map(\.id), [id])
+        state.updateTask(id) { $0.reminderClosed = true }
+        XCTAssertTrue(state.remindersToClose.isEmpty)
+
+        state.restore(id, now: wednesday10am)
+        XCTAssertEqual(state.remindersToReopen.map(\.id), [id])
+    }
+
+    func testLettingGoAndDeletingLeaveTheReminderAlone() {
+        var state = PlannerState()
+        state.inbox.reminders.on = true
+        syncing([reminder("Keep"), reminder("Drop")], &state)
+        let keep = state.tasks[0].id, drop = state.tasks[1].id
+
+        state.letGo(keep, now: wednesday10am)
+        state.deleteTask(drop)
+        XCTAssertTrue(state.remindersToClose.isEmpty)
+
+        syncing([reminder("Keep"), reminder("Drop")], &state)
+        XCTAssertEqual(state.tasks.map(\.id), [keep], "A deleted one doesn't come back")
+        XCTAssertTrue(state.tasks[0].archived, "A let-go one stays let go")
+    }
+
+    func testTheTaskYoureTimingStaysWhenFiltersChange() {
+        var state = PlannerState()
+        state.inbox.reminders.on = true
+        syncing([reminder("Call")], &state)
+        let task = state.tasks[0]
+        state.startSession(tasks: [task], title: task.title, minutes: 30, at: wednesday10am)
+
+        state.inbox.reminders.on = false
+        syncing([reminder("Call")], &state)
+        XCTAssertEqual(state.tasks.count, 1)
+    }
+
     // MARK: Saving
 
     func testNewFieldsSaveAndOldFilesStillLoad() throws {

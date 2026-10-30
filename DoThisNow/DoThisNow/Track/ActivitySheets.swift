@@ -141,7 +141,7 @@ struct ActivityFormView: View {
             } header: {
                 Text("Also called")
             } footer: {
-                Text("Other names it goes by in Reminders, Google Tasks or your task list, separated by commas. Their estimates use these times too.")
+                Text("Other names it goes by in Reminders or your task list, separated by commas. Their estimates use these times too.")
             }
         }
         .tint(Theme.accent)

@@ -15,6 +15,14 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    Button(model.state.inbox.reminders.on ? "Apple Reminders: connected" : "Connect Apple Reminders") {
+                        model.sheet = .inboxSettings
+                    }
+                } header: {
+                    Text("Where tasks come from")
+                }
+
                 Section("Your day") {
                     MinuteOfDayPicker(title: "I wake up at", minutes: $draft.wake)
                     MinuteOfDayPicker(title: "Bedtime", minutes: $draft.bed)
@@ -56,7 +64,7 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Text("Your tasks are saved on this iPhone. Nothing is sent anywhere, except that if you connect Google Tasks, the app talks to Google directly to read and tick off your tasks. Deleting the app erases everything.")
+                    Text("Your tasks are saved on this iPhone and nothing is sent anywhere. Deleting the app erases everything here, but not what’s in Reminders.")
                         .font(.footnote)
                         .foregroundStyle(Theme.ink2)
                     if model.state.hasExamples {

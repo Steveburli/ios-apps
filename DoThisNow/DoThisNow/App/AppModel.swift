@@ -63,7 +63,7 @@ final class AppModel {
         var id: String { rawValue }
     }
 
-    /// A list in Reminders or Google Tasks.
+    /// A list in Reminders.
     struct SourceList: Identifiable, Hashable {
         let id: String
         let name: String
@@ -109,12 +109,10 @@ final class AppModel {
     var scrollDayToNow = false
     var scanMode: ScanMode?
 
-    // The Inbox's outside sources, fetched when the Day tab opens.
-    var reminderTasks: [SourceTask] = []
+    /// Your lists in Reminders, for the task source filters.
     var reminderLists: [SourceList] = []
-    var googleTasks: [SourceTask] = []
-    var googleLists: [SourceList] = []
-    var googleSignedIn = false
+    /// Counts changes sent to Reminders, so a read that overlapped one starts over.
+    @ObservationIgnored var reminderWrites = 0
     /// Why a source couldn't be read, for the Inbox settings.
     var sourceProblem: [TaskSource: String] = [:]
     var inboxOpen = false
@@ -155,7 +153,6 @@ final class AppModel {
         } else {
             state = PlannerState()
         }
-        googleSignedIn = GoogleTasks.shared.isSignedIn
         takeDroppedTasks()
     }
 
@@ -211,6 +208,7 @@ final class AppModel {
     // MARK: Saving
 
     func commit() {
+        pushReminderChanges()
         state.updatedAt = Date()
         state.prune(now: Date(), calendar: calendar)
         do {
@@ -273,7 +271,7 @@ final class AppModel {
         panel = nil
     }
 
-    private func refreshPicks() {
+    func refreshPicks() {
         picks = engine.recommend(state.context, available: available, skip: skip)
         pickIndex = 0
         panel = nil
@@ -448,6 +446,10 @@ final class AppModel {
         } else {
             state.updateTask(task.id) { $0 = task }
         }
+        if let reminderID = task.reminderID {
+            reminderWrites += 1
+            RemindersSource.shared.update(reminderID, title: task.title, notes: task.notes, deadline: task.deadline, calendar: calendar)
+        }
         sheet = nil
         if nowStep == .pick { refreshPicks() }
         commit()
@@ -455,11 +457,12 @@ final class AppModel {
     }
 
     func deleteTask(_ id: String) {
+        let fromReminders = state.task(id)?.reminderID != nil
         state.deleteTask(id)
         sheet = nil
         if nowStep == .pick { refreshPicks() }
         commit()
-        show("Deleted")
+        show(fromReminders ? "Removed here. It’s still in Reminders." : "Deleted")
     }
 
     /// Swipe to cross off a one-time task from the list.
