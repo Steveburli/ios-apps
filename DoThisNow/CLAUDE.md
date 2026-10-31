@@ -37,7 +37,7 @@ xcodebuild -project DoThisNow.xcodeproj -scheme DoThisNow -destination 'generic/
 ## Differences from the web app
 
 - A local notification fires when a timed session runs out. "Not now → Remind me in…" now sends a real reminder at that time instead of waiting for you to open the app.
-- On Tasks, swipe right to mark a task done, swipe left to let it go, and long-press to move it between tiers. To reorder, tap **Reorder**, or touch and hold a row.
+- On Tasks, tap a task's circle or swipe right to mark it done (repeating tasks have no circle, since they never finish), swipe left to let it go, and long-press to move it between tiers. To reorder, tap **Reorder**, or touch and hold a row.
 - No cloud sync. Data stays on the phone, so the sync indicator is gone.
 - New in the app only (not in the web app): the Inbox, hand-placed blocks, the Track tab and the Wake tab. They were modeled on Structured (Inbox and timeline), Atracker (one-tap timers) and Awake (scan-to-stop alarm). Turning off "Suggest tasks for the gaps" leaves only your own blocks on the Day.
 - iPhone always shows its own Stop control on alarms, so "scan to stop" works by backup alarms every couple of minutes until a scan in the app. The scanner also has a 30-second hold for when a code can't be scanned.

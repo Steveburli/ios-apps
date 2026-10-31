@@ -46,7 +46,7 @@ struct TasksView: View {
                         Button("+ Add") { model.sheet = .newTask }
                             .buttonStyle(.dtn(.primary))
                     }
-                    Text("Drag to reorder (tap Reorder, or touch and hold a task). Higher levels win. Within a level, approaching deadlines and things you haven’t done in a while come up first.")
+                    Text("Tap a task’s circle when it’s done. Drag to reorder (tap Reorder, or touch and hold a task). Higher levels win. Within a level, approaching deadlines and things you haven’t done in a while come up first.")
                         .font(.footnote)
                         .foregroundStyle(Theme.ink2)
                 }
@@ -200,29 +200,33 @@ private struct TierHeader: View {
 
 private struct TaskRow: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.editMode) private var editMode
     let task: TaskItem
 
     var body: some View {
-        Button {
-            model.sheet = .editTask(task.id)
-        } label: {
-            VStack(alignment: .leading, spacing: 5) {
-                Text(task.title)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Theme.ink)
-                    .multilineTextAlignment(.leading)
-                FlowLayout(spacing: 6) {
-                    meta
+        HStack(alignment: .top, spacing: 0) {
+            finishControl
+            Button {
+                model.sheet = .editTask(task.id)
+            } label: {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(task.title)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Theme.ink)
+                        .multilineTextAlignment(.leading)
+                    FlowLayout(spacing: 6) {
+                        meta
+                    }
                 }
+                .padding(.trailing, 14)
+                .padding(.vertical, 11)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 11)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.line))
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.line))
         .swipeActions(edge: .leading) {
             if task.kind != .recurring {
                 Button("Done") { model.markTaskDone(task.id) }
@@ -239,6 +243,33 @@ private struct TaskRow: View {
                     Button("Move to \(Tier.name(tier))") { model.moveTask(task.id, toTier: tier) }
                 }
             }
+        }
+    }
+
+    /// A circle to tap when it's finished. Repeating tasks never finish, so
+    /// they get a marker in the same spot and the titles still line up.
+    @ViewBuilder
+    private var finishControl: some View {
+        if editMode?.wrappedValue.isEditing == true {
+            Color.clear.frame(width: 14, height: 44)
+        } else if task.kind == .recurring {
+            Image(systemName: "repeat")
+                .font(.subheadline)
+                .foregroundStyle(Theme.ink3)
+                .frame(width: 46, height: 44)
+                .accessibilityHidden(true)
+        } else {
+            Button {
+                withAnimation { model.markTaskDone(task.id) }
+            } label: {
+                Image(systemName: "circle")
+                    .font(.title3)
+                    .foregroundStyle(Theme.good)
+                    .frame(width: 46, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Mark \(task.title) done")
         }
     }
 
