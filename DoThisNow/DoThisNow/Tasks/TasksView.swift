@@ -52,7 +52,8 @@ struct TasksView: View {
                 }
                 .plainRow()
 
-                if model.state.hasExamples {
+                // The cloud screenshots skip the cards so the task rows fit on screen.
+                if model.state.hasExamples && !Screenshots.isActive {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("You’re looking at example tasks. Play with them, then clear them out when you’re ready to add your own.")
                             .font(.subheadline)
@@ -64,7 +65,7 @@ struct TasksView: View {
                     .plainRow()
                 }
 
-                ForEach(engine.nudges().prefix(3)) { nudge in
+                ForEach(Screenshots.isActive ? [] : Array(engine.nudges().prefix(3))) { nudge in
                     NudgeCard(nudge: nudge)
                         .plainRow()
                 }
