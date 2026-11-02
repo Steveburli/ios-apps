@@ -7,6 +7,26 @@ struct DayView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
+        @Bindable var model = model
+        VStack(spacing: 0) {
+            Picker("Show", selection: $model.dayPage) {
+                Text("Day").tag(AppModel.DayPage.timeline)
+                Text("Inbox (\(model.inboxEntries.count))").tag(AppModel.DayPage.inbox)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+            .frame(maxWidth: 760)
+            if model.dayPage == .inbox {
+                InboxPage(day: model.dayShown)
+            } else {
+                timeline
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var timeline: some View {
         let engine = model.engine
         let day = model.dayShown
         let plan = engine.planDay(day)
@@ -68,6 +88,13 @@ struct DayView: View {
             .disabled(offset >= 13)
             .accessibilityLabel("Next day")
             Spacer()
+            Button {
+                withAnimation(.snappy(duration: 0.3)) { model.setDayFullScreen(true) }
+            } label: {
+                Image(systemName: "arrow.up.left.and.arrow.down.right").frame(width: 40, height: 40)
+            }
+            .accessibilityLabel("Full screen")
+            .accessibilityHint("Shows only the timeline, using the whole screen")
             Button("+ Event") { model.sheet = .newEvent(day) }
                 .buttonStyle(.dtn())
         }

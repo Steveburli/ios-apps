@@ -172,6 +172,28 @@ extension AppModel {
         }
     }
 
+    /// Puts several Inbox tasks on `day`, in order, each in the first gap that fits.
+    func scheduleInNextGaps(_ keys: [String], on day: CalendarDay) {
+        var placed = 0
+        for key in keys {
+            guard let entry = inboxEntry(key),
+                  let start = openSlots(on: day, minutes: entry.estimate.minutes, limit: 1).first else { continue }
+            state.blocks.append(TimeBlock(ref: entry.task.ref, title: entry.task.title, day: day, start: start,
+                                          minutes: entry.estimate.minutes))
+            placed += 1
+        }
+        guard placed > 0 else {
+            show("No gap that long left on this day")
+            return
+        }
+        dayShown = day
+        dayPage = .timeline
+        scrollDayToNow = true
+        commit()
+        let missed = keys.count - placed
+        show("Put \(placed) on the day" + (missed > 0 ? ". \(missed) didn’t fit" : ""))
+    }
+
     /// The first gaps on `day` that fit `minutes`, for the schedule sheet.
     func openSlots(on day: CalendarDay, minutes: Int, limit: Int = 4) -> [Int] {
         let plan = engine.planDay(day)
