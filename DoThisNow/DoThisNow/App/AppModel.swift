@@ -10,6 +10,8 @@ final class AppModel {
     enum Tab: String { case now, tasks, day, track, wake }
     enum NowStep { case ask, pick }
     enum PickPanel { case done, later }
+    /// The Day tab shows the timeline or the Inbox page.
+    enum DayPage: String { case timeline, inbox }
 
     enum Sheet: Identifiable {
         case newTask
@@ -116,6 +118,11 @@ final class AppModel {
     /// Why a source couldn't be read, for the Inbox settings.
     var sourceProblem: [TaskSource: String] = [:]
     var inboxOpen = false
+    var dayPage: DayPage = .timeline
+    /// The Day timeline fills the screen. Remembered, so the Day tab opens the way you left it.
+    var dayFullScreen: Bool {
+        didSet { UserDefaults.standard.set(dayFullScreen, forKey: Keys.dayFullScreen) }
+    }
     /// The Inbox task being dragged onto the timeline.
     var draggingKey: String?
     var draggingBlockID: String?
@@ -128,6 +135,7 @@ final class AppModel {
 
     private enum Keys {
         static let tab = "tab"
+        static let dayFullScreen = "dayFullScreen"
     }
 
     init() {
@@ -137,6 +145,7 @@ final class AppModel {
         self.now = now
         dayShown = CalendarDay(now, calendar: calendar)
         tab = Tab(rawValue: UserDefaults.standard.string(forKey: Keys.tab) ?? "") ?? .now
+        dayFullScreen = !Screenshots.isActive && UserDefaults.standard.bool(forKey: Keys.dayFullScreen)
 
         let folder = (try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask,
                                                    appropriateFor: nil, create: true)) ?? FileManager.default.temporaryDirectory
@@ -157,7 +166,7 @@ final class AppModel {
     }
 
     /// Goes to the screen named by `-screenshots`: now, pick, doing, tasks, day,
-    /// inbox, track or wake.
+    /// dayfull, inbox, inboxpage, track or wake.
     private func openScreenshotScreen() {
         switch Screenshots.screen {
         case "pick":
@@ -172,10 +181,18 @@ final class AppModel {
         case "day":
             tab = .day
             openDayTab()
+        case "dayfull":
+            tab = .day
+            openDayTab()
+            dayFullScreen = true
         case "inbox":
             tab = .day
             openDayTab()
             inboxOpen = true
+        case "inboxpage":
+            tab = .day
+            openDayTab()
+            dayPage = .inbox
         case "track":
             tab = .track
             state.running = RunningTimer(activityID: state.activities.first?.id, title: state.activities.first?.name ?? "Shower",
@@ -535,6 +552,13 @@ final class AppModel {
     func openDayTab() {
         refreshNow()
         dayShown = today
+        dayPage = .timeline
+        scrollDayToNow = true
+    }
+
+    func setDayFullScreen(_ on: Bool) {
+        dayFullScreen = on
+        dayPage = .timeline
         scrollDayToNow = true
     }
 

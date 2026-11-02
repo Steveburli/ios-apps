@@ -41,6 +41,12 @@ struct RootView: View {
                 .tag(AppModel.Tab.wake)
         }
         .tint(Theme.accent)
+        .overlay {
+            if model.tab == .day && model.dayFullScreen {
+                DayFullScreen()
+                    .transition(.move(edge: .bottom))
+            }
+        }
         .overlay(alignment: .bottom) {
             if let toast = model.toast {
                 ToastView(toast: toast)
