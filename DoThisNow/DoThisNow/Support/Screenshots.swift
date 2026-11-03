@@ -2,7 +2,7 @@ import Foundation
 
 /// The cloud build launches the app with `-screenshots <screen>` to photograph
 /// each screen with the example tasks: now, pick, doing, tasks, day, dayfull,
-/// inbox, inboxpage,
+/// inbox, inboxpage, trip, tripcatchup,
 /// track or wake.
 /// Nothing here runs in normal use.
 enum Screenshots {

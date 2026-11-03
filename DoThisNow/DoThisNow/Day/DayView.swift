@@ -12,6 +12,7 @@ struct DayView: View {
             Picker("Show", selection: $model.dayPage) {
                 Text("Day").tag(AppModel.DayPage.timeline)
                 Text("Inbox (\(model.inboxEntries.count))").tag(AppModel.DayPage.inbox)
+                Text("Trip").tag(AppModel.DayPage.trip)
             }
             .pickerStyle(.segmented)
             .padding(.horizontal, 16)
@@ -19,6 +20,8 @@ struct DayView: View {
             .frame(maxWidth: 760)
             if model.dayPage == .inbox {
                 InboxPage(day: model.dayShown)
+            } else if model.dayPage == .trip {
+                TripView()
             } else {
                 timeline
             }
