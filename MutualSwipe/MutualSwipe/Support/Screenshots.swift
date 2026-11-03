@@ -21,6 +21,17 @@ enum Screenshots {
     static let dateDeckID = "deck-dates"
     static let picnicCardID = "card-picnic"
 
+    /// What the "import" screenshot shows on the preview: an AI's answer, pasted in.
+    static let importSample = """
+    Here are some date night ideas:
+    Rooftop dinner | $$$ · evening · downtown | A table with a view of the skyline. |
+    Escape room | $$ · 1 hour | Solve your way out together before the clock runs out. |
+    Farmers market breakfast | $ · Saturday morning | Pastries, coffee and flowers for the table. |
+    Glow-in-the-dark mini golf | $ · 1 hour | Silly, competitive and indoors. |
+    Live jazz bar | $$ · late | Small room, good drinks, no phones. |
+    Sunrise hike | Free · early | Pack coffee and watch the sun come up. |
+    """
+
     struct SampleCard {
         let id: String
         let title: String

@@ -117,10 +117,12 @@ struct GroupsSheet: View {
                                 }
                             }
                             .buttonStyle(.plain)
-                            HStack(spacing: 8) {
+                            FlowLayout(spacing: 8) {
                                 if group.isOwned {
                                     Button(group.isShared ? "Manage people" : "Invite people") { invite(group) }
                                         .buttonStyle(.mutual())
+                                    Button("QR code") { session.sheet = .qr(group.id) }
+                                        .buttonStyle(.mutual(.quiet))
                                     Button("Rename") {
                                         renameText = group.name
                                         renaming = group

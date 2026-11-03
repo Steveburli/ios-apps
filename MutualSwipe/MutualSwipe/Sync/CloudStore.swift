@@ -200,6 +200,34 @@ final class CloudStore: CKSyncEngineDelegate {
         scheduleSave()
     }
 
+    // MARK: After a match
+
+    /// Marks a card as decided for the whole group, or takes it back.
+    func setDecided(_ isDecided: Bool, card cardID: String, by name: String?) {
+        guard let card = cards[cardID], var deck = decks[card.deckID], let group = groups[deck.groupID] else { return }
+        var list = deck.decidedCards.filter { $0 != cardID }
+        if isDecided {
+            list.append(cardID)
+            deck.decidedAt = Date()
+            deck.decidedBy = name
+        }
+        deck.decided = list
+        if deck.decidedAt == nil { deck.decidedAt = Date() }
+        decks[deck.id] = deck
+        enqueueSave(deck.id, in: group)
+        scheduleSave()
+    }
+
+    /// Saves where the spinner landed, so everyone sees the same winner. Nil clears it.
+    func setSpin(_ cardID: String?, deck deckID: String) {
+        guard var deck = decks[deckID], let group = groups[deck.groupID] else { return }
+        deck.spinCardID = cardID ?? ""
+        deck.spinAt = Date()
+        decks[deckID] = deck
+        enqueueSave(deckID, in: group)
+        scheduleSave()
+    }
+
     // MARK: People and votes
 
     /// Adds a name to the group, or returns the person who already has it.
@@ -275,6 +303,24 @@ final class CloudStore: CKSyncEngineDelegate {
         groups[groupID]?.isShared = true
         scheduleSave()
         return saved
+    }
+
+    /// Lets anyone with the group's link (or its QR code) join and swipe, or
+    /// goes back to invited people only. Returns the link.
+    func setOpenToAnyone(_ open: Bool, groupID: String) async throws -> URL {
+        let share = try await share(for: groupID)
+        let wanted: CKShare.ParticipantPermission = open ? .readWrite : .none
+        var current = share
+        if share.publicPermission != wanted {
+            share.publicPermission = wanted
+            let result = try await container.privateCloudDatabase.modifyRecords(saving: [share], deleting: [])
+            guard let saved = try result.saveResults[share.recordID]?.get() as? CKShare else { throw ShareError.failed }
+            current = saved
+        }
+        guard let url = current.url else { throw ShareError.failed }
+        groups[groupID]?.openToAnyone = open
+        scheduleSave()
+        return url
     }
 
     /// Joins a group from an iCloud invitation link.
@@ -477,6 +523,7 @@ final class CloudStore: CKSyncEngineDelegate {
     private func applyShare(_ share: CKShare, groupID: String) {
         guard var group = groups[groupID] else { return }
         group.isShared = true
+        group.openToAnyone = share.publicPermission != .none
         group.participants = share.participants
             .filter { $0.role != .owner && $0.acceptanceStatus == .accepted }
             .compactMap { participant in

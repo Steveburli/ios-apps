@@ -7,6 +7,7 @@ struct CardSheet: View {
     @Environment(Session.self) private var session
     @Environment(\.dismiss) private var dismiss
     let cardID: String
+    @State private var addingEvent = false
 
     var body: some View {
         NavigationStack {
@@ -25,6 +26,12 @@ struct CardSheet: View {
             }
         }
         .presentationDetents([.large])
+        .sheet(isPresented: $addingEvent) {
+            if let card = store.cards[cardID] {
+                EventEditor(card: card) { addingEvent = false }
+                    .ignoresSafeArea()
+            }
+        }
     }
 
     private func content(_ card: Card, deck: Deck) -> some View {
@@ -79,6 +86,36 @@ struct CardSheet: View {
                         Label("Open \(CardText.host(card.link))", systemImage: "arrow.up.right.square")
                     }
                     .buttonStyle(.mutual(.quiet))
+                }
+
+                let isDecided = deck.decidedCards.contains(card.id)
+                if isDecided || verdict.isMatch {
+                    heading("Next step")
+                    FlowLayout {
+                        Button {
+                            addingEvent = true
+                        } label: {
+                            Label("Add to calendar", systemImage: "calendar.badge.plus")
+                        }
+                        .buttonStyle(.mutual(isDecided ? .primary : .quiet))
+                        if store.canWrite(deck.groupID) {
+                            Button {
+                                let name = me.flatMap { store.players[$0]?.name }
+                                store.setDecided(!isDecided, card: card.id, by: name)
+                                if !isDecided { session.markDecisionSeen(deck) }
+                                session.show(isDecided ? "No longer decided" : "Marked as decided for everyone")
+                            } label: {
+                                Label(isDecided ? "Not decided after all" : "Mark as decided",
+                                      systemImage: isDecided ? "arrow.uturn.backward" : "checkmark.seal")
+                            }
+                            .buttonStyle(.mutual(isDecided ? .quiet : .primary))
+                        }
+                    }
+                    Text(isDecided
+                         ? "Decided. Each person adds it to their own calendar."
+                         : "Mark it decided and it moves to the top of Results for everyone.")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
                 }
 
                 heading("Your vote")

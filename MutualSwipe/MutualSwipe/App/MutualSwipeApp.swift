@@ -41,6 +41,16 @@ final class SceneDelegate: NSObject, UIWindowSceneDelegate {
         if let metadata = connectionOptions.cloudKitShareMetadata {
             accept(metadata)
         }
+        // A CSV or text file opened in Mutual from another app.
+        for context in connectionOptions.urlContexts {
+            receive(context.url)
+        }
+    }
+
+    func scene(_ scene: UIScene, openURLContexts contexts: Set<UIOpenURLContext>) {
+        for context in contexts {
+            receive(context.url)
+        }
     }
 
     func windowScene(_ windowScene: UIWindowScene, userDidAcceptCloudKitShareWith metadata: CKShare.Metadata) {
@@ -50,6 +60,38 @@ final class SceneDelegate: NSObject, UIWindowSceneDelegate {
     private func accept(_ metadata: CKShare.Metadata) {
         Task { @MainActor in
             await CloudStore.shared.accept(metadata)
+        }
+    }
+
+    private func receive(_ url: URL) {
+        Task { @MainActor in IncomingFiles.receive(url) }
+    }
+}
+
+/// Files opened in Mutual from Mail, Messages or Files. They can arrive
+/// through SwiftUI or the scene delegate, and before the screen is ready,
+/// so this holds them and makes sure each is handled once.
+@MainActor
+enum IncomingFiles {
+    static var handler: ((URL) -> Void)? {
+        didSet {
+            guard let handler else { return }
+            let waiting = pending
+            pending = []
+            waiting.forEach(handler)
+        }
+    }
+    private static var pending: [URL] = []
+    private static var recent: [URL: Date] = [:]
+
+    static func receive(_ url: URL) {
+        guard url.isFileURL else { return }
+        if let last = recent[url], Date().timeIntervalSince(last) < 5 { return }
+        recent[url] = Date()
+        if let handler {
+            handler(url)
+        } else {
+            pending.append(url)
         }
     }
 }
@@ -76,6 +118,9 @@ struct RootView: View {
                 case .groups: GroupsSheet()
                 case .newDeck: NewDeckSheet()
                 case .card(let id): CardSheet(cardID: id)
+                case .importCards(let deckID): ImportSheet(deckID: deckID)
+                case .spin(let deckID): SpinSheet(deckID: deckID)
+                case .qr(let groupID): QRSheet(groupID: groupID)
                 }
             }
             .environment(store)
@@ -89,6 +134,18 @@ struct RootView: View {
             }
         }
         .animation(.easeOut(duration: 0.2), value: session.toast)
+        .onOpenURL { url in IncomingFiles.receive(url) }
+        .onAppear {
+            IncomingFiles.handler = { url in
+                guard let pending = Session.PendingImport(fileURL: url) else {
+                    session.show("Couldn’t read that file. Save it as CSV or plain text and try again.")
+                    return
+                }
+                session.pendingImport = pending
+                let open = session.path.last
+                session.sheet = .importCards(open.flatMap { store.decks[$0] } == nil ? nil : open)
+            }
+        }
         .onChange(of: store.notice) { _, notice in
             if let notice {
                 session.show(notice)

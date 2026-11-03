@@ -153,6 +153,11 @@ public struct DeckState: Sendable {
         picks[playerID]?[cardID]
     }
 
+    /// What the spinner picks from: every Super match and Match.
+    public var spinCandidates: [Card] {
+        cards(.perfect) + cards(.match)
+    }
+
     /// People who've voted on at least one card.
     public var activeParticipants: [String] {
         participants.filter { (progress[$0] ?? 0) > 0 }

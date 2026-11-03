@@ -11,6 +11,10 @@ final class Session {
         case groups
         case newDeck
         case card(String)
+        /// Add many cards to a deck, or to a deck you pick when it's nil.
+        case importCards(String?)
+        case spin(String)
+        case qr(String)
 
         var id: String {
             switch self {
@@ -18,6 +22,9 @@ final class Session {
             case .groups: return "groups"
             case .newDeck: return "new-deck"
             case .card(let id): return "card-" + id
+            case .importCards(let deck): return "import-" + (deck ?? "any")
+            case .spin(let deck): return "spin-" + deck
+            case .qr(let group): return "qr-" + group
             }
         }
     }
@@ -41,6 +48,12 @@ final class Session {
     }
     /// The player picker opens by itself once per launch.
     var pickerShown = false
+    /// A file opened in Mutual from another app, waiting for the import sheet.
+    var pendingImport: PendingImport?
+    /// Deck ID → when this phone last saw its "just decided" banner.
+    private var seenDecided: [String: Double] = [:] {
+        didSet { UserDefaults.standard.set(seenDecided, forKey: Keys.seenDecided) }
+    }
 
     private var players: [String: String] {
         didSet { UserDefaults.standard.set(players, forKey: Keys.players) }
@@ -51,6 +64,7 @@ final class Session {
     private enum Keys {
         static let group = "mutual.group"
         static let players = "mutual.players"
+        static let seenDecided = "mutual.seenDecided"
     }
 
     init() {
@@ -63,6 +77,17 @@ final class Session {
         }
         currentGroupID = UserDefaults.standard.string(forKey: Keys.group)
         players = UserDefaults.standard.dictionary(forKey: Keys.players) as? [String: String] ?? [:]
+        seenDecided = UserDefaults.standard.dictionary(forKey: Keys.seenDecided) as? [String: Double] ?? [:]
+    }
+
+    /// Someone else marked a card decided since this phone last looked.
+    func hasNewDecision(_ deck: Deck, myName: String?) -> Bool {
+        guard let at = deck.decidedAt, !deck.decidedCards.isEmpty, deck.decidedBy != myName else { return false }
+        return at.timeIntervalSince1970 > (seenDecided[deck.id] ?? 0)
+    }
+
+    func markDecisionSeen(_ deck: Deck) {
+        seenDecided[deck.id] = Date().timeIntervalSince1970
     }
 
     /// Goes to the screen named by `-screenshots`: home, swipe, results or card.
@@ -77,6 +102,15 @@ final class Session {
         case "card":
             path = [deck]
             sheet = .card(Screenshots.picnicCardID)
+        case "import":
+            openingTab[deck] = .cards
+            path = [deck]
+            pendingImport = PendingImport(text: Screenshots.importSample, name: "Sample", isCSV: false)
+            sheet = .importCards(deck)
+        case "spin":
+            openingTab[deck] = .results
+            path = [deck]
+            sheet = .spin(deck)
         default:
             break
         }

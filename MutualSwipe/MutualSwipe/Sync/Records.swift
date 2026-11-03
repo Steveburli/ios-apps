@@ -42,6 +42,17 @@ enum Records {
         record["kind"] = deck.kind.rawValue
         record["blurb"] = deck.blurb
         record["createdAt"] = deck.createdAt
+        // Version 2 fields. They're only written once used, so a deck that
+        // never uses them saves the same way version 1 did.
+        if let decided = deck.decided {
+            record["decided"] = decided.isEmpty ? nil : decided
+            record["decidedAt"] = deck.decidedAt
+            record["decidedBy"] = deck.decidedBy
+        }
+        if let spin = deck.spinCardID {
+            record["spinCardID"] = spin
+            record["spinAt"] = deck.spinAt
+        }
         return record
     }
 
@@ -102,6 +113,13 @@ enum Records {
         var deck = Deck(id: record.recordID.recordName, groupID: groupID, title: string(record, "title"),
                         kind: DeckKind(rawValue: string(record, "kind")) ?? .other, blurb: string(record, "blurb"),
                         createdAt: date(record, "createdAt"))
+        let decidedAt = record["decidedAt"] as? Date
+        deck.decided = record["decided"] as? [String] ?? (decidedAt == nil ? nil : [])
+        deck.decidedAt = decidedAt
+        deck.decidedBy = record["decidedBy"] as? String
+        let spinAt = record["spinAt"] as? Date
+        deck.spinCardID = record["spinCardID"] as? String ?? (spinAt == nil ? nil : "")
+        deck.spinAt = spinAt
         deck.systemFields = record.archivedSystemFields
         return deck
     }

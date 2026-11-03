@@ -46,8 +46,12 @@ struct ResultsTab: View {
 
                 waiting(me: me, hasActive: !active.isEmpty)
 
+                decisionBanner(me: me)
+                decided
+                spinBar
+
                 ForEach(Verdict.shown, id: \.self) { verdict in
-                    let cards = state.cards(verdict)
+                    let cards = state.cards(verdict).filter { !deck.decidedCards.contains($0.id) }
                     if !cards.isEmpty {
                         tier(verdict, cards: cards, people: n)
                     }
@@ -55,6 +59,78 @@ struct ResultsTab: View {
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 28)
+        }
+    }
+
+    /// "Alex marked Sunset picnic as decided", until this phone dismisses it.
+    @ViewBuilder
+    private func decisionBanner(me: String?) -> some View {
+        let myName = me.flatMap { store.players[$0]?.name }
+        if session.hasNewDecision(deck, myName: myName), let last = deck.decidedCards.last.flatMap({ store.cards[$0] }) {
+            HStack(spacing: 10) {
+                Image(systemName: "checkmark.seal.fill").foregroundStyle(Vote.like.color)
+                Text("\(deck.decidedBy ?? "Someone") marked “\(last.title)” as decided.")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.ink)
+                Spacer(minLength: 4)
+                Button {
+                    session.markDecisionSeen(deck)
+                } label: {
+                    Image(systemName: "xmark").foregroundStyle(Theme.muted).frame(width: 32, height: 32)
+                }
+                .accessibilityLabel("Dismiss")
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(Vote.like.soft, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+    }
+
+    @ViewBuilder
+    private var decided: some View {
+        let cards = deck.decidedCards.compactMap { store.cards[$0] }
+        if !cards.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 10) {
+                    Image(systemName: "checkmark")
+                        .font(.footnote.weight(.bold))
+                        .foregroundStyle(Vote.like.color)
+                        .frame(width: 30, height: 30)
+                        .background(Vote.like.soft, in: Circle())
+                    Text("Decided").font(Theme.display(20, weight: .bold)).foregroundStyle(Theme.ink)
+                }
+                .accessibilityAddTraits(.isHeader)
+                Text("Settled. Open one to add it to your calendar.").font(.footnote).foregroundStyle(Theme.muted)
+                ForEach(cards) { card in
+                    ResultRow(card: card, state: state)
+                }
+            }
+            .padding(.top, 6)
+        }
+    }
+
+    /// Spin for it, when there's more than one match.
+    @ViewBuilder
+    private var spinBar: some View {
+        let options = state.spinCandidates
+        if options.count >= 2 {
+            let picked = deck.spinCardID.flatMap { id in options.first { $0.id == id } }
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(picked.map { "Picked by spin: \($0.title)" } ?? "Can’t choose between \(options.count) matches?")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(Theme.ink)
+                    Text(picked == nil ? "Let the wheel pick one." : "Everyone sees the same pick.")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                }
+                Spacer(minLength: 6)
+                Button(picked == nil ? "Spin" : "Spin again") { session.sheet = .spin(deck.id) }
+                    .buttonStyle(.mutual())
+            }
+            .padding(14)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.line))
         }
     }
 

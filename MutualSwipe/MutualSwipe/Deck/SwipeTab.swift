@@ -91,8 +91,10 @@ struct SwipeTab: View {
         } else if state.cards.isEmpty {
             StackMessage {
                 Text("No cards yet").font(Theme.display(25, weight: .bold))
-                Text("Add some on the Cards tab.").foregroundStyle(Theme.muted)
-                Button("Add cards") { showTab(.cards) }
+                Text("Paste a list, ask an AI app or snap a photo of a menu.").foregroundStyle(Theme.muted)
+                Button("Add many cards at once") { session.sheet = .importCards(deck.id) }
+                    .buttonStyle(.mutual())
+                Button("Add one at a time") { showTab(.cards) }
                     .buttonStyle(.mutual(.quiet))
             }
         } else if state.queue.isEmpty {

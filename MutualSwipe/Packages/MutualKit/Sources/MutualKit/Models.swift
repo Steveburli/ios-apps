@@ -112,6 +112,8 @@ public struct SwipeGroup: Identifiable, Codable, Equatable, Sendable {
     public var participants: [String] = []
     /// You were invited without permission to make changes.
     public var readOnly = false
+    /// Anyone with the link or QR code can join. Optional so older saved files still load.
+    public var openToAnyone: Bool?
     public var createdAt: Date
     /// CloudKit's archived system fields for the group record.
     public var systemFields: Data?
@@ -132,7 +134,17 @@ public struct Deck: Identifiable, Codable, Equatable, Sendable {
     public var kind: DeckKind
     public var blurb: String
     public var createdAt: Date
+    /// Cards the group marked as decided, oldest first. Optional so older saved files still load.
+    public var decided: [String]?
+    /// When a card was last marked decided, and by whom, for the "just decided" banner.
+    public var decidedAt: Date?
+    public var decidedBy: String?
+    /// The card the spinner landed on, shared so every phone shows the same winner.
+    public var spinCardID: String?
+    public var spinAt: Date?
     public var systemFields: Data?
+
+    public var decidedCards: [String] { decided ?? [] }
 
     public init(id: String = makeID(), groupID: String, title: String, kind: DeckKind, blurb: String, createdAt: Date) {
         self.id = id

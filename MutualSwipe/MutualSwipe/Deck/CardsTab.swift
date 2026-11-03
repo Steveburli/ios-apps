@@ -13,7 +13,6 @@ struct CardsTab: View {
     @State private var details = ""
     @State private var link = ""
     @State private var tags = ""
-    @State private var bulk = ""
     @State private var deckTitle = ""
     @State private var deckBlurb = ""
     @State private var loaded = false
@@ -44,8 +43,8 @@ struct CardsTab: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Theme.sunk, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 } else {
+                    addMany
                     addCard
-                    pasteList
                 }
                 cardList
                 if canWrite {
@@ -115,28 +114,18 @@ struct CardsTab: View {
         }
     }
 
-    private var pasteList: some View {
+    private var addMany: some View {
         Panel {
-            Text("Paste a list").font(Theme.display(18, weight: .bold))
-            Text("One card per line. Add facts and details after a bar: Title | quick facts | details")
+            Text("Add many cards at once").font(Theme.display(18, weight: .bold))
+            Text("Paste a list, ask an AI app, snap a photo of a menu, or open a spreadsheet.")
                 .font(.footnote)
                 .foregroundStyle(Theme.muted)
-            TextField("\(deck.kind.example) | \(deck.kind.hint)", text: $bulk, axis: .vertical)
-                .lineLimit(5...12)
-                .padding(12)
-                .background(Theme.bg, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.line, lineWidth: 1.5))
-                .accessibilityLabel("Cards to add, one per line")
-            Button("Add all") {
-                let drafts = CardText.parseList(bulk)
-                let added = store.addCards(drafts, to: deck.id)
-                if added > 0 {
-                    bulk = ""
-                    session.show("Added \(added) card\(added == 1 ? "" : "s")")
-                }
+            Button {
+                session.sheet = .importCards(deck.id)
+            } label: {
+                Label("Add many cards", systemImage: "square.stack.3d.up.fill")
             }
-            .buttonStyle(.mutual(.quiet))
-            .disabled(bulk.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .buttonStyle(.mutual(wide: true))
         }
     }
 

@@ -238,6 +238,9 @@ private struct DeckTile: View {
                             Pill(text: "\(state.queue.count) left for you")
                         }
                     }
+                    if let last = deck.decidedCards.last.flatMap({ store.cards[$0] }) {
+                        Pill(text: "Decided: \(last.title)", tint: Vote.like.color, background: Vote.like.soft)
+                    }
                     if !swipers.isEmpty {
                         HStack(spacing: -5) {
                             ForEach(swipers, id: \.self) { id in
@@ -282,20 +285,28 @@ private struct InvitePanel: View {
                      : "Invite people to “\(group.name)” so they can swipe these decks on their own iPhones. They need to be signed in to iCloud.")
                     .font(.subheadline)
                     .foregroundStyle(Theme.muted)
-                Button(group.isShared ? "Manage people" : "Invite people") {
-                    Task {
-                        working = true
-                        defer { working = false }
-                        do {
-                            let share = try await store.share(for: group.id)
-                            SharingPresenter.present(share: share, container: store.container, title: group.name)
-                        } catch {
-                            session.show(error.localizedDescription)
+                FlowLayout {
+                    Button(group.isShared ? "Manage people" : "Invite people") {
+                        Task {
+                            working = true
+                            defer { working = false }
+                            do {
+                                let share = try await store.share(for: group.id)
+                                SharingPresenter.present(share: share, container: store.container, title: group.name)
+                            } catch {
+                                session.show(error.localizedDescription)
+                            }
                         }
                     }
+                    .buttonStyle(.mutual())
+                    .disabled(working)
+                    Button {
+                        session.sheet = .qr(group.id)
+                    } label: {
+                        Label("QR code", systemImage: "qrcode")
+                    }
+                    .buttonStyle(.mutual(.quiet))
                 }
-                .buttonStyle(.mutual())
-                .disabled(working)
             } else {
                 Text("Shared with you")
                     .font(Theme.display(18, weight: .bold))
