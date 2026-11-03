@@ -73,6 +73,9 @@ struct InboxSettingsView: View {
                         Text("No lists found yet.").foregroundStyle(Theme.ink3)
                     } else {
                         ListToggles(source: .reminders, lists: model.reminderLists)
+                        NavigationLink("Labels for shared lists") {
+                            ListLabelsView()
+                        }
                     }
                     FilterRows(source: .reminders, showsPriority: true)
                 }
@@ -242,5 +245,54 @@ struct ShortcutsHelpView: View {
                 .foregroundStyle(Theme.accent)
             Text(text)
         }
+    }
+}
+
+/// A label per Reminders list, so tasks from a list someone shares with you
+/// stand out, such as "From my wife".
+private struct ListLabelsView: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Form {
+            Section {
+                ForEach(model.reminderLists) { list in
+                    LabelField(list: list, saved: model.state.inbox.listLabels[list.id] ?? "")
+                }
+            } footer: {
+                Text("Tasks from a list with a label show it on Tasks, in the Inbox and on the Day. Leave it empty for no label. To share a list, open it in Reminders and tap Share.")
+            }
+        }
+        .navigationTitle("Labels")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+/// Saves a list's label when you're done typing.
+private struct LabelField: View {
+    @Environment(AppModel.self) private var model
+    let list: AppModel.SourceList
+    let saved: String
+    @State private var text = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        HStack {
+            Text(list.name)
+            TextField("No label", text: $text)
+                .multilineTextAlignment(.trailing)
+                .focused($focused)
+                .submitLabel(.done)
+                .onSubmit(save)
+        }
+        .onAppear { text = saved }
+        .onChange(of: focused) { _, isFocused in
+            if !isFocused { save() }
+        }
+    }
+
+    private func save() {
+        let label = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if label != saved { model.setListLabel(list.id, label) }
     }
 }
