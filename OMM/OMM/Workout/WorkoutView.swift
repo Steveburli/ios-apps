@@ -10,7 +10,6 @@ struct WorkoutView: View {
     @State private var confirmingExit = false
 
     var body: some View {
-        @Bindable var model = model
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
@@ -44,7 +43,7 @@ struct WorkoutView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             TimerBar(session: session)
         }
-        .sensoryFeedback(.success, trigger: session.restEndedCount)
+        .sensoryFeedback(.success, trigger: session.rest.endedCount)
         .onAppear { UIApplication.shared.isIdleTimerDisabled = true }
         .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
         .confirmationDialog("End this workout?", isPresented: $confirmingExit, titleVisibility: .visible) {
@@ -53,14 +52,14 @@ struct WorkoutView: View {
         } message: {
             Text("Sets from this workout won't be saved.")
         }
-        .fullScreenCover(isPresented: $model.isEnteringWeights) {
-            WeightEntryView(groupKeys: session.plan.groupKeys)
-                .environment(model)
-        }
     }
 
     private func header(_ group: MuscleGroup) -> some View {
         VStack(alignment: .leading, spacing: 4) {
+            Text(group.category.title.uppercased())
+                .font(.caption.weight(.heavy))
+                .tracking(1)
+                .opacity(0.85)
             Text(group.area)
                 .font(.system(size: 32, weight: .heavy))
                 .padding(.trailing, 56)
@@ -71,7 +70,7 @@ struct WorkoutView: View {
         .foregroundStyle(Color.white)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(18)
-        .background(Theme.primary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(group.category.color, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.white.opacity(0.3)))
         .overlay(alignment: .topTrailing) {
             Text(session.progressLabel)
@@ -88,12 +87,13 @@ struct WorkoutView: View {
     }
 }
 
-/// A numbered list of five exercises under a colored heading.
+/// A numbered list of five exercises under a colored heading. With a muscle
+/// group, each row shows your last weight and reps and a suggested weight.
 struct ExerciseSection: View {
     @Environment(AppModel.self) private var model
     let title: String
     let tint: Color
-    let group: MuscleGroup
+    var group: MuscleGroup?
     let exercises: [String]
 
     var body: some View {
@@ -121,7 +121,9 @@ struct ExerciseSection: View {
 
     private func row(number: Int, exercise: String) -> some View {
         let text = ExerciseText.split(exercise)
-        return HStack(spacing: 12) {
+        let lift = group.flatMap { model.program.lift(for: $0, exercise: exercise) }
+        let lastWeight = group.flatMap { model.program.weight(for: $0, exercise: exercise) }
+        return HStack(alignment: .top, spacing: 12) {
             Text("\(number)")
                 .font(.footnote.weight(.heavy))
                 .foregroundStyle(tint)
@@ -129,18 +131,31 @@ struct ExerciseSection: View {
                 .background(Theme.labelBackground, in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text(text.title)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Theme.text)
-                if let note = text.note {
-                    Text(note)
-                        .font(.footnote)
-                        .foregroundStyle(Theme.muted)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(text.title)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Theme.text)
+                    if let note = text.note {
+                        Text(note)
+                            .font(.footnote)
+                            .foregroundStyle(Theme.muted)
+                    }
+                    if let lift, !lift.reps.isEmpty || lift.tooHeavy {
+                        Text(lastLine(lift))
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(Theme.primary)
+                            .padding(.top, 2)
+                    }
+                }
+                .accessibilityElement(children: .combine)
+                if let group, let lift, let advice = WeightAdvice(log: lift) {
+                    AdviceChip(advice: advice, key: ProgramState.weightKey(group: group, exercise: exercise))
+                        .padding(.top, 6)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            if let last = model.program.weight(for: group, exercise: exercise) {
-                Text("Last: \(last) lbs")
+            if lift == nil, let lastWeight {
+                Text("Last: \(lastWeight) lbs")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(Theme.primary)
                     .lineLimit(1)
@@ -151,6 +166,63 @@ struct ExerciseSection: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .accessibilityElement(children: .combine)
+    }
+
+    /// "Last: 35 lbs × 12, 10, 9" or "Last: 35 lbs, too heavy".
+    private func lastLine(_ lift: LiftLog) -> String {
+        var line = "Last: \(lift.weight) lbs"
+        if !lift.reps.isEmpty {
+            line += " × " + lift.reps.map(String.init).joined(separator: ", ")
+        }
+        if lift.tooHeavy {
+            line += ", too heavy"
+        }
+        return line
+    }
+}
+
+/// The suggested weight. A tap fills it into the weight sheet for this workout;
+/// a second tap takes it back out.
+private struct AdviceChip: View {
+    @Environment(AppModel.self) private var model
+    let advice: WeightAdvice
+    let key: String
+
+    var body: some View {
+        let chosen = model.session?.plannedWeights[key] == advice.weightText
+        VStack(alignment: .leading, spacing: 4) {
+            Button {
+                model.session?.toggleWeight(advice.weightText, forKey: key)
+            } label: {
+                Label(chosen ? "\(advice.weightText) lbs set for today" : advice.label,
+                      systemImage: chosen ? "checkmark.circle.fill" : icon)
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(chosen ? Color.white : color)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(chosen ? color : color.opacity(0.12), in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(chosen ? "Takes it back out of the weight sheet" : "Fills it into the weight sheet for today")
+            Text(advice.reason)
+                .font(.caption2)
+                .foregroundStyle(Theme.muted)
+        }
+    }
+
+    private var icon: String {
+        switch advice.direction {
+        case .up: return "arrow.up.circle.fill"
+        case .same: return "equal.circle.fill"
+        case .down: return "arrow.down.circle.fill"
+        }
+    }
+
+    private var color: Color {
+        switch advice.direction {
+        case .up: return Theme.success
+        case .same: return Theme.primary
+        case .down: return Theme.core
+        }
     }
 }

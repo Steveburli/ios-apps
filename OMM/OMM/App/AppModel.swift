@@ -2,13 +2,15 @@ import SwiftUI
 import Observation
 import OMMKit
 
-/// App state: saved progress, the home grid's picks, and the workout in progress.
+/// App state: saved progress, the home grid's picks, the workout in progress
+/// and any stretch routine.
 @Observable
 @MainActor
 final class AppModel {
     enum Screen: Equatable {
         case home
         case workout
+        case stretch
         case complete(days: Int)
     }
 
@@ -16,10 +18,21 @@ final class AppModel {
     private(set) var selection = GroupSelection()
     private(set) var screen: Screen = .home
     private(set) var session: WorkoutSession?
-    /// True while the weight sheet is up after the last set.
+    private(set) var stretch: StretchSession?
+    /// True while the weight sheet is up after the sets (and any cardio).
     var isEnteringWeights = false
     var durationMinutes: Int {
         didSet { defaults.set(durationMinutes, forKey: Keys.duration) }
+    }
+    var cardioOn: Bool {
+        didSet { defaults.set(cardioOn, forKey: Keys.cardioOn) }
+    }
+    /// The cardio slider's value. `cardioMinutesForWorkout` fits it to the duration.
+    var cardioMinutes: Int {
+        didSet { defaults.set(cardioMinutes, forKey: Keys.cardioMinutes) }
+    }
+    var stretchAfter: Bool {
+        didSet { defaults.set(stretchAfter, forKey: Keys.stretchAfter) }
     }
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -27,6 +40,9 @@ final class AppModel {
     private enum Keys {
         static let program = "program.v1"
         static let duration = "durationMinutes"
+        static let cardioOn = "cardioOn"
+        static let cardioMinutes = "cardioMinutes"
+        static let stretchAfter = "stretchAfter"
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -37,6 +53,9 @@ final class AppModel {
             self.defaults = scratch
             program = Screenshots.sampleProgram()
             durationMinutes = WorkoutPlan.defaultDuration
+            cardioOn = false
+            cardioMinutes = Cardio.defaultMinutes
+            stretchAfter = true
             openScreenshotScreen()
             return
         }
@@ -49,6 +68,11 @@ final class AppModel {
         }
         let storedDuration = defaults.integer(forKey: Keys.duration)
         durationMinutes = WorkoutPlan.durationRange.contains(storedDuration) ? storedDuration : WorkoutPlan.defaultDuration
+        cardioOn = defaults.bool(forKey: Keys.cardioOn)
+        let storedCardio = defaults.integer(forKey: Keys.cardioMinutes)
+        cardioMinutes = Cardio.minutesRange.contains(storedCardio) ? storedCardio : Cardio.defaultMinutes
+        // Stretching is on until it's turned off.
+        stretchAfter = defaults.object(forKey: Keys.stretchAfter) as? Bool ?? true
     }
 
     /// Picks three groups and goes to the screen named by `-screenshots`.
@@ -60,12 +84,25 @@ final class AppModel {
         case "workout":
             startWorkout()
             session?.advance(startingRest: true)
+            session?.adjustRest(by: WorkoutSession.restStep)
         case "weights":
+            startWorkout()
+            session?.toggleWeight("100", forKey: "Hams|Romanian Deadlift (Barbell/Dumbbell)")
+            while let current = session, !current.isLastStep {
+                current.advance(startingRest: false)
+            }
+            skipToNext()
+        case "cardio":
+            cardioOn = true
             startWorkout()
             while let current = session, !current.isLastStep {
                 current.advance(startingRest: false)
             }
             skipToNext()
+            session?.startCardio()
+        case "stretch":
+            startStretch(areas: ["Shoulders", "Thighs", "Core"], afterWorkout: true)
+            stretch?.startHold()
         case "complete":
             screen = .complete(days: 41)
         default:
@@ -79,6 +116,12 @@ final class AppModel {
         !selection.isEmpty
     }
 
+    /// Cardio minutes for the next workout: 0 when off, else the slider value
+    /// fitted so the sets keep enough time.
+    var cardioMinutesForWorkout: Int {
+        cardioOn ? Cardio.clamp(cardioMinutes, forDuration: durationMinutes) : 0
+    }
+
     func toggle(_ group: MuscleGroup) {
         guard !program.isDone(group) else { return }
         selection.toggle(group)
@@ -89,7 +132,8 @@ final class AppModel {
         guard !keys.isEmpty else { return }
         program.markStarted(at: Date())
         save()
-        session = WorkoutSession(plan: WorkoutPlan(groupKeys: keys, durationMinutes: durationMinutes))
+        session = WorkoutSession(plan: WorkoutPlan(groupKeys: keys, durationMinutes: durationMinutes,
+                                                   cardioMinutes: cardioMinutesForWorkout))
         screen = .workout
         RestNotifier.requestPermission()
     }
@@ -111,7 +155,7 @@ final class AppModel {
     func startRest() {
         guard let session else { return }
         if session.isLastStep {
-            finishWorkout()
+            finishSets()
         } else {
             session.advance(startingRest: true)
         }
@@ -121,13 +165,13 @@ final class AppModel {
     func skipToNext() {
         guard let session else { return }
         if session.isLastStep {
-            finishWorkout()
+            finishSets()
         } else {
             session.advance(startingRest: false)
         }
     }
 
-    /// Leaves without recording anything.
+    /// Leaves during the sets without recording anything.
     func endWorkoutEarly() {
         session?.stop()
         session = nil
@@ -135,24 +179,74 @@ final class AppModel {
         screen = .home
     }
 
-    private func finishWorkout() {
+    /// The last set is done: record it, then cardio if it's on, else the weight sheet.
+    private func finishSets() {
         guard let session, !session.isFinished else { return }
         session.finish()
+        let now = Date()
         program.recordWorkout(groupKeys: session.plan.groupKeys, setsPerGroup: WorkoutPlan.setsPerGroup,
-                              dayKey: DayKey.string(for: Date()))
+                              dayKey: DayKey.string(for: now))
+        program.markTrained(groupKeys: session.plan.groupKeys, at: now)
         save()
+        if session.plan.cardioMinutes > 0 {
+            session.showCardio()
+        } else {
+            isEnteringWeights = true
+        }
+    }
+
+    /// "Finish Cardio" or "Skip Cardio".
+    func finishCardio() {
+        session?.stop()
         isEnteringWeights = true
     }
 
-    /// "Save & Continue" on the weight sheet.
-    func saveWeights(_ entries: [String: String]) {
-        for (key, value) in entries {
+    /// "Save & Continue" on the weight sheet: weights, reps and "too heavy"
+    /// ticks by weight key. Then stretching, if it's on.
+    func saveWeights(_ weights: [String: String], reps: [String: [Int]], tooHeavy: Set<String>) {
+        for (key, value) in weights {
             program.setWeight(value, forKey: key)
+            program.logLift(forKey: key, weight: value, reps: reps[key] ?? [], tooHeavy: tooHeavy.contains(key))
         }
         save()
         isEnteringWeights = false
+        let areas = session?.plan.areas ?? []
         session = nil
         selection.clear()
+        if stretchAfter && !areas.isEmpty {
+            startStretch(areas: areas, afterWorkout: true)
+        } else {
+            showHomeOrComplete()
+        }
+    }
+
+    // MARK: Stretching
+
+    func startStretch(areas: [String], afterWorkout: Bool = false) {
+        let steps = Stretches.routine(areas: areas)
+        guard !steps.isEmpty else { return }
+        stretch = StretchSession(steps: steps, afterWorkout: afterWorkout)
+        screen = .stretch
+    }
+
+    func endStretch() {
+        let afterWorkout = stretch?.afterWorkout ?? false
+        stretch?.stop()
+        stretch = nil
+        if afterWorkout {
+            showHomeOrComplete()
+        } else {
+            screen = .home
+        }
+    }
+
+    /// Catches the timers up after the app comes back from the background.
+    func refreshTimers() {
+        session?.refresh()
+        stretch?.refresh()
+    }
+
+    private func showHomeOrComplete() {
         if program.isComplete {
             screen = .complete(days: DayKey.daysInclusive(from: program.startDate ?? Date(), to: Date()))
         } else {

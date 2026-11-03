@@ -1,28 +1,38 @@
 import SwiftUI
 import OMMKit
 
-/// The bar pinned to the bottom of a set: progress, clock, and the two buttons.
+/// The bar pinned to the bottom of a set: progress, the clock with its plus
+/// and minus buttons, and the two buttons.
 struct TimerBar: View {
     @Environment(AppModel.self) private var model
     let session: WorkoutSession
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: session.isResting ? 0.25 : 60)) { context in
+        TimelineView(.periodic(from: .now, by: session.isResting ? 0.25 : 15)) { context in
             let status = RestStatus(session: session, now: context.date)
-            VStack(spacing: 0) {
+            BottomPanel {
                 ProgressBar(fraction: status.fraction)
-                Text(status.clock)
-                    .font(.system(size: 46, weight: .heavy).monospacedDigit())
-                    .foregroundStyle(status.clockColor)
-                    .padding(.top, 8)
-                    .accessibilityLabel(status.accessibleClock)
+                HStack(spacing: 16) {
+                    adjustButton(-WorkoutSession.restStep, systemImage: "minus", label: "15 seconds less rest")
+                        .disabled(session.restSeconds == 0)
+                    Text(status.clock)
+                        .font(.system(size: 46, weight: .heavy).monospacedDigit())
+                        .foregroundStyle(status.clockColor)
+                        .frame(minWidth: 130)
+                        .accessibilityLabel(status.accessibleClock)
+                    adjustButton(WorkoutSession.restStep, systemImage: "plus", label: "15 seconds more rest")
+                }
+                .padding(.top, 8)
                 Text(status.info)
                     .font(.subheadline.weight(status.tone == .done ? .bold : .regular))
                     .foregroundStyle(status.tone == .done ? Theme.success : Theme.muted)
                     .multilineTextAlignment(.center)
                     .frame(minHeight: 18)
                     .padding(.top, 4)
-                    .padding(.bottom, 12)
+                if session.restAdjustment != 0 {
+                    adjustedLine(now: context.date)
+                        .padding(.top, 6)
+                }
                 HStack(spacing: 10) {
                     if !session.isResting {
                         Button("Start Timer") { model.startRest() }
@@ -31,22 +41,62 @@ struct TimerBar: View {
                     Button("Next Workout") { model.skipToNext() }
                         .buttonStyle(SecondaryButtonStyle())
                 }
+                .padding(.top, 12)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .frame(maxWidth: 568)
-            .frame(maxWidth: .infinity)
-            .background(alignment: .top) {
-                UnevenRoundedRectangle(topLeadingRadius: 20, topTrailingRadius: 20, style: .continuous)
-                    .fill(Color.white)
-                    .shadow(color: Theme.shadow.opacity(0.25), radius: 14, y: -8)
-                    .ignoresSafeArea(edges: .bottom)
-            }
+        }
+    }
+
+    private func adjustButton(_ delta: Int, systemImage: String, label: String) -> some View {
+        Button {
+            session.adjustRest(by: delta)
+        } label: {
+            Image(systemName: systemImage)
+                .font(.title3.weight(.bold))
+                .foregroundStyle(Theme.primary)
+                .frame(width: 48, height: 48)
+                .background(Theme.primary.opacity(0.12), in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+
+    /// "Rest 2:45 · Done about 6:42 PM · Reset", shown once the rest is changed.
+    private func adjustedLine(now: Date) -> some View {
+        let finish = session.estimatedFinish(now: now).formatted(date: .omitted, time: .shortened)
+        return HStack(spacing: 8) {
+            Text("Rest \(Clock.string(session.restSeconds)) · Done about \(finish)")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(Theme.text)
+            Button("Reset") { session.resetRest() }
+                .font(.footnote.weight(.bold))
+                .foregroundStyle(Theme.primary)
+                .accessibilityLabel("Reset to suggested rest, \(Clock.string(session.plan.restSeconds))")
         }
     }
 }
 
-private struct ProgressBar: View {
+/// The white panel pinned to the bottom of the workout, cardio and stretch screens.
+struct BottomPanel<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(spacing: 0) {
+            content
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(maxWidth: 568)
+        .frame(maxWidth: .infinity)
+        .background(alignment: .top) {
+            UnevenRoundedRectangle(topLeadingRadius: 20, topTrailingRadius: 20, style: .continuous)
+                .fill(Color.white)
+                .shadow(color: Theme.shadow.opacity(0.25), radius: 14, y: -8)
+                .ignoresSafeArea(edges: .bottom)
+        }
+    }
+}
+
+struct ProgressBar: View {
     let fraction: Double
 
     var body: some View {
@@ -78,27 +128,23 @@ private struct RestStatus {
     let tone: Tone
 
     init(session: WorkoutSession, now: Date) {
-        let total = Double(session.plan.restSeconds)
-        switch session.rest {
-        case .running(let endsAt):
-            let left = max(0, endsAt.timeIntervalSince(now))
-            let seconds = Int(left.rounded(.up))
-            clock = Self.format(seconds)
+        fraction = session.rest.fraction(now: now)
+        switch session.rest.state {
+        case .running:
+            let seconds = session.rest.secondsLeft(now: now) ?? 0
+            clock = Clock.string(seconds)
             accessibleClock = "\(seconds) seconds of rest left"
             info = "Rest time — Get ready for next exercise"
-            fraction = total > 0 ? 1 - left / total : 1
             tone = .running
         case .done:
             clock = "0:00"
             accessibleClock = "Rest is over"
             info = "Ready for next set!"
-            fraction = 1
             tone = .done
         case .idle:
-            clock = Self.format(session.plan.restSeconds)
-            accessibleClock = "Rest timer, \(session.plan.restSeconds) seconds"
+            clock = Clock.string(session.restSeconds)
+            accessibleClock = "Rest timer, \(session.restSeconds) seconds"
             info = session.isLastStep ? "Last set! Tap either button when you finish" : "Finish this set, then tap Start Timer"
-            fraction = 0
             tone = .idle
         }
     }
@@ -109,9 +155,5 @@ private struct RestStatus {
         case .running: return Theme.primary
         case .done: return Theme.success
         }
-    }
-
-    static func format(_ seconds: Int) -> String {
-        String(format: "%d:%02d", seconds / 60, seconds % 60)
     }
 }
