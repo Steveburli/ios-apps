@@ -46,7 +46,7 @@ TestFlight and App Store builds use CloudKit's **Production** environment. That 
    | Record type | Fields (type) |
    |---|---|
    | `Group` | `name` (String), `createdAt` (Date/Time) |
-   | `Deck` | `title` (String), `kind` (String), `blurb` (String), `createdAt` (Date/Time) |
+   | `Deck` | `title` (String), `kind` (String), `blurb` (String), `createdAt` (Date/Time); version 2 adds `decided` (String List), `decidedAt` (Date/Time), `decidedBy` (String), `spinCardID` (String), `spinAt` (Date/Time) |
    | `Card` | `deck` (Reference), `deckID` (String), `title` (String), `subtitle` (String), `details` (String), `tags` (String List), `link` (String), `order` (Double), `createdAt` (Date/Time) |
    | `Player` | `name` (String), `color` (Int(64)), `createdAt` (Date/Time) |
    | `Pick` | `card` (Reference), `deckID` (String), `cardID` (String), `playerID` (String), `vote` (String), `updatedAt` (Date/Time) |

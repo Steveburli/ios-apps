@@ -103,7 +103,7 @@ struct SpinSheet: View {
                     .accessibilityElement(children: .contain)
                 }
 
-                FlowLayout {
+                HStack(spacing: 10) {
                     Button(winner == nil ? "Spin" : "Spin again") { spin(options, deck: deck) }
                         .buttonStyle(.mutual())
                         .disabled(spinning || options.count < 2)
@@ -173,13 +173,18 @@ struct Wheel: View {
                     .fill(Theme.cardColor(card.id))
                     .overlay(SliceShape(start: .degrees(slice * Double(index) - 90), end: .degrees(slice * Double(index + 1) - 90))
                         .stroke(Color.white.opacity(0.6), lineWidth: 2))
+                // Labels run outward from the middle. On the left half they're
+                // turned around so they never read upside down.
+                let center = slice * (Double(index) + 0.5)
+                let leftHalf = center > 180
                 Text(count <= 10 ? card.title : CardText.initial(card.title))
-                    .font(.system(size: count <= 6 ? 14 : 12, weight: .bold))
+                    .font(.system(size: count <= 6 ? 15 : 12, weight: .bold))
                     .foregroundStyle(Color.white)
                     .lineLimit(1)
-                    .frame(width: 100, alignment: .trailing)
-                    .offset(x: 62)
-                    .rotationEffect(.degrees(slice * (Double(index) + 0.5) - 90))
+                    .minimumScaleFactor(0.6)
+                    .frame(width: 112, alignment: leftHalf ? .leading : .trailing)
+                    .offset(x: leftHalf ? -72 : 72)
+                    .rotationEffect(.degrees(center - 90 + (leftHalf ? 180 : 0)))
             }
             Circle()
                 .fill(Theme.surface)
