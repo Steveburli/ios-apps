@@ -2,8 +2,8 @@ import Foundation
 import OMMKit
 
 /// The cloud build launches the app with `-screenshots <screen>` to photograph
-/// each screen with sample data: home, workout, weights or complete.
-/// Nothing here runs in normal use.
+/// each screen with sample data: home, workout, weights, cardio, stretch or
+/// complete. Nothing here runs in normal use.
 enum Screenshots {
     static let screen: String? = {
         let arguments = ProcessInfo.processInfo.arguments
@@ -15,10 +15,12 @@ enum Screenshots {
         screen != nil
     }
 
-    /// Twelve days in: some groups crossed out, a few weights remembered.
+    /// Twelve days in: some groups crossed out, a few trained this week, and
+    /// a few weights and reps remembered.
     static func sampleProgram(now: Date = Date()) -> ProgramState {
+        func daysAgo(_ days: Int) -> Date { now.addingTimeInterval(Double(-days) * 86_400) }
         var state = ProgramState()
-        state.startDate = now.addingTimeInterval(-12 * 86_400)
+        state.startDate = daysAgo(12)
         for key in ["Mid", "Upper", "Traps", "Lats", "Biceps", "Triceps", "Rear"] {
             state.progress[key] = 3
         }
@@ -28,14 +30,26 @@ enum Screenshots {
         state.progress["Hams"] = 3
         state.progress["Rectus"] = 12
         state.progress["Oblique"] = 6
-        for daysAgo in [1, 3, 5, 7, 9, 12] {
-            state.dailySets[DayKey.string(for: now.addingTimeInterval(Double(-daysAgo) * 86_400))] = 9
+        for days in [1, 3, 5, 7, 9, 12] {
+            state.dailySets[DayKey.string(for: daysAgo(days))] = 9
+        }
+        let trained: [(String, Int)] = [("Biceps", 1), ("Standing", 1), ("Transversal", 1),
+                                        ("Lats", 3), ("Hams", 3), ("Lower Abs", 3),
+                                        ("Quads", 5), ("Seated", 5)]
+        for (key, days) in trained {
+            state.lastTrained[key] = daysAgo(days)
         }
         state.weights["Front|Dumbbell Shoulder Press"] = "35"
         state.weights["Front|Arnold Press"] = "30"
         state.weights["Front|Front Raises (Dumbbell/Plate)"] = "15"
         state.weights["Hams|Romanian Deadlift (Barbell/Dumbbell)"] = "95"
+        state.weights["Hams|Kettlebell Swings"] = "35"
+        state.weights["Hams|Seated Leg Curl Machine"] = "70"
         state.weights["Oblique|Dumbbell Side Bends"] = "40"
+        state.lifts["Front|Dumbbell Shoulder Press"] = LiftLog(weight: "35", reps: [12, 11, 10])
+        state.lifts["Hams|Romanian Deadlift (Barbell/Dumbbell)"] = LiftLog(weight: "95", reps: [12, 10, 9])
+        state.lifts["Hams|Kettlebell Swings"] = LiftLog(weight: "35", reps: [12, 12, 11], tooHeavy: true)
+        state.lifts["Hams|Seated Leg Curl Machine"] = LiftLog(weight: "70", reps: [12, 10, 8])
         return state
     }
 }

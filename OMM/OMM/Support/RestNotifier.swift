@@ -1,7 +1,8 @@
 import UserNotifications
 
-/// A local notification for when rest runs out while the phone is locked or
-/// another app is open. In the foreground the chime plays instead.
+/// A local notification for when a countdown (rest, cardio or a stretch) runs
+/// out while the phone is locked or another app is open. In the foreground the
+/// chime plays instead. Only one countdown runs at a time, so one id covers all.
 enum RestNotifier {
     private static let identifier = "rest-timer"
 
@@ -11,13 +12,13 @@ enum RestNotifier {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 
-    static func schedule(after seconds: Int, title: String, body: String) {
-        guard seconds > 0, !Screenshots.isActive else { return }
+    static func schedule(after seconds: TimeInterval, title: String, body: String) {
+        guard seconds >= 1, !Screenshots.isActive else { return }
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
         content.sound = .default
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(seconds), repeats: false)
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: seconds, repeats: false)
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
         UNUserNotificationCenter.current().add(request) { _ in }
     }

@@ -17,6 +17,7 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
+        @Bindable var model = model
         ZStack {
             Theme.background.ignoresSafeArea()
             switch model.screen {
@@ -24,14 +25,28 @@ struct RootView: View {
                 HomeView()
             case .workout:
                 if let session = model.session {
-                    WorkoutView(session: session)
+                    if session.phase == .cardio {
+                        CardioView(session: session)
+                    } else {
+                        WorkoutView(session: session)
+                    }
+                }
+            case .stretch:
+                if let stretch = model.stretch {
+                    StretchView(session: stretch)
                 }
             case .complete(let days):
                 CompletionView(days: days)
             }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { model.session?.refresh() }
+            if phase == .active { model.refreshTimers() }
+        }
+        .fullScreenCover(isPresented: $model.isEnteringWeights) {
+            if let session = model.session {
+                WeightEntryView(session: session)
+                    .environment(model)
+            }
         }
     }
 }

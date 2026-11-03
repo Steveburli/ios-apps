@@ -1,7 +1,14 @@
 import SwiftUI
+import OMMKit
 
 /// The web app's purple-blue palette.
 enum Theme {
+    /// Section colors on the home grid. Each also has a word label, so color is never the only cue.
+    static let upper = Color(hex: 0x5A67D8)
+    static let lower = Color(hex: 0x2C7A7B)
+    static let core = Color(hex: 0xC05621)
+    /// A recently trained cell fades toward this.
+    static let faded = Color(hex: 0xDCE0E8)
     static let primary = Color(hex: 0x667EEA)
     static let deep = Color(hex: 0x764BA2)
     static let text = Color(hex: 0x2D3748)
@@ -18,6 +25,16 @@ enum Theme {
 
     static let background = LinearGradient(colors: [primary, deep],
                                            startPoint: .topLeading, endPoint: .bottomTrailing)
+}
+
+extension MuscleCategory {
+    var color: Color {
+        switch self {
+        case .upper: return Theme.upper
+        case .lower: return Theme.lower
+        case .core: return Theme.core
+        }
+    }
 }
 
 extension Color {

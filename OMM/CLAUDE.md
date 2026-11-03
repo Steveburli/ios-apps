@@ -6,12 +6,14 @@ A native SwiftUI (iOS 18+, iPhone, portrait) version of the OMM workout web app 
 
 - `OMM.xcodeproj` is an Xcode 16 synchronized-folder project (objectVersion 77). Files added under `OMM/` join the app target automatically, so never edit `project.pbxproj` just to add a file.
 - `Packages/OMMKit` holds Foundation-only logic plus XCTest:
-  - `Catalog` and `Exercises`: the 7 × 4 grid and 10 exercises per group
-  - `ProgramState`: progress, weights, start date and daily sets, plus the completion and estimate math
-  - `WorkoutPlan` and `GroupSelection`
-- `OMM/App` has `AppModel`, which owns the state and saves `ProgramState` as JSON in UserDefaults (`program.v1`).
-- `OMM/Workout/WorkoutSession` runs the set-by-set flow and the rest timer.
-- `OMM/Support` has the theme, the chime (a WAV built in memory) and the rest notification.
+  - `Catalog` and `Exercises`: the 7 × 4 grid in three sections (upper, lower, core) and 10 exercises per group
+  - `ProgramState`: progress, weights, start date and daily sets, plus `lastTrained` (the grid's 7-day fade) and `lifts` (reps per set and a "too heavy" tick). It decodes saves that lack the newer fields.
+  - `WorkoutPlan` (cardio minutes come out of the total) and `GroupSelection`
+  - `WeightAdvice`: Steve's rule. First set 12+ and last set 9+ → up 5 lb; "too heavy" → down 5 lb; else same.
+  - `Cardio` and `Stretches`: the cardio list and two gentle stretches per body area
+- `OMM/App` has `AppModel`, which owns the state and saves `ProgramState` as JSON in UserDefaults (`program.v1`). Flow: sets → cardio (if on) → weight sheet → stretches (if on) → home.
+- `OMM/Workout/WorkoutSession` runs the set-by-set flow, the rest timer (±15 s for this workout only) and cardio. `OMM/Stretch` runs stretch routines, after a workout or from "Just Stretch".
+- `OMM/Support` has the theme, `Countdown` (shared by rest, cardio and stretch holds), the chime (a WAV built in memory) and the notification.
 - `Config/Info.plist` is merged into the generated Info.plist.
 
 ## Commands
@@ -36,6 +38,7 @@ If `xcodebuild` complains about the developer directory, ask the user to run `su
 
 - **Back to Home** asks for confirmation before it throws away the workout.
 - The duration slider remembers its last value.
+- Version 2 (from App HQ feedback, 2026-11-03): labeled, colored grid sections; recently trained groups fade; adjustable rest with a finish time; reps and a suggested weight; optional cardio; stretching after workouts (on by default) and on its own.
 - A local notification fires when rest ends while the app is in the background.
 
 ## How this repo is worked on
