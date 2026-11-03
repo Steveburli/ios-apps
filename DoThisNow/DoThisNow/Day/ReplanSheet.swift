@@ -59,7 +59,7 @@ struct ReplanSheet: View {
                     }
                 }
             }
-            .navigationTitle("Replan")
+            .navigationTitle("Catch up on today")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -95,13 +95,16 @@ struct ReplanSheet: View {
             }
             Picker("What happens to it", selection: choice) {
                 ForEach(Leftover.allCases.filter { !(tomorrowFull && $0 == .tomorrow) }, id: \.self) { option in
-                    Text(option == .tomorrow ? "Tomorrow \(model.formats.time(tomorrow, Double(item.tomorrow ?? 0)))"
-                                             : option == .inbox ? "Inbox" : option.label)
+                    Text(option == .tomorrow ? "Tomorrow" : option == .inbox ? "Inbox" : option.label)
                         .tag(option)
                 }
             }
             .pickerStyle(.segmented)
-            if tomorrowFull {
+            if let start = item.tomorrow, choice.wrappedValue == .tomorrow {
+                Text("Tomorrow at \(model.formats.time(tomorrow, Double(start))), in the first gap that fits.")
+                    .font(.caption)
+                    .foregroundStyle(Theme.ink3)
+            } else if tomorrowFull {
                 Text("Tomorrow is full too.")
                     .font(.caption)
                     .foregroundStyle(Theme.ink3)
