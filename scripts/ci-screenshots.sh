@@ -79,7 +79,7 @@ print(sorted(ids)[-1] if ids else "")
     xcrun simctl status_bar "$ipad" override --time "9:41" --dataNetwork wifi --wifiMode active --wifiBars 3 \
       --batteryState charged --batteryLevel 100 || true
     xcrun simctl install "$ipad" "$app_path"
-    pause=12
+    pause=20
     for screen in day replan trip; do
       xcrun simctl launch --terminate-running-process "$ipad" "$bundle" -screenshots "$screen" > /dev/null || true
       sleep "$pause"
