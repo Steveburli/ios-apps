@@ -34,6 +34,8 @@ final class AppModel {
         case routineStep(String?)
         case sleep
         case alarm
+        /// Catching up on what you missed earlier today.
+        case replan
 
         var id: String {
             switch self {
@@ -54,6 +56,7 @@ final class AppModel {
             case .routineStep(let id): return "routine-" + (id ?? "new")
             case .sleep: return "sleep"
             case .alarm: return "alarm"
+            case .replan: return "replan"
             }
         }
     }
@@ -83,6 +86,16 @@ final class AppModel {
         var target: Int
         let push: Double
     }
+
+    /// What Replan changed, so one tap puts it back.
+    struct ReplanUndo {
+        let blocks: [TimeBlock]
+        let tasks: [TaskItem]
+        let hidden: [String]
+        let count: Int
+    }
+
+    enum SideListMode: String { case inbox, tasks }
 
     struct Toast: Identifiable, Equatable {
         let id = UUID()
@@ -127,6 +140,13 @@ final class AppModel {
     var draggingKey: String?
     var draggingBlockID: String?
     @ObservationIgnored var blockDrag: BlockDrag?
+    /// On iPad, a block dragged over the left column goes back to the Inbox when let go.
+    var blockOverSideList = false
+    @ObservationIgnored var sideListFrame: CGRect?
+    /// The day as it was before the last Replan, for Undo.
+    var replanUndo: ReplanUndo?
+    /// The left column on iPad shows every source, or only Do This Now's tasks.
+    var sideList: SideListMode = .inbox
 
     let formats: Formats
     @ObservationIgnored private var skip: Set<String> = []
@@ -166,7 +186,7 @@ final class AppModel {
     }
 
     /// Goes to the screen named by `-screenshots`: now, pick, doing, tasks, day,
-    /// dayfull, inbox, inboxpage, track or wake.
+    /// dayfull, inbox, inboxpage, replan, track or wake.
     private func openScreenshotScreen() {
         switch Screenshots.screen {
         case "pick":
@@ -193,6 +213,13 @@ final class AppModel {
             tab = .day
             openDayTab()
             dayPage = .inbox
+        case "replan":
+            tab = .day
+            openDayTab()
+            let minute = calendar.component(.hour, from: now) * 60 + calendar.component(.minute, from: now)
+            state.blocks.append(TimeBlock(ref: SourceRef(.inbox, "replan-example"), title: "Call the plumber", day: today,
+                                          start: max(0, minute - 120), minutes: 30))
+            sheet = .replan
         case "track":
             tab = .track
             state.running = RunningTimer(activityID: state.activities.first?.id, title: state.activities.first?.name ?? "Shower",

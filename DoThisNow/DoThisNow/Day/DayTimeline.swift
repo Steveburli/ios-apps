@@ -279,6 +279,7 @@ struct DayTimeline: View {
         let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
         var detail = [f.range(day, Double(block.start), Double(block.end))]
         if block.done { detail.append("done") } else if block.ref.source != .app { detail.append(block.ref.source.label) }
+        if let label = model.state.listLabel(for: block.ref) { detail.append(label) }
 
         return BlockLabel(title: block.title, detail: detail.joined(separator: " · "), trailingPadding: 34)
             .foregroundStyle(Theme.blockInk)
@@ -308,6 +309,7 @@ struct DayTimeline: View {
                     .onChanged { value in
                         if case .second(true, let drag?) = value {
                             model.dragBlock(block.id, by: drag.translation.height, pointsPerMinute: Self.px)
+                            model.trackBlockDrag(at: drag.location)
                         }
                     }
                     .onEnded { _ in model.endBlockDrag() }

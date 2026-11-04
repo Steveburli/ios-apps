@@ -12,7 +12,7 @@ derived="$2"
 
 case "$app" in
   OMM)         bundle="com.steveburlison.omm";         screens="home workout weights cardio stretch complete" ;;
-  DoThisNow)   bundle="com.steveburlison.dothisnow";   screens="now pick doing tasks day dayfull inbox inboxpage track wake" ;;
+  DoThisNow)   bundle="com.steveburlison.dothisnow";   screens="now pick doing tasks day dayfull inbox inboxpage replan track wake" ;;
   MutualSwipe) bundle="com.steveburlison.mutualswipe"; screens="home swipe results card" ;;
   *) echo "Unknown app: $app"; exit 1 ;;
 esac
@@ -61,6 +61,34 @@ if [ "$app" != "OMM" ]; then
   xcrun simctl launch --terminate-running-process "$udid" "$bundle" -screenshots "$first" > /dev/null || true
   sleep 6
   xcrun simctl io "$udid" screenshot "report/screens/$(printf %02d "$i")-$first-dark.png" > /dev/null 2>&1 || true
+  i=$((i + 1))
+fi
+
+# Do This Now runs on iPad too: photograph its two-column screens there.
+if [ "$app" = "DoThisNow" ]; then
+  ipad_type="$(xcrun simctl list devicetypes -j | python3 -c '
+import json, sys
+ids = [d["identifier"] for d in json.load(sys.stdin)["devicetypes"] if "iPad-Pro-13-inch" in d["identifier"]]
+print(sorted(ids)[-1] if ids else "")
+')"
+  if [ -n "$ipad_type" ]; then
+    echo "Using $ipad_type for iPad screens"
+    ipad="$(xcrun simctl create "Screens-$app-iPad" "$ipad_type" "$runtime")"
+    xcrun simctl boot "$ipad"
+    xcrun simctl bootstatus "$ipad" -b > /dev/null
+    xcrun simctl status_bar "$ipad" override --time "9:41" --dataNetwork wifi --wifiMode active --wifiBars 3 \
+      --batteryState charged --batteryLevel 100 || true
+    xcrun simctl install "$ipad" "$app_path"
+    pause=12
+    for screen in day replan; do
+      xcrun simctl launch --terminate-running-process "$ipad" "$bundle" -screenshots "$screen" > /dev/null || true
+      sleep "$pause"
+      pause=6
+      xcrun simctl io "$ipad" screenshot "report/screens/$(printf %02d "$i")-ipad-$screen.png" > /dev/null 2>&1 || true
+      i=$((i + 1))
+    done
+    xcrun simctl shutdown "$ipad" || true
+  fi
 fi
 
 xcrun simctl spawn "$udid" log show --style compact --last 10m --predicate "process == \"$app\"" \

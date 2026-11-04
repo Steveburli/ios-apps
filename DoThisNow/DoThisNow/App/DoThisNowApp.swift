@@ -167,6 +167,8 @@ private struct SheetContent: View {
             SleepSettingsForm()
         case .alarm:
             AlarmSettingsView()
+        case .replan:
+            ReplanSheet()
         }
     }
 }
