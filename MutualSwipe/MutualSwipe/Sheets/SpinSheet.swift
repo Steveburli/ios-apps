@@ -182,8 +182,9 @@ struct Wheel: View {
                     .foregroundStyle(Color.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
-                    .frame(width: 112, alignment: leftHalf ? .leading : .trailing)
-                    .offset(x: leftHalf ? -72 : 72)
+                    // Kept clear of the 44pt hub in the middle.
+                    .frame(width: 104, alignment: leftHalf ? .leading : .trailing)
+                    .offset(x: leftHalf ? -84 : 84)
                     .rotationEffect(.degrees(center - 90 + (leftHalf ? 180 : 0)))
             }
             Circle()
