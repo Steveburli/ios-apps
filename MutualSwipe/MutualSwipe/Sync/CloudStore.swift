@@ -125,7 +125,7 @@ final class CloudStore: CKSyncEngineDelegate {
     /// Each person's share of the deck vetted.
     func vetting(of deckID: String) -> Vetting {
         let groupID = decks[deckID]?.groupID ?? ""
-        return Vetting(state: state(of: deckID, me: nil), players: players(in: groupID).map(.id))
+        return Vetting(state: state(of: deckID, me: nil), players: players(in: groupID).map { $0.id })
     }
 
     func canWrite(_ groupID: String) -> Bool {
