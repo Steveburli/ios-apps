@@ -17,15 +17,21 @@ public struct WorkoutPlan: Equatable, Sendable {
     public static let durationRange: ClosedRange<Int> = 9...90
     public static let durationStep = 3
     public static let defaultDuration = 27
+    /// Time allowed for doing one set, before its rest.
+    public static let secondsPerSet = 30
 
     /// The chosen groups in upper, lower, core order.
     public let groupKeys: [String]
     public let steps: [Step]
-    /// Rest after each set: the workout's time split evenly across its sets,
+    /// Rest after each set: the time left for sets split evenly across them,
     /// minus 30 seconds for doing the set. 27 minutes over 9 sets is 2:30.
     public let restSeconds: Int
+    /// Cardio at the end. It comes out of the total, so the workout still fits.
+    public let cardioMinutes: Int
 
-    public init(groupKeys: [String], durationMinutes: Int) {
+    public init(groupKeys: [String], durationMinutes: Int, cardioMinutes: Int = 0) {
+        let cardioMinutes = max(0, min(cardioMinutes, durationMinutes))
+        let setMinutes = durationMinutes - cardioMinutes
         var steps: [Step] = []
         for set in 1...Self.setsPerGroup {
             for key in groupKeys {
@@ -34,12 +40,24 @@ public struct WorkoutPlan: Equatable, Sendable {
         }
         self.groupKeys = groupKeys
         self.steps = steps
+        self.cardioMinutes = cardioMinutes
         if steps.isEmpty {
             restSeconds = 0
         } else {
-            let perStep = (Double(durationMinutes * 60) / Double(steps.count)).rounded()
-            restSeconds = max(0, Int(perStep) - 30)
+            let perStep = (Double(setMinutes * 60) / Double(steps.count)).rounded()
+            restSeconds = max(0, Int(perStep) - Self.secondsPerSet)
         }
+    }
+
+    /// Sets still to come after the one at `index`.
+    public func setsAfter(_ index: Int) -> Int {
+        max(0, steps.count - 1 - index)
+    }
+
+    /// Body areas worked, in workout order, for the stretches afterwards.
+    public var areas: [String] {
+        var seen = Set<String>()
+        return groupKeys.compactMap { Catalog.group($0)?.area }.filter { seen.insert($0).inserted }
     }
 }
 

@@ -2,34 +2,62 @@ import SwiftUI
 import DoThisNowKit
 
 /// The day planner: work is a rock, tasks are soft, events are jelly with a
-/// hard core, and sleep moves but complains.
+/// hard core, and sleep moves but complains. On iPad the task list sits on
+/// the left and the timeline on the right, so you drag between them.
 struct DayView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
         @Bindable var model = model
-        VStack(spacing: 0) {
-            Picker("Show", selection: $model.dayPage) {
-                Text("Day").tag(AppModel.DayPage.timeline)
-                Text("Inbox (\(model.inboxEntries.count))").tag(AppModel.DayPage.inbox)
-                Text("Trip").tag(AppModel.DayPage.trip)
+        if sizeClass == .regular {
+            // The Inbox already sits in the left column, so iPad only
+            // switches between the day and the trip.
+            VStack(spacing: 0) {
+                Picker("Show", selection: Binding(get: { model.dayPage == .trip ? AppModel.DayPage.trip : .timeline },
+                                                  set: { model.dayPage = $0 })) {
+                    Text("Day").tag(AppModel.DayPage.timeline)
+                    Text("Trip").tag(AppModel.DayPage.trip)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 6)
+                .frame(maxWidth: 360)
+                if model.dayPage == .trip {
+                    TripView()
+                } else {
+                    HStack(spacing: 0) {
+                        SideList(day: model.dayShown)
+                            .frame(width: 360)
+                        Divider().overlay(Theme.line)
+                        timeline(tray: false)
+                    }
+                }
             }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 6)
-            .frame(maxWidth: 760)
-            if model.dayPage == .inbox {
-                InboxPage(day: model.dayShown)
-            } else if model.dayPage == .trip {
-                TripView()
-            } else {
-                timeline
+        } else {
+            VStack(spacing: 0) {
+                Picker("Show", selection: $model.dayPage) {
+                    Text("Day").tag(AppModel.DayPage.timeline)
+                    Text("Inbox (\(model.inboxEntries.count))").tag(AppModel.DayPage.inbox)
+                    Text("Trip").tag(AppModel.DayPage.trip)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 6)
+                .frame(maxWidth: 760)
+                if model.dayPage == .inbox {
+                    InboxPage(day: model.dayShown)
+                } else if model.dayPage == .trip {
+                    TripView()
+                } else {
+                    timeline(tray: true)
+                }
             }
         }
     }
 
     @ViewBuilder
-    private var timeline: some View {
+    private func timeline(tray: Bool) -> some View {
         let engine = model.engine
         let day = model.dayShown
         let plan = engine.planDay(day)
@@ -39,6 +67,7 @@ struct DayView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     header(day: day, offset: offset)
+                    if offset == 0 { replanCard }
                     stats(plan)
                     fixes(plan)
                     legend
@@ -54,7 +83,41 @@ struct DayView: View {
             .onAppear { scrollToNow(proxy) }
             .onChange(of: model.scrollDayToNow) { scrollToNow(proxy) }
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                InboxTray(day: day)
+                if tray { InboxTray(day: day) }
+            }
+        }
+    }
+
+    /// Offers Replan when something from earlier today was missed, and Undo right after one.
+    @ViewBuilder
+    private var replanCard: some View {
+        if let undo = model.replanUndo {
+            HStack(spacing: 10) {
+                Text("Replanned \(undo.count) thing\(undo.count == 1 ? "" : "s").")
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.ink)
+                Spacer()
+                Button("Undo") { model.undoReplan() }
+                    .buttonStyle(.dtn(size: .small))
+                Button { model.dismissReplanUndo() } label: {
+                    Image(systemName: "xmark").font(.footnote.weight(.bold)).frame(width: 32, height: 32)
+                }
+                .foregroundStyle(Theme.ink3)
+                .accessibilityLabel("Keep the new plan")
+            }
+            .banner()
+        } else {
+            let missed = model.missedCount
+            if missed > 0 {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(missed == 1 ? "One thing from earlier today didn’t get done."
+                                     : "\(missed) things from earlier today didn’t get done.")
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.ink)
+                    Button("Replan the rest of my day") { model.openReplan() }
+                        .buttonStyle(.dtn(.primary, size: .small))
+                }
+                .banner()
             }
         }
     }

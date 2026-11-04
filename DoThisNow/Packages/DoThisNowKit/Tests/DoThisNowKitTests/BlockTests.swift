@@ -202,6 +202,16 @@ final class BlockTests: XCTestCase {
         XCTAssertEqual(state.tasks[0].tier, 1, "Your priority level stays")
     }
 
+    func testTasksFromALabeledListCarryTheLabel() {
+        var state = PlannerState()
+        state.inbox.reminders.on = true
+        state.inbox.listLabels = ["house": "From my wife", "blank": "  "]
+        syncing([reminder("Porch light", list: "house"), reminder("Call"), reminder("Gutter", list: "blank")], &state)
+        XCTAssertEqual(state.tasks.map { state.listLabel(for: $0) }, ["From my wife", nil, nil])
+        XCTAssertEqual(state.listLabel(for: SourceRef(.app, state.tasks[0].id)), "From my wife")
+        XCTAssertNil(state.listLabel(for: SourceRef(.inbox, state.tasks[0].id)))
+    }
+
     func testRemindersStayOutWhileTurnedOffOrFilteredOut() {
         var state = PlannerState()
         syncing([reminder("Off")], &state)

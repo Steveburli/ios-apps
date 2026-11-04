@@ -13,6 +13,15 @@ public enum MuscleCategory: String, Codable, CaseIterable, Sendable {
         case .core: return 12
         }
     }
+
+    /// The section heading on the home grid.
+    public var title: String {
+        switch self {
+        case .upper: return "Upper body"
+        case .lower: return "Lower body"
+        case .core: return "Core"
+        }
+    }
 }
 
 /// One selectable cell of the home grid.
@@ -43,7 +52,25 @@ public struct BodyAreaRow: Identifiable, Sendable {
     public var id: String { area }
 }
 
+/// One labeled section of the home grid: a category and its body-area rows.
+public struct CategorySection: Identifiable, Sendable {
+    public let category: MuscleCategory
+    public let rows: [BodyAreaRow]
+
+    public var id: String { category.rawValue }
+}
+
 public enum Catalog {
+    /// The grid's three sections in workout order: upper body, lower body, core.
+    public static let sections: [CategorySection] = MuscleCategory.allCases.map { category in
+        CategorySection(category: category, rows: rows.filter { $0.category == category })
+    }
+
+    /// The seven body areas in section order, for picking stretches.
+    public static var areas: [String] {
+        sections.flatMap { $0.rows.map(\.area) }
+    }
+
     /// Grid rows, top to bottom.
     public static let rows: [BodyAreaRow] = layout.map { row in
         let groups = row.names.map { name -> MuscleGroup in

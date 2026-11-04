@@ -1,6 +1,6 @@
 # Do This Now
 
-A native SwiftUI (iOS 18+, iPhone, portrait, light and dark) version of the Do This Now web app at steveburlison.com/do-this-now/. It picks the one thing to do right now from your priorities, the time you have, where you are, and your mood. It also has a day planner where work is a rock, tasks are soft clay, events are jelly with a hard core, and sleep moves but complains. The web app's `index.html` (in the user's Windows `Documents\Websites\hub\apps\do-this-now\`) is the reference, and this port follows it closely.
+A native SwiftUI (iOS 18+, iPhone in portrait and iPad in any orientation, light and dark) version of the Do This Now web app at steveburlison.com/do-this-now/. It picks the one thing to do right now from your priorities, the time you have, where you are, and your mood. It also has a day planner where work is a rock, tasks are soft clay, events are jelly with a hard core, and sleep moves but complains. The web app's `index.html` (in the user's Windows `Documents\Websites\hub\apps\do-this-now\`) is the reference, and this port follows it closely.
 
 ## Layout
 
@@ -14,9 +14,10 @@ A native SwiftUI (iOS 18+, iPhone, portrait, light and dark) version of the Do T
   - `Inbox`: `SourceTask` (a task from any source), per-source `SourceFilter`s, and `Engine.inbox(external:)`
   - `ReminderSync`: `PlannerState.syncReminders`, which keeps a `TaskItem` (`reminderID`) for each reminder that passes the filters, so Now, Tasks and the Day all use them. Reminder priority sets the starting tier only: high is Top priority, medium is High, low or none is Medium
   - `Tracking`: Track-tab activities and timings, and `Estimator` (title keys, outlier-free typical times from the last 20 runs, word-based guesses). `PlannerState.estimate` picks your own minutes, then history, then the task's estimate, then a guess
+  - `Replan`: `Engine.missedBlocks` (blocks on today that ended undone), `Engine.replan()` (later-today gaps, then tomorrow's) and `PlannerState.apply` (tomorrow, back to the Inbox, or let go). `Engine.openSlots` is the shared gap finder
   - `Wake`: the morning routine, `Engine.wakePlan(for:)` (work or the first event, minus commute, buffer and routine, then the sleep goal), and the alarm's ring times with backups
 - `DoThisNow/App/AppModel` owns the state. It saves `planner.json` in Application Support and re-syncs local notifications after every change.
-- `Now/`, `Tasks/`, `Day/`, `Track/`, `Wake/` and `Settings/` hold the screens. `Day/DayFullScreen` is the timeline over the whole screen (remembered in `dayFullScreen`). `Inbox/` holds the Day tab's Inbox drawer, the Inbox page (the Day tab's second segment: pick tasks, then put them in the first gaps) and its sources: `RemindersSource` (EventKit) and `InboxDropbox` (the Shortcuts/Siri intent writes a file the app picks up). `AppModel.commit` sends finished and restored tasks to Reminders through `pushReminderChanges`. `Wake/WakeAlarms` schedules AlarmKit alarms on iOS 26+ (weak-linked with `-weak_framework AlarmKit`) and notifications before that. `Support/` holds the theme and chips, `FlowLayout`, the synthesized sounds, and `Notifier`.
+- `Now/`, `Tasks/`, `Day/`, `Track/`, `Wake/` and `Settings/` hold the screens. `Day/DayFullScreen` is the timeline over the whole screen (remembered in `dayFullScreen`). On iPad (regular width) the Day tab is two columns: `Inbox/SideList` (Inbox or Do This Now tasks only) and the timeline; a block dragged over the left column goes back to the Inbox. `Day/ReplanSheet` previews a Replan, and the Day card offers it and then Undo. `Inbox/` holds the Day tab's Inbox drawer, the Inbox page (the Day tab's second segment: pick tasks, then put them in the first gaps) and its sources: `RemindersSource` (EventKit) and `InboxDropbox` (the Shortcuts/Siri intent writes a file the app picks up). `AppModel.commit` sends finished and restored tasks to Reminders through `pushReminderChanges`. `Wake/WakeAlarms` schedules AlarmKit alarms on iOS 26+ (weak-linked with `-weak_framework AlarmKit`) and notifications before that. `Support/` holds the theme and chips, `FlowLayout`, the synthesized sounds, and `Notifier`.
 
 ## Commands
 
@@ -41,6 +42,7 @@ xcodebuild -project DoThisNow.xcodeproj -scheme DoThisNow -destination 'generic/
 - No cloud sync. Data stays on the phone, so the sync indicator is gone.
 - New in the app only (not in the web app): the Inbox, hand-placed blocks, the Track tab and the Wake tab. They were modeled on Structured (Inbox and timeline), Atracker (one-tap timers) and Awake (scan-to-stop alarm). Turning off "Suggest tasks for the gaps" leaves only your own blocks on the Day.
 - iPhone always shows its own Stop control on alarms, so "scan to stop" works by backup alarms every couple of minutes until a scan in the app. The scanner also has a 30-second hold for when a code can't be scanned.
+- A Reminders list can carry a label (`InboxSettings.listLabels`, set under Task sources > Labels for shared lists), shown on Tasks, Inbox rows and blocks. Meant for a list someone shares with you, such as "From my wife".
 - The system rounded font replaces the web app's Recursive font, so no font file ships with the app.
 
 ## How this repo is worked on
