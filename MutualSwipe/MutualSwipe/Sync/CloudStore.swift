@@ -86,19 +86,46 @@ final class CloudStore: CKSyncEngineDelegate {
         decks.values.filter { $0.groupID == groupID }.sorted { ($0.createdAt, $0.id) > ($1.createdAt, $1.id) }
     }
 
+    /// The deck's cards, leaving out ones marked "Never, for good".
     func cards(in deckID: String) -> [Card] {
-        cards.values.filter { $0.deckID == deckID }.inSwipeOrder()
+        cards.values.filter { $0.deckID == deckID && !$0.isRetired }.inSwipeOrder()
+    }
+
+    func retiredCards(in deckID: String) -> [Card] {
+        cards.values.filter { $0.deckID == deckID && $0.isRetired }.inSwipeOrder()
     }
 
     func players(in groupID: String) -> [Player] {
         players.values.filter { $0.groupID == groupID }.sorted { ($0.createdAt, $0.id) < ($1.createdAt, $1.id) }
     }
 
+    /// The deck's vetting: everyone's first pass, outside any round.
     func state(of deckID: String, me: String?) -> DeckState {
         let deck = decks[deckID]
-        let deckPicks = picks.values.filter { $0.deckID == deckID }
+        let deckPicks = picks.values.filter { $0.deckID == deckID && $0.roundID == nil }
         return DeckState(cards: cards(in: deckID), players: deck.map { players(in: $0.groupID) } ?? [],
                          picks: Array(deckPicks), me: me)
+    }
+
+    /// The round running on a deck, with only that round's cards and votes.
+    func roundState(of deckID: String, me: String?) -> DeckState? {
+        guard let deck = decks[deckID], let round = deck.activeRound else { return nil }
+        let inRound = Set(deck.roundCards ?? [])
+        let roundPicks = picks.values.filter { $0.deckID == deckID && $0.roundID == round }
+        return DeckState(cards: cards(in: deckID).filter { inRound.contains($0.id) }, players: players(in: deck.groupID),
+                         picks: Array(roundPicks), me: me)
+    }
+
+    /// The round when one is running and on screen, else vetting.
+    func liveState(of deckID: String, me: String?, vetting: Bool) -> DeckState {
+        if !vetting, let round = roundState(of: deckID, me: me) { return round }
+        return state(of: deckID, me: me)
+    }
+
+    /// Each person's share of the deck vetted.
+    func vetting(of deckID: String) -> Vetting {
+        let groupID = decks[deckID]?.groupID ?? ""
+        return Vetting(state: state(of: deckID, me: nil), players: players(in: groupID).map(.id))
     }
 
     func canWrite(_ groupID: String) -> Bool {
@@ -213,6 +240,10 @@ final class CloudStore: CKSyncEngineDelegate {
         }
         deck.decided = list
         if deck.decidedAt == nil { deck.decidedAt = Date() }
+        // Deciding in a round makes that card the round's winner in the history.
+        if isDecided, let round = deck.activeRound, deck.roundCards?.contains(cardID) == true {
+            remember(card, round: round, in: &deck)
+        }
         decks[deck.id] = deck
         enqueueSave(deck.id, in: group)
         scheduleSave()
@@ -243,13 +274,13 @@ final class CloudStore: CKSyncEngineDelegate {
         return player
     }
 
-    /// Sets or clears one person's vote on a card.
-    func setVote(_ vote: Vote?, card cardID: String, player playerID: String) {
+    /// Sets or clears one person's vote on a card, in vetting or in a round.
+    func setVote(_ vote: Vote?, card cardID: String, player playerID: String, round: String? = nil) {
         guard let card = cards[cardID], let group = groups[card.groupID] else { return }
-        let id = Pick.id(cardID: cardID, playerID: playerID)
+        let id = Pick.id(cardID: cardID, playerID: playerID, roundID: round)
         if let vote {
             var pick = picks[id] ?? Pick(groupID: group.id, deckID: card.deckID, cardID: cardID, playerID: playerID,
-                                         vote: vote, updatedAt: Date())
+                                         vote: vote, updatedAt: Date(), roundID: round)
             pick.vote = vote
             pick.updatedAt = Date()
             picks[id] = pick
@@ -261,11 +292,100 @@ final class CloudStore: CKSyncEngineDelegate {
         scheduleSave()
     }
 
-    /// "Clear my swipes" for one deck.
+    /// "Clear my swipes" for one deck's vetting. Round votes are left alone.
     func clearVotes(deck deckID: String, player playerID: String) {
-        for pick in picks.values where pick.deckID == deckID && pick.playerID == playerID {
+        for pick in picks.values where pick.deckID == deckID && pick.playerID == playerID && pick.roundID == nil {
             setVote(nil, card: pick.cardID, player: playerID)
         }
+    }
+
+    // MARK: Rounds
+
+    /// Starts a round, or starts a new one over the round running now. A new
+    /// round clears everyone's round votes, the decided list and the spin, after
+    /// saving the old round's winner. Vetting votes are never touched.
+    @discardableResult
+    func startRound(deck deckID: String, question: String, chain: [String]? = nil, filter: [String]? = nil) -> Rounds.Plan? {
+        guard var deck = decks[deckID], let group = groups[deck.groupID] else { return nil }
+        closeRound(&deck)
+        let filter = filter ?? deck.roundFilter ?? []
+        let plan = Rounds.plan(vetting: state(of: deckID, me: nil), filter: filter)
+        let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        deck.roundID = makeID()
+        deck.roundQuestion = String((trimmed.isEmpty ? Rounds.defaultQuestion : trimmed).prefix(80))
+        deck.roundStartedAt = Date()
+        deck.roundCards = plan.cards.map(\.id)
+        deck.roundFilter = filter
+        deck.roundChain = chain ?? deck.roundChain ?? []
+        decks[deckID] = deck
+        enqueueSave(deckID, in: group)
+        scheduleSave()
+        return plan
+    }
+
+    /// Ends the round running now, saving its winner. The deck goes back to vetting.
+    func endRound(deck deckID: String) {
+        guard var deck = decks[deckID], let group = groups[deck.groupID], deck.activeRound != nil else { return }
+        closeRound(&deck)
+        deck.roundID = ""
+        deck.roundCards = []
+        deck.roundChain = []
+        deck.roundFilter = []
+        decks[deckID] = deck
+        enqueueSave(deckID, in: group)
+        scheduleSave()
+    }
+
+    /// Saves the round's winner (if it has one), then clears its votes, the
+    /// decided list and the spin, ready for whatever comes next.
+    private func closeRound(_ deck: inout Deck) {
+        guard let round = deck.activeRound, let group = groups[deck.groupID] else { return }
+        if let state = roundState(of: deck.id, me: nil),
+           let winner = Rounds.winner(of: state, decided: deck.decidedCards, spin: deck.spinCardID) {
+            remember(winner, round: round, in: &deck)
+        }
+        for pick in picks.values where pick.deckID == deck.id && pick.roundID != nil {
+            picks[pick.id] = nil
+            enqueueDelete(pick.id, in: group)
+        }
+        if deck.decided != nil { deck.decided = [] }
+        if deck.spinCardID != nil { deck.spinCardID = "" }
+    }
+
+    private func remember(_ card: Card, round: String, in deck: inout Deck) {
+        let result = RoundResult(roundID: round, question: deck.roundQuestion ?? Rounds.defaultQuestion,
+                                 cardID: card.id, title: card.title, at: Date())
+        deck.roundHistory = Rounds.record(result, in: deck.roundHistory ?? [])
+    }
+
+    /// The next deck in a chain, narrowed to this round's winner. Returns its ID.
+    func startNextInChain(from deckID: String, winner cardID: String) -> String? {
+        guard let deck = decks[deckID], let winner = cards[cardID],
+              let nextID = deck.roundChain?.first(where: { decks[$0] != nil }) else { return nil }
+        let rest = Array((deck.roundChain ?? []).drop { $0 != nextID }.dropFirst())
+        startRound(deck: nextID, question: deck.roundQuestion ?? Rounds.defaultQuestion, chain: rest,
+                   filter: (deck.roundFilter ?? []) + [winner.title])
+        return nextID
+    }
+
+    /// "Never, for good": takes a card out of every round and stack, for
+    /// everyone, until someone brings it back. Its votes are kept.
+    func retire(card cardID: String, by name: String?) {
+        guard var card = cards[cardID], let group = groups[card.groupID] else { return }
+        card.retiredAt = Date()
+        card.retiredBy = name ?? ""
+        cards[cardID] = card
+        enqueueSave(cardID, in: group)
+        scheduleSave()
+    }
+
+    func bringBack(card cardID: String) {
+        guard var card = cards[cardID], let group = groups[card.groupID] else { return }
+        card.retiredAt = nil
+        if card.retiredBy == nil { card.retiredBy = "" }
+        cards[cardID] = card
+        enqueueSave(cardID, in: group)
+        scheduleSave()
     }
 
     // MARK: Sharing
@@ -723,6 +843,33 @@ final class CloudStore: CKSyncEngineDelegate {
                     let pick = Pick(groupID: group.id, deckID: deck.id, cardID: card.id, playerID: playerID, vote: vote, updatedAt: now)
                     picks[pick.id] = pick
                 }
+            }
+        }
+
+        // The dinners deck is vetted and has tonight's round going, with two past winners.
+        guard var dinners = decks[Screenshots.dinnerDeckID] else { return }
+        let plan = Rounds.plan(vetting: state(of: dinners.id, me: nil))
+        dinners.roundID = Screenshots.roundID
+        dinners.roundQuestion = "What sounds good tonight?"
+        dinners.roundStartedAt = now.addingTimeInterval(-1_800)
+        dinners.roundCards = plan.cards.map(\.id)
+        dinners.roundHistory = [
+            RoundResult(roundID: "r-mon", question: "Monday dinner?", cardID: "card-fajitas", title: "Sheet-pan fajitas",
+                        at: now.addingTimeInterval(-2 * 86_400)),
+            RoundResult(roundID: "r-wed", question: "What sounds good tonight?", cardID: "card-pizza", title: "Homemade pizza night",
+                        at: now.addingTimeInterval(-86_400)),
+        ]
+        decks[dinners.id] = dinners
+        for (cardID, vote) in Screenshots.alexRound {
+            let pick = Pick(groupID: group.id, deckID: dinners.id, cardID: cardID, playerID: alex.id, vote: vote,
+                            updatedAt: now, roundID: Screenshots.roundID)
+            picks[pick.id] = pick
+        }
+        if Screenshots.screen == "roundresults" {
+            for (cardID, vote) in Screenshots.samRound {
+                let pick = Pick(groupID: group.id, deckID: dinners.id, cardID: cardID, playerID: sam.id, vote: vote,
+                                updatedAt: now, roundID: Screenshots.roundID)
+                picks[pick.id] = pick
             }
         }
     }

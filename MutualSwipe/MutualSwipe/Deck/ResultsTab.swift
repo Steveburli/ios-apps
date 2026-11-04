@@ -10,6 +10,8 @@ struct ResultsTab: View {
     let showTab: (Session.DeckTab) -> Void
     @State private var openTiers: Set<Verdict> = []
 
+    private var inRound: Bool { session.showsRound(deck) }
+
     var body: some View {
         let me = session.me(in: deck.groupID, store: store)
         let active = state.activeParticipants
@@ -47,6 +49,7 @@ struct ResultsTab: View {
                 waiting(me: me, hasActive: !active.isEmpty)
 
                 decisionBanner(me: me)
+                nextInChain
                 decided
                 spinBar
 
@@ -56,6 +59,8 @@ struct ResultsTab: View {
                         tier(verdict, cards: cards, people: n)
                     }
                 }
+
+                history
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 28)
@@ -102,10 +107,78 @@ struct ResultsTab: View {
                 .accessibilityAddTraits(.isHeader)
                 Text("Settled. Open one to add it to your calendar.").font(.footnote).foregroundStyle(Theme.muted)
                 ForEach(cards) { card in
-                    ResultRow(card: card, state: state)
+                    ResultRow(card: card, state: state, round: inRound)
                 }
             }
             .padding(.top, 6)
+        }
+    }
+
+    /// In a chained round, once there's a winner: go on to the next deck,
+    /// narrowed to what won here.
+    @ViewBuilder
+    private var nextInChain: some View {
+        if inRound, let nextID = deck.roundChain?.first(where: { store.decks[$0] != nil }), let next = store.decks[nextID],
+           let winner = Rounds.winner(of: state, decided: deck.decidedCards, spin: deck.spinCardID) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Winner: \(winner.title)")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(Theme.ink)
+                    Text("Next, pick from \(next.title), narrowed to “\(winner.title)”.")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                }
+                Spacer(minLength: 6)
+                if store.canWrite(deck.groupID) {
+                    Button("Next") {
+                        guard let id = store.startNextInChain(from: deck.id, winner: winner.id) else { return }
+                        session.vettingShown.remove(id)
+                        session.path.append(id)
+                    }
+                    .buttonStyle(.mutual())
+                }
+            }
+            .padding(14)
+            .background(Theme.accentSoft, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.line))
+        }
+    }
+
+    /// Past rounds' winners, newest first.
+    @ViewBuilder
+    private var history: some View {
+        let past = Array((deck.roundHistory ?? []).reversed())
+        if !past.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 10) {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                        .frame(width: 30, height: 30)
+                        .background(Theme.sunk, in: Circle())
+                    Text("Past rounds").font(Theme.display(20, weight: .bold)).foregroundStyle(Theme.ink)
+                }
+                .accessibilityAddTraits(.isHeader)
+                ForEach(past) { result in
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(result.title).font(.body.weight(.semibold)).foregroundStyle(Theme.ink).lineLimit(1)
+                            Text(result.question).font(.footnote).foregroundStyle(Theme.muted).lineLimit(1)
+                        }
+                        Spacer(minLength: 6)
+                        Text(result.at, format: .dateTime.month(.abbreviated).day())
+                            .font(.footnote.monospacedDigit())
+                            .foregroundStyle(Theme.muted)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.line))
+                    .accessibilityElement(children: .combine)
+                }
+            }
+            .padding(.top, 14)
         }
     }
 
@@ -184,7 +257,7 @@ struct ResultsTab: View {
         let rows = VStack(alignment: .leading, spacing: 8) {
             Text(verdict.note).font(.footnote).foregroundStyle(Theme.muted)
             ForEach(cards) { card in
-                ResultRow(card: card, state: state)
+                ResultRow(card: card, state: state, round: inRound)
             }
         }
         if verdict.startsCollapsed {
@@ -226,6 +299,7 @@ private struct ResultRow: View {
     @Environment(Session.self) private var session
     let card: Card
     let state: DeckState
+    var round = false
 
     var body: some View {
         Button {
@@ -258,7 +332,7 @@ private struct ResultRow: View {
                             .padding(.vertical, 2)
                             .background(vote.soft, in: Capsule())
                             .accessibilityElement(children: .ignore)
-                            .accessibilityLabel("\(store.players[id]?.name ?? "Someone"): \(vote.long)")
+                            .accessibilityLabel("\(store.players[id]?.name ?? "Someone"): \(vote.long(round: round))")
                         }
                     }
                 }

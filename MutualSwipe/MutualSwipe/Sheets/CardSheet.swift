@@ -8,6 +8,7 @@ struct CardSheet: View {
     @Environment(\.dismiss) private var dismiss
     let cardID: String
     @State private var addingEvent = false
+    @State private var confirmingRetire = false
 
     var body: some View {
         NavigationStack {
@@ -36,10 +37,11 @@ struct CardSheet: View {
 
     private func content(_ card: Card, deck: Deck) -> some View {
         let me = session.me(in: deck.groupID, store: store)
-        let state = store.state(of: deck.id, me: me)
+        let state = store.liveState(of: deck.id, me: me, vetting: !session.showsRound(deck))
         let mine = me.flatMap { state.vote(of: $0, on: card.id) }
         let others = state.participants.filter { $0 != me && state.vote(of: $0, on: card.id) != nil }
         let verdict = state.verdict(for: card)
+        let round = session.showsRound(deck) ? deck.activeRound : nil
 
         return ScrollView {
             VStack(alignment: .leading, spacing: 12) {
@@ -118,7 +120,7 @@ struct CardSheet: View {
                         .foregroundStyle(Theme.muted)
                 }
 
-                heading("Your vote")
+                heading(round == nil ? "Your vote" : "Your vote this round")
                 if let me {
                     HStack(spacing: 8) {
                         ForEach([Vote.never, .nope, .like, .love]) { vote in
@@ -127,11 +129,11 @@ struct CardSheet: View {
                                     session.show(Session.readOnlyMessage)
                                     return
                                 }
-                                store.setVote(vote, card: card.id, player: me)
+                                store.setVote(vote, card: card.id, player: me, round: round)
                             } label: {
                                 VStack(spacing: 4) {
                                     Image(systemName: vote.symbol).foregroundStyle(vote.color)
-                                    Text(vote.label).font(.footnote.weight(.semibold)).foregroundStyle(Theme.ink)
+                                    Text(vote.label(round: round != nil)).font(.footnote.weight(.semibold)).foregroundStyle(Theme.ink)
                                 }
                                 .padding(.vertical, 10)
                                 .frame(maxWidth: .infinity)
@@ -140,7 +142,7 @@ struct CardSheet: View {
                                     .strokeBorder(mine == vote ? vote.color : Theme.line, lineWidth: 1.5))
                             }
                             .buttonStyle(.plain)
-                            .accessibilityLabel(vote.long)
+                            .accessibilityLabel(vote.long(round: round != nil))
                             .accessibilityAddTraits(mine == vote ? .isSelected : [])
                         }
                     }
@@ -164,7 +166,7 @@ struct CardSheet: View {
                                     PlayerDot(player: store.players[id])
                                     Text(store.players[id]?.name ?? "Someone").font(.body.weight(.semibold))
                                     Spacer()
-                                    Label(vote.long, systemImage: vote.symbol)
+                                    Label(vote.long(round: round != nil), systemImage: vote.symbol)
                                         .font(.footnote.weight(.semibold))
                                         .foregroundStyle(vote.color)
                                         .padding(.horizontal, 10)
@@ -176,8 +178,45 @@ struct CardSheet: View {
                         }
                     }
                 }
+
+                if store.canWrite(deck.groupID) {
+                    retireButton(card, me: me)
+                        .padding(.top, 12)
+                }
             }
             .padding(16)
+        }
+        .confirmationDialog("Never “\(card.title)”, for good?", isPresented: $confirmingRetire, titleVisibility: .visible) {
+            Button("Never, for good", role: .destructive) {
+                store.retire(card: card.id, by: me.flatMap { store.players[$0]?.name })
+                session.show("“\(card.title)” is out for good")
+                dismiss()
+            }
+        } message: {
+            Text("It leaves this deck’s rounds and stacks for everyone, until someone brings it back from the Cards tab.")
+        }
+    }
+
+    @ViewBuilder
+    private func retireButton(_ card: Card, me: String?) -> some View {
+        if card.isRetired {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("\(card.retiredBy.flatMap { $0.isEmpty ? nil : $0 } ?? "Someone") marked this “Never, for good”.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.muted)
+                Button("Bring it back") {
+                    store.bringBack(card: card.id)
+                    session.show("“\(card.title)” is back in the deck")
+                }
+                .buttonStyle(.mutual(.quiet))
+            }
+        } else {
+            Button {
+                confirmingRetire = true
+            } label: {
+                Label("Never, for good", systemImage: "nosign")
+            }
+            .buttonStyle(.mutual(.danger))
         }
     }
 

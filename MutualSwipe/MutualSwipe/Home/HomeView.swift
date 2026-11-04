@@ -228,6 +228,17 @@ private struct DeckTile: View {
                         .lineLimit(2)
                 }
                 FlowLayout(spacing: 6) {
+                    if deck.activeRound != nil {
+                        Pill(text: "Round going", tint: Theme.accentInk, background: Theme.accent)
+                    }
+                    if total > 0 {
+                        let vetting = store.vetting(of: deck.id)
+                        let names = vetting.vetted.compactMap { store.players[$0]?.name }
+                        Pill(text: (names.isEmpty ? "Not vetted yet" : "Vetted by \(names.joined(separator: ", "))")
+                             + " · \(Vetting.percent(vetting.group))",
+                             tint: names.isEmpty ? Theme.ink : Vote.like.color,
+                             background: names.isEmpty ? Theme.sunk : Vote.like.soft)
+                    }
                     if state.matchCount > 0 {
                         Pill(text: "\(state.matchCount) match\(state.matchCount == 1 ? "" : "es")", tint: Theme.accent, background: Theme.accentSoft)
                     }

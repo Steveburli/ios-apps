@@ -38,7 +38,7 @@ struct SpinSheet: View {
 
     private func content(_ deck: Deck) -> some View {
         let me = session.me(in: deck.groupID, store: store)
-        let state = store.state(of: deck.id, me: me)
+        let state = store.liveState(of: deck.id, me: me, vetting: !session.showsRound(deck))
         let options = state.spinCandidates.filter { !setAside.contains($0.id) }
         let winner = winnerID.flatMap { store.cards[$0] }
 

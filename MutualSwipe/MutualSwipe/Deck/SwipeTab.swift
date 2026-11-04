@@ -16,7 +16,13 @@ struct SwipeTab: View {
     @State private var voteCount = 0
     @State private var stackSize = CGSize(width: 400, height: 600)
 
+    @State private var retiring: Card?
+
     private var me: String? { session.me(in: deck.groupID, store: store) }
+    /// The round on screen, or nil for vetting.
+    private var round: String? { session.showsRound(deck) ? deck.activeRound : nil }
+    /// Undo is kept per deck and person, and per round.
+    private var undoDeck: String { round.map { deck.id + "#" + $0 } ?? deck.id }
 
     var body: some View {
         let total = state.cards.count
@@ -49,9 +55,19 @@ struct SwipeTab: View {
             }
 
             HStack {
-                Text("← nope · → like · ↑ love · ↓ never")
+                Text(round == nil ? "← nope · → like · ↑ love · ↓ never" : "← nope · → like · ↑ love · ↓ not tonight")
                     .accessibilityHidden(true)
                 Spacer()
+                if round != nil, showingCards, store.canWrite(deck.groupID), let top = state.queue.first {
+                    Button {
+                        retiring = top
+                    } label: {
+                        Label("Never, for good", systemImage: "nosign")
+                    }
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Vote.never.color)
+                    .padding(.trailing, 8)
+                }
                 Button {
                     undo()
                 } label: {
@@ -66,6 +82,16 @@ struct SwipeTab: View {
         .padding(.horizontal, 16)
         .padding(.bottom, 10)
         .sensoryFeedback(.impact(weight: .light), trigger: voteCount)
+        .confirmationDialog(retiring.map { "Never “\($0.title)”, for good?" } ?? "",
+                            isPresented: Binding(get: { retiring != nil }, set: { if !$0 { retiring = nil } }),
+                            titleVisibility: .visible, presenting: retiring) { card in
+            Button("Never, for good", role: .destructive) {
+                store.retire(card: card.id, by: me.flatMap { store.players[$0]?.name })
+                session.show("“\(card.title)” is out for good. Bring it back from the Cards tab.")
+            }
+        } message: { _ in
+            Text("It leaves this deck’s rounds and stacks for everyone. “Not tonight” only hides it until the next round.")
+        }
     }
 
     private var showingCards: Bool {
@@ -74,7 +100,7 @@ struct SwipeTab: View {
 
     private var canUndo: Bool {
         guard let me else { return false }
-        return store.canWrite(deck.groupID) && session.canUndo(deck: deck.id, player: me)
+        return store.canWrite(deck.groupID) && session.canUndo(deck: undoDeck, player: me)
     }
 
     // MARK: Stack
@@ -88,6 +114,11 @@ struct SwipeTab: View {
                 Button("Choose your name") { session.sheet = .player(deck.groupID) }
                     .buttonStyle(.mutual(.quiet))
             }
+        } else if state.cards.isEmpty && round != nil {
+            StackMessage {
+                Text("Nothing left in this round").font(Theme.display(25, weight: .bold))
+                Text("Every card in it is out for good. Start a new round from the bar above.").foregroundStyle(Theme.muted)
+            }
         } else if state.cards.isEmpty {
             StackMessage {
                 Text("No cards yet").font(Theme.display(25, weight: .bold))
@@ -100,7 +131,8 @@ struct SwipeTab: View {
         } else if state.queue.isEmpty {
             StackMessage {
                 BrandMark().scaleEffect(1.8).padding(.bottom, 8)
-                Text("You’ve swiped all \(state.cards.count)").font(Theme.display(25, weight: .bold))
+                Text(round == nil ? "You’ve swiped all \(state.cards.count)" : "You’re done with this round")
+                    .font(Theme.display(25, weight: .bold))
                 Text(doneLine).foregroundStyle(Theme.muted)
                 Button("See results") { showTab(.results) }
                     .buttonStyle(.mutual(.quiet))
@@ -130,7 +162,7 @@ struct SwipeTab: View {
         // While the top card flies off, the next one moves up into its place.
         let position = flying != nil && index > 0 ? index - 1 : index
         let isTop = index == 0
-        CardFace(card: card, kind: deck.kind, stamp: isTop ? stamp : nil)
+        CardFace(card: card, kind: deck.kind, stamp: isTop ? stamp : nil, round: round != nil)
             .frame(width: size.width, height: max(0, size.height - 20))
             .scaleEffect(position == 0 ? 1 : position == 1 ? 0.95 : 0.9)
             .offset(y: position == 0 ? 0 : position == 1 ? 12 : 24)
@@ -143,7 +175,7 @@ struct SwipeTab: View {
             .accessibilityHint("Double-tap for details. Swipe up or down for actions.")
             .accessibilityActions {
                 ForEach(Vote.allCases) { vote in
-                    Button(vote.long) { fling(card, vote, size: size) }
+                    Button(vote.long(round: round != nil)) { fling(card, vote, size: size) }
                 }
             }
             .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.8), value: position)
@@ -209,14 +241,14 @@ struct SwipeTab: View {
                     .background(Theme.surface, in: Circle())
                     .overlay(Circle().strokeBorder(Theme.line, lineWidth: 1.5))
                     .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
-                Text(vote.label)
+                Text(vote.label(round: round != nil))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(Theme.muted)
             }
         }
         .buttonStyle(.plain)
         .disabled(flying != nil)
-        .accessibilityLabel(vote == .love ? "Love: super like" : vote == .never ? "Never: super reject" : vote == .nope ? "Nope: reject" : "Like")
+        .accessibilityLabel(vote == .love ? "Love: super like" : vote == .never ? (round == nil ? "Never: super reject" : "Not tonight") : vote == .nope ? "Nope: reject" : "Like")
     }
 
     private func fling(_ card: Card, _ vote: Vote, size: CGSize) {
@@ -239,8 +271,8 @@ struct SwipeTab: View {
         withAnimation(.easeIn(duration: duration)) { drag = target }
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(duration))
-            store.setVote(vote, card: card.id, player: me)
-            session.pushUndo(card: card.id, deck: deck.id, player: me)
+            store.setVote(vote, card: card.id, player: me, round: round)
+            session.pushUndo(card: card.id, deck: undoDeck, player: me)
             var instant = Transaction()
             instant.disablesAnimations = true
             withTransaction(instant) {
@@ -252,8 +284,8 @@ struct SwipeTab: View {
     }
 
     private func undo() {
-        guard let me, let cardID = session.popUndo(deck: deck.id, player: me) else { return }
-        store.setVote(nil, card: cardID, player: me)
+        guard let me, let cardID = session.popUndo(deck: undoDeck, player: me) else { return }
+        store.setVote(nil, card: cardID, player: me, round: round)
     }
 }
 
@@ -279,6 +311,8 @@ struct CardFace: View {
     let card: Card
     let kind: DeckKind
     var stamp: (vote: Vote, opacity: Double)?
+    /// In a round, the down swipe reads "Not tonight".
+    var round = false
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
@@ -341,7 +375,7 @@ struct CardFace: View {
     private var stampView: some View {
         if let stamp {
             let vote = stamp.vote
-            Text(vote.stamp)
+            Text(vote.stamp(round: round))
                 .font(.system(size: 30, weight: .heavy))
                 .tracking(1.2)
                 .foregroundStyle(vote.stampColor)

@@ -47,6 +47,7 @@ struct CardsTab: View {
                     addCard
                 }
                 cardList
+                retiredList
                 if canWrite {
                     settings
                 }
@@ -171,6 +172,41 @@ struct CardsTab: View {
                 }
                 .padding(.vertical, 4)
                 Divider().overlay(Theme.line)
+            }
+        }
+    }
+
+    /// Cards someone marked "Never, for good".
+    @ViewBuilder
+    private var retiredList: some View {
+        let retired = store.retiredCards(in: deck.id)
+        if !retired.isEmpty {
+            Panel {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Out for good").font(Theme.display(18, weight: .bold))
+                    Text("\(retired.count)").font(.subheadline.weight(.bold).monospacedDigit()).foregroundStyle(Theme.muted)
+                }
+                Text("Marked “Never, for good”. They’re out of every round and stack until someone brings them back.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.muted)
+                ForEach(retired) { card in
+                    HStack(spacing: 10) {
+                        Text(card.title)
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(Theme.muted)
+                            .strikethrough()
+                            .lineLimit(1)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if canWrite {
+                            Button("Bring back") {
+                                store.bringBack(card: card.id)
+                                session.show("“\(card.title)” is back")
+                            }
+                            .buttonStyle(.mutual(.quiet))
+                            .controlSize(.small)
+                        }
+                    }
+                }
             }
         }
     }

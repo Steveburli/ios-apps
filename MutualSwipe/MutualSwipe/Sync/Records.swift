@@ -53,6 +53,17 @@ enum Records {
             record["spinCardID"] = spin
             record["spinAt"] = deck.spinAt
         }
+        if let round = deck.roundID {
+            record["roundID"] = round
+            record["roundQuestion"] = deck.roundQuestion
+            record["roundStartedAt"] = deck.roundStartedAt
+            record["roundCards"] = deck.roundCards.flatMap { $0.isEmpty ? nil : $0 }
+            record["roundFilter"] = deck.roundFilter.flatMap { $0.isEmpty ? nil : $0 }
+            record["roundChain"] = deck.roundChain.flatMap { $0.isEmpty ? nil : $0 }
+        }
+        if let history = deck.roundHistory, !history.isEmpty {
+            record["roundHistory"] = history.compactMap(encode)
+        }
         return record
     }
 
@@ -68,6 +79,11 @@ enum Records {
         record["link"] = card.link
         record["order"] = card.order
         record["createdAt"] = card.createdAt
+        // Only written once a card has been retired, so other cards save as before.
+        if card.retiredAt != nil || card.retiredBy != nil {
+            record["retiredAt"] = card.retiredAt
+            record["retiredBy"] = card.retiredBy
+        }
         return record
     }
 
@@ -89,7 +105,17 @@ enum Records {
         record["playerID"] = pick.playerID
         record["vote"] = pick.vote.rawValue
         record["updatedAt"] = pick.updatedAt
+        if let round = pick.roundID { record["roundID"] = round }
         return record
+    }
+
+    /// Round history entries are saved as small JSON strings in a String List.
+    private static func encode(_ result: RoundResult) -> String? {
+        (try? JSONEncoder().encode(result)).flatMap { String(data: $0, encoding: .utf8) }
+    }
+
+    private static func decode(_ text: String) -> RoundResult? {
+        try? JSONDecoder().decode(RoundResult.self, from: Data(text.utf8))
     }
 
     // MARK: Reading
@@ -120,6 +146,14 @@ enum Records {
         let spinAt = record["spinAt"] as? Date
         deck.spinCardID = record["spinCardID"] as? String ?? (spinAt == nil ? nil : "")
         deck.spinAt = spinAt
+        let roundStartedAt = record["roundStartedAt"] as? Date
+        deck.roundID = record["roundID"] as? String ?? (roundStartedAt == nil ? nil : "")
+        deck.roundQuestion = record["roundQuestion"] as? String
+        deck.roundStartedAt = roundStartedAt
+        deck.roundCards = record["roundCards"] as? [String]
+        deck.roundFilter = record["roundFilter"] as? [String]
+        deck.roundChain = record["roundChain"] as? [String]
+        deck.roundHistory = (record["roundHistory"] as? [String])?.compactMap(decode)
         deck.systemFields = record.archivedSystemFields
         return deck
     }
@@ -130,6 +164,8 @@ enum Records {
                               tags: record["tags"] as? [String] ?? [])
         var card = Card(id: record.recordID.recordName, groupID: groupID, deckID: string(record, "deckID"), draft: draft,
                         order: record["order"] as? Double ?? 0, createdAt: date(record, "createdAt"))
+        card.retiredAt = record["retiredAt"] as? Date
+        card.retiredBy = record["retiredBy"] as? String
         card.systemFields = record.archivedSystemFields
         return card
     }
@@ -147,6 +183,7 @@ enum Records {
         var pick = Pick(groupID: groupID, deckID: string(record, "deckID"), cardID: string(record, "cardID"),
                         playerID: string(record, "playerID"), vote: vote, updatedAt: date(record, "updatedAt"))
         pick.id = record.recordID.recordName
+        pick.roundID = record["roundID"] as? String
         pick.systemFields = record.archivedSystemFields
         return pick
     }

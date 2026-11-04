@@ -96,6 +96,21 @@ public enum Vote: String, Codable, CaseIterable, Identifiable, Sendable {
         case .never: return "Super reject"
         }
     }
+
+    // In a round the down swipe means "not tonight": it only hides the card
+    // until the next round. The vote itself is stored the same way.
+
+    public func label(round: Bool) -> String {
+        round && self == .never ? "Not tonight" : label
+    }
+
+    public func stamp(round: Bool) -> String {
+        round && self == .never ? "NOT TONIGHT" : stamp
+    }
+
+    public func long(round: Bool) -> String {
+        round && self == .never ? "Not tonight" : long
+    }
 }
 
 /// People who swipe together. Each group is one iCloud record zone, shared
@@ -142,9 +157,28 @@ public struct Deck: Identifiable, Codable, Equatable, Sendable {
     /// The card the spinner landed on, shared so every phone shows the same winner.
     public var spinCardID: String?
     public var spinAt: Date?
+    /// The round running now, if any. Empty or nil means no round. Rounds are
+    /// quick picks for right now that start fresh each time; vetting votes stay.
+    public var roundID: String?
+    public var roundQuestion: String?
+    public var roundStartedAt: Date?
+    /// The cards in this round, picked when it started.
+    public var roundCards: [String]?
+    /// Words a chained round narrows to, like the category picked one step before.
+    public var roundFilter: [String]?
+    /// Decks still to come in a chain, in order.
+    public var roundChain: [String]?
+    /// Each round's winner, oldest first.
+    public var roundHistory: [RoundResult]?
     public var systemFields: Data?
 
     public var decidedCards: [String] { decided ?? [] }
+
+    /// The ID of the round running now, or nil.
+    public var activeRound: String? {
+        guard let roundID, !roundID.isEmpty else { return nil }
+        return roundID
+    }
 
     public init(id: String = makeID(), groupID: String, title: String, kind: DeckKind, blurb: String, createdAt: Date) {
         self.id = id
@@ -169,7 +203,13 @@ public struct Card: Identifiable, Codable, Equatable, Sendable {
     public var link: String
     public var order: Double
     public var createdAt: Date
+    /// Set when someone marked the card "Never, for good". It's out of every
+    /// round and every stack, for everyone, until someone brings it back.
+    public var retiredAt: Date?
+    public var retiredBy: String?
     public var systemFields: Data?
+
+    public var isRetired: Bool { retiredAt != nil }
 
     public init(id: String = makeID(), groupID: String, deckID: String, draft: CardDraft, order: Double, createdAt: Date) {
         self.id = id
@@ -220,10 +260,14 @@ public struct Pick: Identifiable, Codable, Equatable, Sendable {
     public var playerID: String
     public var vote: Vote
     public var updatedAt: Date
+    /// The round this vote belongs to. Nil is a vetting vote.
+    public var roundID: String?
     public var systemFields: Data?
 
-    public init(groupID: String, deckID: String, cardID: String, playerID: String, vote: Vote, updatedAt: Date) {
-        self.id = Pick.id(cardID: cardID, playerID: playerID)
+    public init(groupID: String, deckID: String, cardID: String, playerID: String, vote: Vote, updatedAt: Date,
+                roundID: String? = nil) {
+        self.id = Pick.id(cardID: cardID, playerID: playerID, roundID: roundID)
+        self.roundID = roundID
         self.groupID = groupID
         self.deckID = deckID
         self.cardID = cardID
@@ -232,8 +276,9 @@ public struct Pick: Identifiable, Codable, Equatable, Sendable {
         self.updatedAt = updatedAt
     }
 
-    public static func id(cardID: String, playerID: String) -> String {
-        "pick_\(cardID)_\(playerID)"
+    public static func id(cardID: String, playerID: String, roundID: String? = nil) -> String {
+        guard let roundID else { return "pick_\(cardID)_\(playerID)" }
+        return "pick_\(cardID)_\(playerID)_r\(roundID)"
     }
 }
 

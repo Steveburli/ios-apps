@@ -15,6 +15,8 @@ final class Session {
         case importCards(String?)
         case spin(String)
         case qr(String)
+        /// Start a round on a deck.
+        case startRound(String)
 
         var id: String {
             switch self {
@@ -25,6 +27,7 @@ final class Session {
             case .importCards(let deck): return "import-" + (deck ?? "any")
             case .spin(let deck): return "spin-" + deck
             case .qr(let group): return "qr-" + group
+            case .startRound(let deck): return "round-" + deck
             }
         }
     }
@@ -46,6 +49,8 @@ final class Session {
     var currentGroupID: String? {
         didSet { UserDefaults.standard.set(currentGroupID, forKey: Keys.group) }
     }
+    /// Decks showing their vetting while a round is running. Rounds show by default.
+    var vettingShown: Set<String> = []
     /// The player picker opens by itself once per launch.
     var pickerShown = false
     /// A file opened in Mutual from another app, waiting for the import sheet.
@@ -90,7 +95,7 @@ final class Session {
         seenDecided[deck.id] = Date().timeIntervalSince1970
     }
 
-    /// Goes to the screen named by `-screenshots`: home, swipe, results or card.
+    /// Goes to the screen named by `-screenshots` (see `Screenshots`).
     private func openScreenshotScreen() {
         let deck = Screenshots.dateDeckID
         switch Screenshots.screen {
@@ -111,9 +116,22 @@ final class Session {
             openingTab[deck] = .results
             path = [deck]
             sheet = .spin(deck)
+        case "round":
+            path = [Screenshots.dinnerDeckID]
+        case "roundresults":
+            openingTab[Screenshots.dinnerDeckID] = .results
+            path = [Screenshots.dinnerDeckID]
+        case "startround":
+            path = [deck]
+            sheet = .startRound(deck)
         default:
             break
         }
+    }
+
+    /// Whether a deck shows its round (true) or its vetting (false).
+    func showsRound(_ deck: Deck) -> Bool {
+        deck.activeRound != nil && !vettingShown.contains(deck.id)
     }
 
     /// The group on screen: the one picked, else the first.

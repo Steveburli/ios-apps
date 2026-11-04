@@ -12,6 +12,7 @@ A native SwiftUI (iOS 18+, iPhone, portrait, light and dark) version of the user
   - `Player`
   - `Pick` (`card` reference, `.deleteSelf`)
 - A **Pick** is one person's vote on one card, stored as its own record named `pick_<card>_<player>`. Two people swiping at once never overwrite each other.
+- **Vetting and rounds.** A deck's first pass is its vetting: plain picks with no `roundID`. A **round** (`Deck.roundID`) is a quick pick for right now. Its votes are separate picks named `pick_<card>_<player>_r<round>`, the down swipe reads "Not tonight", and starting a new round saves the winner to `roundHistory`, then deletes the old round's picks. `Rounds.plan` picks the round's cards: a vetted deck uses the cards everyone liked. A chain (`roundChain`) goes on to other decks, narrowed by each winner's title (`roundFilter`). "Never, for good" sets `Card.retiredAt`, which hides the card everywhere until someone brings it back.
 - Deleting a deck cascades through the references on the server. Picks reference their card, not the deck, which keeps them under CloudKit's limit of 750 `.deleteSelf` references per target.
 - **Players** are names inside a group, not iCloud identities. That keeps the artifact's pass-the-phone mode working. Each phone remembers "who's swiping" per group in UserDefaults (`Session`).
 - `Sync/CloudStore` is local-first. A JSON cache lives in Application Support, and two `CKSyncEngine`s do the syncing: one for the private database (groups you own) and one for the shared database (groups shared with you). Conflicts resolve as last writer wins: on `serverRecordChanged` it takes the server's change tag and saves again.
@@ -46,10 +47,10 @@ TestFlight and App Store builds use CloudKit's **Production** environment. That 
    | Record type | Fields (type) |
    |---|---|
    | `Group` | `name` (String), `createdAt` (Date/Time) |
-   | `Deck` | `title` (String), `kind` (String), `blurb` (String), `createdAt` (Date/Time); version 2 adds `decided` (String List), `decidedAt` (Date/Time), `decidedBy` (String), `spinCardID` (String), `spinAt` (Date/Time) |
-   | `Card` | `deck` (Reference), `deckID` (String), `title` (String), `subtitle` (String), `details` (String), `tags` (String List), `link` (String), `order` (Double), `createdAt` (Date/Time) |
+   | `Deck` | `title` (String), `kind` (String), `blurb` (String), `createdAt` (Date/Time); version 2 adds `decided` (String List), `decidedAt` (Date/Time), `decidedBy` (String), `spinCardID` (String), `spinAt` (Date/Time); version 2 build B adds `roundID` (String), `roundQuestion` (String), `roundStartedAt` (Date/Time), `roundCards` (String List), `roundFilter` (String List), `roundChain` (String List), `roundHistory` (String List) |
+   | `Card` | `deck` (Reference), `deckID` (String), `title` (String), `subtitle` (String), `details` (String), `tags` (String List), `link` (String), `order` (Double), `createdAt` (Date/Time); build B adds `retiredAt` (Date/Time), `retiredBy` (String) |
    | `Player` | `name` (String), `color` (Int(64)), `createdAt` (Date/Time) |
-   | `Pick` | `card` (Reference), `deckID` (String), `cardID` (String), `playerID` (String), `vote` (String), `updatedAt` (Date/Time) |
+   | `Pick` | `card` (Reference), `deckID` (String), `cardID` (String), `playerID` (String), `vote` (String), `updatedAt` (Date/Time); build B adds `roundID` (String) |
 
 4. **Deploy.** In the console, press **Deploy Schema Changes** to copy them to **Production**.
 
