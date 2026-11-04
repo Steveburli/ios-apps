@@ -55,7 +55,7 @@ struct SwipeTab: View {
             }
 
             HStack {
-                Text(round == nil ? "← nope · → like · ↑ love · ↓ never" : "← nope · → like · ↑ love · ↓ not tonight")
+                Text(round == nil ? "← nope · → like · ↑ love · ↓ never" : "↓ not tonight")
                     .accessibilityHidden(true)
                 Spacer()
                 if round != nil, showingCards, store.canWrite(deck.groupID), let top = state.queue.first {
