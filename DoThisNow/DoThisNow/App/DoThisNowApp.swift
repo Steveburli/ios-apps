@@ -1,16 +1,54 @@
 import SwiftUI
 import UIKit
 import EventKit
+import CloudKit
 import DoThisNowKit
 
 @main
 struct DoThisNowApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var model = AppModel()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(model)
+        }
+    }
+}
+
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication,
+                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        // Silent pushes tell the trip sync engines when someone else changes a shared trip.
+        // CKSyncEngine handles them itself; the app only has to register.
+        application.registerForRemoteNotifications()
+        return true
+    }
+
+    func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession,
+                     options: UIScene.ConnectionOptions) -> UISceneConfiguration {
+        let configuration = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
+        configuration.delegateClass = SceneDelegate.self
+        return configuration
+    }
+}
+
+/// Receives trip invitations: tapping a shared trip's link opens the app here.
+final class SceneDelegate: NSObject, UIWindowSceneDelegate {
+    func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
+        if let metadata = connectionOptions.cloudKitShareMetadata {
+            accept(metadata)
+        }
+    }
+
+    func windowScene(_ windowScene: UIWindowScene, userDidAcceptCloudKitShareWith metadata: CKShare.Metadata) {
+        accept(metadata)
+    }
+
+    private func accept(_ metadata: CKShare.Metadata) {
+        Task { @MainActor in
+            await TripStore.shared.accept(metadata)
         }
     }
 }
@@ -42,7 +80,7 @@ struct RootView: View {
         }
         .tint(Theme.accent)
         .overlay {
-            if model.tab == .day && model.dayFullScreen {
+            if model.tab == .day && model.dayFullScreen && model.dayPage != .trip {
                 DayFullScreen()
                     .transition(.move(edge: .bottom))
             }
@@ -85,6 +123,19 @@ struct RootView: View {
             }
         }
         .task { await model.refreshSources() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await TripStore.shared.refresh() } }
+        }
+        .onChange(of: TripStore.shared.openRequests) {
+            // Just joined a shared trip: show it.
+            model.tab = .day
+            model.dayPage = .trip
+        }
+        .onChange(of: TripStore.shared.notice) { _, notice in
+            guard let notice else { return }
+            model.show(notice)
+            TripStore.shared.notice = nil
+        }
     }
 }
 

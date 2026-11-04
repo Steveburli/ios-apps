@@ -10,5 +10,13 @@
 	<string>The camera scans the barcode or QR code that turns your wake-up alarm off. Nothing is recorded or saved.</string>
 	<key>NSAlarmKitUsageDescription</key>
 	<string>Do This Now rings your wake-up alarm at the time that fits your morning, even in silent mode.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>When you tap “We’re off schedule” on a trip, Do This Now uses where you are to work out travel times to what’s next. It isn’t saved or sent anywhere.</string>
+	<key>CKSharingSupported</key>
+	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>
