@@ -67,7 +67,7 @@ jobs:
       - name: Screenshots
         if: steps.build.outcome == 'success'
         continue-on-error: true
-        timeout-minutes: 15
+        timeout-minutes: 30
         run: bash scripts/ci-screenshots.sh "${{ matrix.app }}" "$RUNNER_TEMP/DerivedData"
 
       - name: Collect errors

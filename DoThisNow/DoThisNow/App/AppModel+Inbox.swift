@@ -95,6 +95,12 @@ extension AppModel {
         commit()
     }
 
+    /// Names a Reminders list, such as "From my wife". An empty label removes it.
+    func setListLabel(_ listID: String, _ label: String) {
+        state.inbox.listLabels[listID] = label.isEmpty ? nil : label
+        commit()
+    }
+
     func setFilter(_ source: TaskSource, _ change: (inout SourceFilter) -> Void) {
         change(&state.inbox[source])
         commit()
@@ -196,17 +202,7 @@ extension AppModel {
 
     /// The first gaps on `day` that fit `minutes`, for the schedule sheet.
     func openSlots(on day: CalendarDay, minutes: Int, limit: Int = 4) -> [Int] {
-        let plan = engine.planDay(day)
-        var busy = plan.rocks + plan.blocks.map { TimeSpan(start: Double($0.start), end: Double($0.end)) }
-        busy += plan.live.map { TimeSpan(start: $0.coreStart, end: $0.leave + $0.travel) }
-        busy += plan.doing.map { TimeSpan(start: $0.start, end: $0.end) }
-        if let meal = plan.meal { busy.append(meal) }
-        var starts: [Int] = []
-        for slot in DayPlanner.freeSlots(busy, from: plan.dayStart, to: plan.bed) where slot.length >= Double(minutes) {
-            starts.append(Int((slot.start / 5).rounded(.up) * 5))
-            if starts.count == limit { break }
-        }
-        return starts
+        engine.openSlots(on: day, minutes: minutes, limit: limit)
     }
 
     // MARK: Blocks
@@ -258,10 +254,22 @@ extension AppModel {
                              into: drag.original)
     }
 
+    /// Where the finger is during a block drag, in screen points.
+    func trackBlockDrag(at point: CGPoint) {
+        let over = sideListFrame?.contains(point) ?? false
+        if over != blockOverSideList { blockOverSideList = over }
+    }
+
     func endBlockDrag() {
         guard let drag = blockDrag else { return }
         blockDrag = nil
         draggingBlockID = nil
+        if blockOverSideList {
+            blockOverSideList = false
+            state.blocks = drag.original
+            unschedule(drag.id)
+            return
+        }
         commit()
         if let day = state.block(drag.id)?.day {
             let push = engine.planDay(day).push

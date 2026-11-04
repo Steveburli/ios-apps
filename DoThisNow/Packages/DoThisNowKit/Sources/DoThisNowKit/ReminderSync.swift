@@ -58,6 +58,7 @@ extension PlannerState {
                         t.doneAt = nil
                     }
                     t.reminderClosed = false
+                    t.reminderListID = reminder.listID
                     t.title = reminder.title
                     t.notes = reminder.notes
                     t.deadline = reminder.due.map { CalendarDay($0, calendar: calendar) }
@@ -65,6 +66,7 @@ extension PlannerState {
             } else {
                 var task = TaskItem(title: reminder.title, created: now)
                 task.reminderID = reminder.ref.id
+                task.reminderListID = reminder.listID
                 task.notes = reminder.notes
                 task.tier = Tier.forReminder(priority: reminder.priority)
                 task.places = [.anywhere]
@@ -83,5 +85,21 @@ extension PlannerState {
     /// Brought back here and still ticked off in Reminders.
     public var remindersToReopen: [TaskItem] {
         tasks.filter { $0.reminderID != nil && !$0.done && !$0.archived && $0.reminderClosed }
+    }
+}
+
+extension PlannerState {
+    /// The label of the Reminders list a task came from, such as "From my wife".
+    public func listLabel(for task: TaskItem) -> String? {
+        guard let list = task.reminderListID,
+              let label = inbox.listLabels[list]?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !label.isEmpty else { return nil }
+        return label
+    }
+
+    /// The label for a task anywhere a block or Inbox row points at it.
+    public func listLabel(for ref: SourceRef) -> String? {
+        guard ref.source == .app, let task = task(ref.id) else { return nil }
+        return listLabel(for: task)
     }
 }

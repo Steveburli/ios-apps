@@ -1,7 +1,23 @@
 import Foundation
 
-/// Everything the program remembers between launches. Same shape as the web
-/// app's four localStorage keys.
+/// What you did on one exercise the last time you logged reps for it.
+public struct LiftLog: Codable, Equatable, Sendable {
+    /// Pounds, as typed.
+    public var weight: String
+    /// Reps for each set, in order.
+    public var reps: [Int]
+    /// Ticked when form slipped, even if the reps were there.
+    public var tooHeavy: Bool
+
+    public init(weight: String, reps: [Int], tooHeavy: Bool = false) {
+        self.weight = weight
+        self.reps = reps
+        self.tooHeavy = tooHeavy
+    }
+}
+
+/// Everything the program remembers between launches. The first four fields
+/// are the web app's four localStorage keys.
 public struct ProgramState: Codable, Equatable, Sendable {
     /// Group key → total sets recorded.
     public var progress: [String: Int]
@@ -11,13 +27,38 @@ public struct ProgramState: Codable, Equatable, Sendable {
     public var startDate: Date?
     /// "yyyy-MM-dd" → sets completed that day.
     public var dailySets: [String: Int]
+    /// Group key → when it was last trained. Drives the grid's fade.
+    public var lastTrained: [String: Date]
+    /// "groupKey|exercise" → the last logged reps. Drives the weight suggestion.
+    public var lifts: [String: LiftLog]
+
+    /// Days until a trained group looks fully fresh on the grid again.
+    public static let recoveryDays = 7
 
     public init(progress: [String: Int] = [:], weights: [String: String] = [:],
-                startDate: Date? = nil, dailySets: [String: Int] = [:]) {
+                startDate: Date? = nil, dailySets: [String: Int] = [:],
+                lastTrained: [String: Date] = [:], lifts: [String: LiftLog] = [:]) {
         self.progress = progress
         self.weights = weights
         self.startDate = startDate
         self.dailySets = dailySets
+        self.lastTrained = lastTrained
+        self.lifts = lifts
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case progress, weights, startDate, dailySets, lastTrained, lifts
+    }
+
+    /// Saves from before a field existed still load, with that field empty.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        progress = try container.decodeIfPresent([String: Int].self, forKey: .progress) ?? [:]
+        weights = try container.decodeIfPresent([String: String].self, forKey: .weights) ?? [:]
+        startDate = try container.decodeIfPresent(Date.self, forKey: .startDate)
+        dailySets = try container.decodeIfPresent([String: Int].self, forKey: .dailySets) ?? [:]
+        lastTrained = try container.decodeIfPresent([String: Date].self, forKey: .lastTrained) ?? [:]
+        lifts = try container.decodeIfPresent([String: LiftLog].self, forKey: .lifts) ?? [:]
     }
 
     public func setsDone(_ group: MuscleGroup) -> Int {
@@ -53,12 +94,29 @@ public struct ProgramState: Codable, Equatable, Sendable {
         return Int((Double(remainingSets) / average).rounded(.up))
     }
 
+    /// Calendar days since the group was last trained: 0 the same day, nil if never.
+    public func daysSinceTrained(_ group: MuscleGroup, now: Date, calendar: Calendar = .current) -> Int? {
+        guard let date = lastTrained[group.key] else { return nil }
+        return DayKey.daysInclusive(from: date, to: now, calendar: calendar) - 1
+    }
+
+    /// 1 on the day a group is trained, fading evenly to 0 after `recoveryDays`.
+    /// 0 for groups never trained.
+    public func freshness(of group: MuscleGroup, now: Date, calendar: Calendar = .current) -> Double {
+        guard let days = daysSinceTrained(group, now: now, calendar: calendar) else { return 0 }
+        return max(0, 1 - Double(days) / Double(Self.recoveryDays))
+    }
+
     public static func weightKey(group: MuscleGroup, exercise: String) -> String {
         group.key + "|" + exercise
     }
 
     public func weight(for group: MuscleGroup, exercise: String) -> String? {
         weights[Self.weightKey(group: group, exercise: exercise)]
+    }
+
+    public func lift(for group: MuscleGroup, exercise: String) -> LiftLog? {
+        lifts[Self.weightKey(group: group, exercise: exercise)]
     }
 
     /// Sets the start date the first time a workout begins.
@@ -75,10 +133,30 @@ public struct ProgramState: Codable, Equatable, Sendable {
         dailySets[dayKey, default: 0] += groupKeys.count * setsPerGroup
     }
 
+    public mutating func markTrained(groupKeys: [String], at date: Date) {
+        for key in groupKeys {
+            lastTrained[key] = date
+        }
+    }
+
     /// Stores a weight as typed. A blank value clears it.
     public mutating func setWeight(_ value: String, forKey key: String) {
         let trimmed = value.trimmingCharacters(in: .whitespaces)
         weights[key] = trimmed.isEmpty ? nil : trimmed
+    }
+
+    /// Saves the reps from the weight sheet. Reps or a "too heavy" tick replace
+    /// the log. With neither, the old log stays if the weight didn't change, so
+    /// an exercise you skipped keeps its suggestion, and goes if it did.
+    public mutating func logLift(forKey key: String, weight: String, reps: [Int], tooHeavy: Bool) {
+        let weight = weight.trimmingCharacters(in: .whitespaces)
+        if weight.isEmpty {
+            lifts[key] = nil
+        } else if !reps.isEmpty || tooHeavy {
+            lifts[key] = LiftLog(weight: weight, reps: reps, tooHeavy: tooHeavy)
+        } else if let old = lifts[key], old.weight != weight {
+            lifts[key] = nil
+        }
     }
 }
 

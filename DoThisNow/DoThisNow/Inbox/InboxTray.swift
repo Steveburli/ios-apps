@@ -116,7 +116,8 @@ struct InboxTray: View {
     }
 }
 
-private struct InboxRow: View {
+/// A task in the Inbox. Tap it for times, or drag it onto the timeline.
+struct InboxRow: View {
     @Environment(AppModel.self) private var model
     let entry: InboxEntry
     let day: CalendarDay
@@ -170,6 +171,7 @@ private struct InboxRow: View {
     private var detail: String {
         let task = entry.task
         var parts: [String] = []
+        if let label = model.state.listLabel(for: task.ref) { parts.append(label) }
         if task.ref.source == .inbox {
             if !task.notes.isEmpty { parts.append(task.notes.replacingOccurrences(of: "\n", with: " ")) }
         } else if !task.listName.isEmpty {

@@ -316,7 +316,9 @@ private struct TaskRow: View {
         if task.isExample {
             Tag(text: "Example", tone: .example)
         }
-        if task.reminderID != nil {
+        if let label = model.state.listLabel(for: task) {
+            Tag(text: label, tone: .hot)
+        } else if task.reminderID != nil {
             Tag(text: "Reminders")
         }
     }

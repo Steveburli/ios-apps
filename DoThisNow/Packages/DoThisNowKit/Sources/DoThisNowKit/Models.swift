@@ -156,6 +156,8 @@ public struct TaskItem: Codable, Identifiable, Equatable, Sendable {
     public var reminderID: String?
     /// The reminder is ticked off in Reminders.
     public var reminderClosed: Bool = false
+    /// The Reminders list it came from, for that list's label.
+    public var reminderListID: String?
 
     public init(id: String = newID(), title: String, created: Date) {
         self.id = id
@@ -170,7 +172,7 @@ public struct TaskItem: Codable, Identifiable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case id, title, kind, tier, places, estimate, weekly, minBlock, place, deadline, stakes, binge,
              maxSession, focus, posture, outside, tv, notes, isExample, created, spent, lastDone, done,
-             doneAt, archived, snoozeUntil, remindSeen, nudgeUntil, reminderID, reminderClosed
+             doneAt, archived, snoozeUntil, remindSeen, nudgeUntil, reminderID, reminderClosed, reminderListID
     }
 
     public init(from decoder: Decoder) throws {
@@ -205,6 +207,7 @@ public struct TaskItem: Codable, Identifiable, Equatable, Sendable {
         nudgeUntil = try c.decodeIfPresent(Date.self, forKey: .nudgeUntil)
         reminderID = try c.decodeIfPresent(String.self, forKey: .reminderID)
         reminderClosed = try c.decodeIfPresent(Bool.self, forKey: .reminderClosed) ?? reminderClosed
+        reminderListID = try c.decodeIfPresent(String.self, forKey: .reminderListID)
     }
 }
 
