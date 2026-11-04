@@ -11,17 +11,35 @@ struct DayView: View {
     var body: some View {
         @Bindable var model = model
         if sizeClass == .regular {
-            HStack(spacing: 0) {
-                SideList(day: model.dayShown)
-                    .frame(width: 360)
-                Divider().overlay(Theme.line)
-                timeline(tray: false)
+            // The Inbox already sits in the left column, so iPad only
+            // switches between the day and the trip.
+            VStack(spacing: 0) {
+                Picker("Show", selection: Binding(get: { model.dayPage == .trip ? AppModel.DayPage.trip : .timeline },
+                                                  set: { model.dayPage = $0 })) {
+                    Text("Day").tag(AppModel.DayPage.timeline)
+                    Text("Trip").tag(AppModel.DayPage.trip)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 6)
+                .frame(maxWidth: 360)
+                if model.dayPage == .trip {
+                    TripView()
+                } else {
+                    HStack(spacing: 0) {
+                        SideList(day: model.dayShown)
+                            .frame(width: 360)
+                        Divider().overlay(Theme.line)
+                        timeline(tray: false)
+                    }
+                }
             }
         } else {
             VStack(spacing: 0) {
                 Picker("Show", selection: $model.dayPage) {
                     Text("Day").tag(AppModel.DayPage.timeline)
                     Text("Inbox (\(model.inboxEntries.count))").tag(AppModel.DayPage.inbox)
+                    Text("Trip").tag(AppModel.DayPage.trip)
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal, 16)
@@ -29,6 +47,8 @@ struct DayView: View {
                 .frame(maxWidth: 760)
                 if model.dayPage == .inbox {
                     InboxPage(day: model.dayShown)
+                } else if model.dayPage == .trip {
+                    TripView()
                 } else {
                     timeline(tray: true)
                 }

@@ -2,7 +2,8 @@ import Foundation
 
 /// The cloud build launches the app with `-screenshots <screen>` to photograph
 /// each screen with the example tasks: now, pick, doing, tasks, day, dayfull,
-/// inbox, inboxpage, replan, track or wake. On iPad, day shows the two-column layout.
+/// inbox, inboxpage, replan, trip, tripcatchup, track or wake. On iPad, day
+/// shows the two-column layout.
 /// Nothing here runs in normal use.
 enum Screenshots {
     static let screen: String? = {

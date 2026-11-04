@@ -10,8 +10,8 @@ final class AppModel {
     enum Tab: String { case now, tasks, day, track, wake }
     enum NowStep { case ask, pick }
     enum PickPanel { case done, later }
-    /// The Day tab shows the timeline or the Inbox page.
-    enum DayPage: String { case timeline, inbox }
+    /// The Day tab shows the timeline, the Inbox page or Trip mode.
+    enum DayPage: String { case timeline, inbox, trip }
 
     enum Sheet: Identifiable {
         case newTask
@@ -186,7 +186,7 @@ final class AppModel {
     }
 
     /// Goes to the screen named by `-screenshots`: now, pick, doing, tasks, day,
-    /// dayfull, inbox, inboxpage, replan, track or wake.
+    /// dayfull, inbox, inboxpage, replan, trip, tripcatchup, track or wake.
     private func openScreenshotScreen() {
         switch Screenshots.screen {
         case "pick":
@@ -220,6 +220,10 @@ final class AppModel {
             state.blocks.append(TimeBlock(ref: SourceRef(.inbox, "replan-example"), title: "Call the plumber", day: today,
                                           start: max(0, minute - 120), minutes: 30))
             sheet = .replan
+        case "trip", "tripcatchup":
+            tab = .day
+            openDayTab()
+            dayPage = .trip
         case "track":
             tab = .track
             state.running = RunningTimer(activityID: state.activities.first?.id, title: state.activities.first?.name ?? "Shower",
@@ -579,7 +583,8 @@ final class AppModel {
     func openDayTab() {
         refreshNow()
         dayShown = today
-        dayPage = .timeline
+        // Trip mode stays open while you're out, so it's one tap away.
+        if dayPage != .trip { dayPage = .timeline }
         scrollDayToNow = true
     }
 
