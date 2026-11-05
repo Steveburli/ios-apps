@@ -141,12 +141,7 @@ struct CardsTab: View {
             }
             ForEach(state.cards) { card in
                 HStack(spacing: 10) {
-                    Text(CardText.initial(card.title))
-                        .font(.system(size: 17, weight: .heavy))
-                        .foregroundStyle(Color.white)
-                        .frame(width: 34, height: 34)
-                        .background(Theme.cardColor(card.id), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                        .accessibilityHidden(true)
+                    CardThumb(title: card.title, colorID: card.id, photo: StarterPhoto.image(for: card))
                     Button {
                         session.sheet = .card(card.id)
                     } label: {

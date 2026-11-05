@@ -17,6 +17,8 @@ final class Session {
         case qr(String)
         /// Start a round on a deck.
         case startRound(String)
+        /// Pick a ready-made deck, opened on one deck when given.
+        case starter(String?)
 
         var id: String {
             switch self {
@@ -28,6 +30,7 @@ final class Session {
             case .spin(let deck): return "spin-" + deck
             case .qr(let group): return "qr-" + group
             case .startRound(let deck): return "round-" + deck
+            case .starter(let deck): return "starter-" + (deck ?? "all")
             }
         }
     }
@@ -124,6 +127,12 @@ final class Session {
         case "startround":
             path = [deck]
             sheet = .startRound(deck)
+        case "starter":
+            sheet = .starter(nil)
+        case "starterpreview":
+            sheet = .starter("dinners")
+        case "starterswipe":
+            path = [Screenshots.starterDeckID]
         default:
             break
         }

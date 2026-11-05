@@ -318,13 +318,27 @@ struct CardFace: View {
         let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
         ZStack(alignment: .topLeading) {
             Theme.cardColor(card.id)
-            RadialGradient(colors: [Color.white.opacity(0.17), .clear], center: .topLeading, startRadius: 0, endRadius: 420)
-            Text(CardText.initial(card.title))
-                .font(.system(size: 260, weight: .black))
-                .foregroundStyle(Color.white.opacity(0.14))
-                .frame(maxWidth: .infinity, alignment: .trailing)
-                .offset(x: 8, y: -40)
+            if let photo = StarterPhoto.image(for: card) {
+                GeometryReader { box in
+                    Image(uiImage: photo)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: box.size.width, height: box.size.height)
+                        .clipped()
+                }
                 .accessibilityHidden(true)
+                LinearGradient(stops: [.init(color: .black.opacity(0.45), location: 0), .init(color: .clear, location: 0.22),
+                                       .init(color: .black.opacity(0.25), location: 0.4), .init(color: .black.opacity(0.85), location: 1)],
+                               startPoint: .top, endPoint: .bottom)
+            } else {
+                RadialGradient(colors: [Color.white.opacity(0.17), .clear], center: .topLeading, startRadius: 0, endRadius: 420)
+                Text(CardText.initial(card.title))
+                    .font(.system(size: 260, weight: .black))
+                    .foregroundStyle(Color.white.opacity(0.14))
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .offset(x: 8, y: -40)
+                    .accessibilityHidden(true)
+            }
             VStack(alignment: .leading, spacing: 9) {
                 HStack {
                     Text(kind.label.uppercased())

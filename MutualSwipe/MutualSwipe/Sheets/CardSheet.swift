@@ -42,6 +42,7 @@ struct CardSheet: View {
         let others = state.participants.filter { $0 != me && state.vote(of: $0, on: card.id) != nil }
         let verdict = state.verdict(for: card)
         let round = session.showsRound(deck) ? deck.activeRound : nil
+        let starter = Starter.match(card)
 
         return ScrollView {
             VStack(alignment: .leading, spacing: 12) {
@@ -59,10 +60,22 @@ struct CardSheet: View {
                 .foregroundStyle(Color.white)
                 .padding(18)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(minHeight: starter?.hasPhoto == true ? 200 : 0, alignment: .bottomLeading)
                 .background {
                     ZStack {
                         Theme.cardColor(card.id)
-                        RadialGradient(colors: [Color.white.opacity(0.17), .clear], center: .topLeading, startRadius: 0, endRadius: 300)
+                        if let photo = StarterPhoto.image(named: starter?.photoName) {
+                            GeometryReader { box in
+                                Image(uiImage: photo)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: box.size.width, height: box.size.height)
+                                    .clipped()
+                            }
+                            LinearGradient(colors: [.clear, .black.opacity(0.75)], startPoint: .top, endPoint: .bottom)
+                        } else {
+                            RadialGradient(colors: [Color.white.opacity(0.17), .clear], center: .topLeading, startRadius: 0, endRadius: 300)
+                        }
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
@@ -88,6 +101,11 @@ struct CardSheet: View {
                         Label("Open \(CardText.host(card.link))", systemImage: "arrow.up.right.square")
                     }
                     .buttonStyle(.mutual(.quiet))
+                }
+                if starter?.website.isEmpty == false {
+                    Text("From Mutual’s ready-made decks. Last checked \(Starter.lastChecked), so check hours before you go.")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
                 }
 
                 let isDecided = deck.decidedCards.contains(card.id)

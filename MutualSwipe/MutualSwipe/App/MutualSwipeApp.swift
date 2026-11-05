@@ -122,6 +122,7 @@ struct RootView: View {
                 case .spin(let deckID): SpinSheet(deckID: deckID)
                 case .qr(let groupID): QRSheet(groupID: groupID)
                 case .startRound(let deckID): StartRoundSheet(deckID: deckID)
+                case .starter(let deckID): StarterSheet(initialDeckID: deckID)
                 }
             }
             .environment(store)

@@ -3,7 +3,7 @@ import MutualKit
 
 /// The cloud build launches the app with `-screenshots <screen>` to photograph
 /// each screen with sample decks: home, swipe, results, card, import, spin,
-/// round, roundresults or startround. Nothing here
+/// round, roundresults, startround, starter, starterpreview or starterswipe. Nothing here
 /// runs in normal use, and it never touches iCloud.
 enum Screenshots {
     static let screen: String? = {
@@ -23,6 +23,8 @@ enum Screenshots {
     static let picnicCardID = "card-picnic"
     static let dinnerDeckID = "deck-dinners"
     static let roundID = "round-sample"
+    /// A deck copied from the ready-made Indy date nights, so its cards show photos.
+    static let starterDeckID = "deck-indy"
     /// Round votes for the "round" and "roundresults" screens.
     static let alexRound: [(String, Vote)] = [("card-curry", .like), ("card-fajitas", .nope), ("card-salmon", .love), ("card-pizza", .never)]
     static let samRound: [(String, Vote)] = [("card-curry", .love), ("card-fajitas", .like), ("card-salmon", .like), ("card-pizza", .like)]

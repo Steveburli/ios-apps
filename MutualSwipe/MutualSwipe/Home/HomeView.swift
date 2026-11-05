@@ -96,6 +96,14 @@ struct HomeView: View {
                 Text("Make one for dinners, movies, trips or anything else you’re deciding together.")
                     .multilineTextAlignment(.center)
                     .foregroundStyle(Theme.muted)
+                Button {
+                    session.sheet = .starter(nil)
+                } label: {
+                    Label("Start from a ready-made deck", systemImage: "square.stack.3d.up")
+                }
+                .buttonStyle(.mutual())
+                .padding(.top, 8)
+                .disabled(group.map { !store.canWrite($0.id) } ?? false)
             }
             .padding(.vertical, 28)
             .padding(.horizontal, 20)

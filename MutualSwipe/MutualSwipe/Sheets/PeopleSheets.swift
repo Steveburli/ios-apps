@@ -237,7 +237,13 @@ struct NewDeckSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Name it, then add the cards you want to swipe on.")
+                    Button {
+                        session.sheet = .starter(nil)
+                    } label: {
+                        Label("Start from a ready-made deck", systemImage: "square.stack.3d.up")
+                    }
+                    .buttonStyle(.mutual(.quiet, wide: true))
+                    Text("Or name your own, then add the cards you want to swipe on.")
                         .foregroundStyle(Theme.muted)
                     Field(label: "Name", text: $title, placeholder: "Friday movie night")
                         .focused($titleFocused)

@@ -306,12 +306,7 @@ private struct ResultRow: View {
             session.sheet = .card(card.id)
         } label: {
             HStack(spacing: 12) {
-                Text(CardText.initial(card.title))
-                    .font(.system(size: 20, weight: .heavy))
-                    .foregroundStyle(Color.white)
-                    .frame(width: 40, height: 40)
-                    .background(Theme.cardColor(card.id), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .accessibilityHidden(true)
+                CardThumb(title: card.title, colorID: card.id, photo: StarterPhoto.image(for: card), size: 40)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(card.title).font(.body.weight(.semibold)).lineLimit(1).foregroundStyle(Theme.ink)
                     if !card.subtitle.isEmpty {

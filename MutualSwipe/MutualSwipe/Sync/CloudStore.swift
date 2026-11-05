@@ -846,6 +846,17 @@ final class CloudStore: CKSyncEngineDelegate {
             }
         }
 
+        if Screenshots.screen == "starterswipe" {
+            let deck = Deck(id: Screenshots.starterDeckID, groupID: group.id, title: Starter.dates.title, kind: Starter.dates.kind,
+                            blurb: Starter.dates.blurb, createdAt: now)
+            decks[deck.id] = deck
+            for (index, starter) in Starter.dates.cards.filter(.hasPhoto).prefix(6).enumerated() {
+                let card = Card(id: "indy-" + starter.id, groupID: group.id, deckID: deck.id, draft: starter.draft,
+                                order: Double(index), createdAt: now)
+                cards[card.id] = card
+            }
+        }
+
         // The dinners deck is vetted and has tonight's round going, with two past winners.
         guard var dinners = decks[Screenshots.dinnerDeckID] else { return }
         let plan = Rounds.plan(vetting: state(of: dinners.id, me: nil))
