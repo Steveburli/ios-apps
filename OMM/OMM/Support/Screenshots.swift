@@ -52,4 +52,17 @@ enum Screenshots {
         state.lifts["Hams|Seated Leg Curl Machine"] = LiftLog(weight: "70", reps: [12, 10, 8])
         return state
     }
+
+    /// A machine circuit and a short core routine, groups filled in by guess.
+    static func samplePresets() -> [Preset] {
+        func preset(_ name: String, _ exercises: [String]) -> Preset {
+            Preset(name: name, exercises: exercises.map { .init(name: $0, groupKey: GroupGuess.group(for: $0)?.key) })
+        }
+        return [
+            preset("Gym Machine Circuit", ["Chest Press", "Seated Row", "Leg Curl", "Leg Extension", "Shoulder Press",
+                                           "Lat Pulldown", "Back Extension", "Abdominal Crunch", "Triceps",
+                                           "Biceps Curl", "Leg Press"]),
+            preset("Morning Core", ["Plank", "Russian Twist", "Leg Raise"]),
+        ]
+    }
 }

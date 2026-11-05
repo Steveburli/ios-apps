@@ -14,7 +14,34 @@ final class AppModel {
         case complete(days: Int)
     }
 
+    /// The preset editor sheet: a new preset, or a saved one to change.
+    enum PresetSheet: Identifiable {
+        case new
+        case edit(Preset)
+
+        var id: String {
+            switch self {
+            case .new: return "new"
+            case .edit(let preset): return preset.id.uuidString
+            }
+        }
+    }
+
+    /// The bar on the home screen after a one-tap log, with Undo.
+    struct QuickLogNote: Equatable {
+        let presetName: String
+        let sets: Int
+        /// Groups this log crossed off.
+        let finished: [String]
+        /// Progress before the log, for Undo.
+        let previous: ProgramState
+    }
+
     private(set) var program: ProgramState
+    /// One-tap routines, saved apart from the program so Reset Program keeps them.
+    private(set) var presets: [Preset]
+    var presetSheet: PresetSheet?
+    private(set) var quickLog: QuickLogNote?
     private(set) var selection = GroupSelection()
     private(set) var screen: Screen = .home
     private(set) var session: WorkoutSession?
@@ -43,6 +70,7 @@ final class AppModel {
         static let cardioOn = "cardioOn"
         static let cardioMinutes = "cardioMinutes"
         static let stretchAfter = "stretchAfter"
+        static let presets = "presets.v1"
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -52,6 +80,7 @@ final class AppModel {
             scratch.removePersistentDomain(forName: "screenshots")
             self.defaults = scratch
             program = Screenshots.sampleProgram()
+            presets = Screenshots.samplePresets()
             durationMinutes = WorkoutPlan.defaultDuration
             cardioOn = false
             cardioMinutes = Cardio.defaultMinutes
@@ -65,6 +94,12 @@ final class AppModel {
             program = saved
         } else {
             program = ProgramState()
+        }
+        if let data = defaults.data(forKey: Keys.presets),
+           let saved = try? JSONDecoder().decode([Preset].self, from: data) {
+            presets = saved
+        } else {
+            presets = []
         }
         let storedDuration = defaults.integer(forKey: Keys.duration)
         durationMinutes = WorkoutPlan.durationRange.contains(storedDuration) ? storedDuration : WorkoutPlan.defaultDuration
@@ -103,6 +138,10 @@ final class AppModel {
         case "stretch":
             startStretch(areas: ["Shoulders", "Thighs", "Core"], afterWorkout: true)
             stretch?.startHold()
+        case "quicklog":
+            if let preset = presets.first { logPreset(preset) }
+        case "preset":
+            if let preset = presets.first { presetSheet = .edit(preset) }
         case "complete":
             screen = .complete(days: 41)
         default:
@@ -130,6 +169,7 @@ final class AppModel {
     func startWorkout() {
         let keys = selection.orderedKeys
         guard !keys.isEmpty else { return }
+        quickLog = nil
         program.markStarted(at: Date())
         save()
         session = WorkoutSession(plan: WorkoutPlan(groupKeys: keys, durationMinutes: durationMinutes,
@@ -141,7 +181,51 @@ final class AppModel {
     func resetProgram() {
         program = ProgramState()
         selection.clear()
+        quickLog = nil
         save()
+    }
+
+    // MARK: Presets
+
+    /// Adds a new preset or replaces the saved one with the same id.
+    func savePreset(_ preset: Preset) {
+        if let index = presets.firstIndex(where: { $0.id == preset.id }) {
+            presets[index] = preset
+        } else {
+            presets.append(preset)
+        }
+        savePresets()
+    }
+
+    func deletePreset(_ preset: Preset) {
+        presets.removeAll { $0.id == preset.id }
+        savePresets()
+    }
+
+    /// The one-tap "Log": a set for each exercise's group, then a note with Undo.
+    func logPreset(_ preset: Preset) {
+        let before = program
+        program.recordPreset(preset, at: Date())
+        save()
+        let finished = preset.setsByGroup.map(\.group).filter { !before.isDone($0) && program.isDone($0) }
+        quickLog = QuickLogNote(presetName: preset.name, sets: preset.totalSets,
+                                finished: finished.map { "\($0.area) · \($0.name)" }, previous: before)
+        selection.removeCompleted(in: program)
+        if program.isComplete {
+            screen = .complete(days: DayKey.daysInclusive(from: program.startDate ?? Date(), to: Date()))
+        }
+    }
+
+    func undoQuickLog() {
+        guard let quickLog else { return }
+        program = quickLog.previous
+        self.quickLog = nil
+        save()
+        screen = .home
+    }
+
+    func dismissQuickLog() {
+        quickLog = nil
     }
 
     func goHome() {
@@ -257,6 +341,12 @@ final class AppModel {
     private func save() {
         if let data = try? JSONEncoder().encode(program) {
             defaults.set(data, forKey: Keys.program)
+        }
+    }
+
+    private func savePresets() {
+        if let data = try? JSONEncoder().encode(presets) {
+            defaults.set(data, forKey: Keys.presets)
         }
     }
 }
