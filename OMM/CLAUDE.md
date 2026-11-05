@@ -13,6 +13,7 @@ A native SwiftUI (iOS 18+, iPhone, portrait) version of the OMM workout web app 
   - `Cardio` and `Stretches`: the cardio list and two gentle stretches per body area
 - `OMM/App` has `AppModel`, which owns the state and saves `ProgramState` as JSON in UserDefaults (`program.v1`). Flow: sets → cardio (if on) → weight sheet → stretches (if on) → home.
 - `OMM/Workout/WorkoutSession` runs the set-by-set flow, the rest timer (±15 s for this workout only) and cardio. `OMM/Stretch` runs stretch routines, after a workout or from "Just Stretch".
+- `OMM/Presets`: Quick Log. People save their own presets (`Preset` in OMMKit, saved under `presets.v1`, apart from the program so Reset keeps them); one tap of Log adds a set per exercise to its group, with Undo. `GroupGuess` fills a group in from a typed machine name. Nothing about any one gym is built in.
 - `OMM/Support` has the theme, `Countdown` (shared by rest, cardio and stretch holds), the chime (a WAV built in memory) and the notification.
 - `Config/Info.plist` is merged into the generated Info.plist.
 
