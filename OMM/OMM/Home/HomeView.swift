@@ -7,10 +7,12 @@ struct HomeView: View {
     @State private var pickingStretches = false
 
     var body: some View {
+        @Bindable var model = model
         ScrollView {
             VStack(spacing: 14) {
                 header
                 StatsCard(program: model.program)
+                QuickLogCard()
                 Card(padding: 6) {
                     MuscleGrid()
                 }
@@ -33,6 +35,10 @@ struct HomeView: View {
             StretchPickerView()
                 .environment(model)
                 .presentationDetents([.large])
+        }
+        .sheet(item: $model.presetSheet) { sheet in
+            PresetEditorView(sheet: sheet)
+                .environment(model)
         }
     }
 
