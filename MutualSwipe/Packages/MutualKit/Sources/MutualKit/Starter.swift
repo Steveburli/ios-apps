@@ -108,7 +108,7 @@ public enum Starter {
 
     // MARK: The decks
 
-    static let meals = StarterDeck(id: mealsID, title: "What should we eat?", kind: .restaurants,
+    public static let meals = StarterDeck(id: mealsID, title: "What should we eat?", kind: .restaurants,
                                    blurb: "Pick a kind of food first, then chain into Dinners", cards: [
         StarterCard("m-pizza", "Pizza", "Delivery or dine-in", "Thin, deep dish or wood-fired.", section: "Eat out"),
         StarterCard("m-mexican", "Mexican", "Tacos, burritos, queso", "Street tacos to sit-down margaritas.", section: "Eat out"),
@@ -130,7 +130,7 @@ public enum Starter {
         StarterCard("m-leftovers", "Leftovers", "Free", "Clean out the fridge.", section: "At home"),
     ])
 
-    static let dinners = StarterDeck(id: "dinners", title: "Indy dinners", kind: .restaurants,
+    public static let dinners = StarterDeck(id: "dinners", title: "Indy dinners", kind: .restaurants,
                                      blurb: "Indianapolis restaurants, tagged by kind of food", cards: [
         StarterCard("d-stelmo", "St. Elmo Steak House", "Downtown · $$$$ · Steak",
                     "Open since 1902, across from the Circle Centre mall.",
@@ -230,7 +230,7 @@ public enum Starter {
                     site: "https://www.cafepatachou.com/", section: "Brunch", tags: ["Brunch"], photo: true),
     ])
 
-    static let dates = StarterDeck(id: "dates", title: "Indy date nights", kind: .dates,
+    public static let dates = StarterDeck(id: "dates", title: "Indy date nights", kind: .dates,
                                    blurb: "Things to do in and around Indianapolis", cards: [
         StarterCard("n-newfields", "Newfields", "Art museum and gardens · $$",
                     "The art museum, gardens and Winter Lights from November to January.",
@@ -318,7 +318,7 @@ public enum Starter {
                     site: "https://www.sunkingbrewing.com/", section: "Drinks", photo: true),
     ])
 
-    static let movies = StarterDeck(id: "movies", title: "Indy movie nights", kind: .movies,
+    public static let movies = StarterDeck(id: "movies", title: "Indy movie nights", kind: .movies,
                                     blurb: "Places to see a movie", cards: [
         StarterCard("v-livingroom", "Living Room Theaters", "Bottleworks District · $$",
                     "Dine-in recliners in the old Coca-Cola bottling plant.",
@@ -360,7 +360,7 @@ public enum Starter {
                     section: "At home"),
     ])
 
-    static let trips = StarterDeck(id: "trips", title: "Trips from Indy", kind: .travel,
+    public static let trips = StarterDeck(id: "trips", title: "Trips from Indy", kind: .travel,
                                    blurb: "Day trips and weekends, with drive times from downtown", cards: [
         StarterCard("t-browncounty", "Brown County and Nashville, IN", "1 hr · day or weekend",
                     "Fall colors, art galleries and fudge.",

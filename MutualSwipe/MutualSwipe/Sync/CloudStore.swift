@@ -850,7 +850,7 @@ final class CloudStore: CKSyncEngineDelegate {
             let deck = Deck(id: Screenshots.starterDeckID, groupID: group.id, title: Starter.dates.title, kind: Starter.dates.kind,
                             blurb: Starter.dates.blurb, createdAt: now)
             decks[deck.id] = deck
-            for (index, starter) in Starter.dates.cards.filter(.hasPhoto).prefix(6).enumerated() {
+            for (index, starter) in Starter.dates.cards.filter({ $0.hasPhoto }).prefix(6).enumerated() {
                 let card = Card(id: "indy-" + starter.id, groupID: group.id, deckID: deck.id, draft: starter.draft,
                                 order: Double(index), createdAt: now)
                 cards[card.id] = card
