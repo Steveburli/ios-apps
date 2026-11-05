@@ -109,7 +109,7 @@ public enum Starter {
     // MARK: The decks
 
     public static let meals = StarterDeck(id: mealsID, title: "What should we eat?", kind: .restaurants,
-                                   blurb: "Pick a kind of food first, then chain into Dinners", cards: [
+                                   blurb: "Pick a kind of food first, then chain into Indy dinners", cards: [
         StarterCard("m-pizza", "Pizza", "Delivery or dine-in", "Thin, deep dish or wood-fired.", section: "Eat out"),
         StarterCard("m-mexican", "Mexican", "Tacos, burritos, queso", "Street tacos to sit-down margaritas.", section: "Eat out"),
         StarterCard("m-burgers", "Burgers", "Fries required", "Smash, pub or fancy.", section: "Eat out"),
