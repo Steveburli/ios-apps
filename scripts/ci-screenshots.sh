@@ -11,13 +11,8 @@ app="$1"
 derived="$2"
 
 case "$app" in
-<<<<<<< HEAD
-  OMM)         bundle="com.steveburlison.omm";         screens="home workout weights cardio stretch complete" ;;
-  MutualSwipe) bundle="com.steveburlison.mutualswipe"; screens="home swipe results card import spin round roundresults startround" ;;
-=======
   OMM)         bundle="com.steveburlison.omm";         screens="home quicklog preset workout weights cardio stretch complete" ;;
-  MutualSwipe) bundle="com.steveburlison.mutualswipe"; screens="home swipe results card import spin" ;;
->>>>>>> origin/main
+  MutualSwipe) bundle="com.steveburlison.mutualswipe"; screens="home swipe results card import spin round roundresults startround" ;;
   DoThisNow)   bundle="com.steveburlison.dothisnow";   screens="now pick doing tasks day dayfull inbox inboxpage replan trip tripcatchup track wake" ;;
   *) echo "Unknown app: $app"; exit 1 ;;
 esac
