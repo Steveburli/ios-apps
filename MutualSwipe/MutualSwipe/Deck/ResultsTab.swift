@@ -60,6 +60,8 @@ struct ResultsTab: View {
                     }
                 }
 
+                shareResults
+
                 history
             }
             .padding(.horizontal, 16)
@@ -142,6 +144,27 @@ struct ResultsTab: View {
             .padding(14)
             .background(Theme.accentSoft, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.line))
+        }
+    }
+
+    /// Sends the results as a little CSV (title,result), for pasting into
+    /// another app such as Burlison's Pantry.
+    @ViewBuilder
+    private var shareResults: some View {
+        if ResultsExport.hasResults(state) {
+            ShareLink(item: ResultsExport.csv(state),
+                      subject: Text("(deck.title) results"),
+                      preview: SharePreview("(deck.title) results")) {
+                Label("Share results", systemImage: "square.and.arrow.up")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.line))
+            }
+            .foregroundStyle(Theme.ink)
+            .padding(.top, 18)
+            .accessibilityHint("Shares each card and its result as a list you can paste into another app.")
         }
     }
 
