@@ -8,20 +8,12 @@ struct HomeView: View {
 
     var body: some View {
         let group = session.group(in: store)
+        let canWrite = group.map { store.canWrite($0.id) } ?? true
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("What are we deciding?")
-                        .font(Theme.display(40))
-                        .foregroundStyle(Theme.ink)
-                        .accessibilityAddTraits(.isHeader)
-                    Text("Everyone swipes on their own phone. Mutual shows you what you agree on.")
-                        .foregroundStyle(Theme.muted)
-                }
-                .padding(.vertical, 12)
-
                 if store.sortedGroups.count > 1, let group {
                     GroupSwitcher(current: group)
+                        .padding(.top, 8)
                 }
 
                 if store.accountStatus == .noAccount || store.accountStatus == .restricted {
@@ -33,6 +25,12 @@ struct HomeView: View {
                         .background(Theme.sunk, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
 
+                SectionTitle("Ready-made decks", detail: "Places around Indianapolis. Tap one to look through it.")
+                    .padding(.top, 8)
+                ReadyMadeStrip()
+
+                SectionTitle("Your decks", detail: group.map { "In “\($0.name)”" })
+                    .padding(.top, 12)
                 decks(in: group)
 
                 Button {
@@ -42,12 +40,7 @@ struct HomeView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(DashedButtonStyle())
-                .disabled(group.map { !store.canWrite($0.id) } ?? false)
-
-                if let group {
-                    InvitePanel(group: group)
-                        .padding(.top, 8)
-                }
+                .disabled(!canWrite)
 
                 HowItWorks()
                     .padding(.top, 20)
@@ -77,7 +70,7 @@ struct HomeView: View {
                 } label: {
                     Image(systemName: "person.2")
                 }
-                .accessibilityLabel("Groups and sharing")
+                .accessibilityLabel("People and groups")
                 if let group {
                     WhoButton(groupID: group.id)
                 }
@@ -91,21 +84,14 @@ struct HomeView: View {
         if decks.isEmpty {
             VStack(spacing: 6) {
                 Text("No decks yet")
-                    .font(Theme.display(22, weight: .bold))
+                    .font(Theme.display(20, weight: .bold))
                     .foregroundStyle(Theme.ink)
-                Text("Make one for dinners, movies, trips or anything else you’re deciding together.")
+                Text("Pick a ready-made deck above, or make your own for dinners, movies, trips or anything else you’re deciding together.")
+                    .font(.subheadline)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(Theme.muted)
-                Button {
-                    session.sheet = .starter(nil)
-                } label: {
-                    Label("Start from a ready-made deck", systemImage: "square.stack.3d.up")
-                }
-                .buttonStyle(.mutual())
-                .padding(.top, 8)
-                .disabled(group.map { !store.canWrite($0.id) } ?? false)
             }
-            .padding(.vertical, 28)
+            .padding(.vertical, 22)
             .padding(.horizontal, 20)
             .frame(maxWidth: .infinity)
             .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -285,88 +271,128 @@ private struct DeckTile: View {
     }
 }
 
-/// Inviting people: iCloud sharing for the group.
-private struct InvitePanel: View {
-    @Environment(CloudStore.self) private var store
-    @Environment(Session.self) private var session
-    let group: SwipeGroup
-    @State private var working = false
+/// A section heading on the home screen, with an optional line under it.
+private struct SectionTitle: View {
+    let title: String
+    let detail: String?
+
+    init(_ title: String, detail: String? = nil) {
+        self.title = title
+        self.detail = detail
+    }
 
     var body: some View {
-        Panel {
-            if group.isOwned {
-                Text(group.isShared ? "Swiping together" : "Bring people in")
-                    .font(Theme.display(18, weight: .bold))
-                    .foregroundStyle(Theme.ink)
-                Text(group.isShared
-                     ? (group.participants.isEmpty ? "You’ve invited people to “\(group.name)”. They’ll appear here once they join."
-                                                    : "Shared with \(group.participants.formatted(.list(type: .and))).")
-                     : "Invite people to “\(group.name)” so they can swipe these decks on their own iPhones. They need to be signed in to iCloud.")
-                    .font(.subheadline)
-                    .foregroundStyle(Theme.muted)
-                FlowLayout {
-                    Button(group.isShared ? "Manage people" : "Invite people") {
-                        Task {
-                            working = true
-                            defer { working = false }
-                            do {
-                                let share = try await store.share(for: group.id)
-                                SharingPresenter.present(share: share, container: store.container, title: group.name)
-                            } catch {
-                                session.show(error.localizedDescription)
-                            }
-                        }
-                    }
-                    .buttonStyle(.mutual())
-                    .disabled(working)
-                    Button {
-                        session.sheet = .qr(group.id)
-                    } label: {
-                        Label("QR code", systemImage: "qrcode")
-                    }
-                    .buttonStyle(.mutual(.quiet))
-                }
-            } else {
-                Text("Shared with you")
-                    .font(Theme.display(18, weight: .bold))
-                    .foregroundStyle(Theme.ink)
-                Text(group.readOnly
-                     ? "You can see “\(group.name)” but not change it."
-                     : "You’re swiping in “\(group.name)”. Everyone in it sees the same decks.")
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(Theme.display(22, weight: .bold))
+                .foregroundStyle(Theme.ink)
+                .accessibilityAddTraits(.isHeader)
+            if let detail {
+                Text(detail)
                     .font(.subheadline)
                     .foregroundStyle(Theme.muted)
             }
-            Text("Sharing one phone? Tap your name at the top to switch who’s swiping.")
-                .font(.footnote)
-                .foregroundStyle(Theme.muted)
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Theme.sunk, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
 }
 
-private struct HowItWorks: View {
+/// The built-in Indianapolis decks, side by side. Tapping one opens its
+/// preview, where you pick the cards and make your own copy.
+private struct ReadyMadeStrip: View {
+    @Environment(Session.self) private var session
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Divider().overlay(Theme.line)
-            Text("How it works")
-                .font(Theme.display(19, weight: .bold))
-                .foregroundStyle(Theme.ink)
-                .accessibilityAddTraits(.isHeader)
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 10) {
-                move(.love, "Swipe up · super like")
-                move(.like, "Swipe right")
-                move(.nope, "Swipe left · reject")
-                move(.never, "Swipe down · super reject")
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .top, spacing: 12) {
+                ForEach(Starter.decks) { deck in
+                    Button {
+                        session.sheet = .starter(deck.id)
+                    } label: {
+                        ReadyMadeTile(deck: deck)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
-            VStack(alignment: .leading, spacing: 10) {
-                rule(.perfect, "Everyone super liked it.")
-                rule(.match, "Everyone liked or super liked it.")
-                rule(.debate, "Someone super liked it and someone rejected it.")
-                rule(.trash, "Anyone super rejected it, or everyone rejected it. Once someone super rejects a card, it skips the stack for everyone else.")
-            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 2)
         }
+        .padding(.horizontal, -16)
+    }
+}
+
+private struct ReadyMadeTile: View {
+    let deck: StarterDeck
+
+    var body: some View {
+        let photo = deck.cards.lazy.compactMap { StarterPhoto.image(named: $0.photoName) }.first
+        VStack(alignment: .leading, spacing: 0) {
+            ZStack {
+                Theme.cardColor(deck.id)
+                if let photo {
+                    Image(uiImage: photo)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Text(CardText.initial(deck.title))
+                        .font(.system(size: 44, weight: .heavy))
+                        .foregroundStyle(Color.white)
+                }
+            }
+            .frame(width: 210, height: 120)
+            .clipped()
+            VStack(alignment: .leading, spacing: 3) {
+                Text("\(deck.kind.plural.uppercased()) · \(deck.cards.count) CARDS")
+                    .font(.caption2.weight(.bold))
+                    .tracking(0.8)
+                    .foregroundStyle(Theme.muted)
+                Text(deck.title)
+                    .font(Theme.display(17, weight: .bold))
+                    .foregroundStyle(Theme.ink)
+                    .lineLimit(1)
+                Text(deck.blurb)
+                    .font(.caption)
+                    .foregroundStyle(Theme.muted)
+                    .lineLimit(2, reservesSpace: true)
+            }
+            .padding(12)
+        }
+        .frame(width: 210, alignment: .leading)
+        .background(Theme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.line))
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Look through this deck and make your own copy")
+    }
+}
+
+/// The swipe moves and what the results mean, folded away until someone asks.
+private struct HowItWorks: View {
+    @State private var isOpen = false
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $isOpen) {
+            VStack(alignment: .leading, spacing: 16) {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 10) {
+                    move(.love, "Swipe up · super like")
+                    move(.like, "Swipe right")
+                    move(.nope, "Swipe left · reject")
+                    move(.never, "Swipe down · super reject")
+                }
+                VStack(alignment: .leading, spacing: 10) {
+                    rule(.perfect, "Everyone super liked it.")
+                    rule(.match, "Everyone liked or super liked it.")
+                    rule(.debate, "Someone super liked it and someone rejected it.")
+                    rule(.trash, "Anyone super rejected it, or everyone rejected it. Once someone super rejects a card, it skips the stack for everyone else.")
+                }
+            }
+            .padding(.top, 12)
+        } label: {
+            Label("How swiping works", systemImage: "questionmark.circle")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.ink)
+        }
+        .tint(Theme.muted)
     }
 
     private func move(_ vote: Vote, _ detail: String) -> some View {
