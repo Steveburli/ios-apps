@@ -70,7 +70,6 @@ struct DayView: View {
                     if offset == 0 { replanCard }
                     stats(plan)
                     fixes(plan)
-                    legend
                     DayTimeline(plan: plan, engine: engine)
                     lists(plan, offset: offset)
                 }
@@ -161,6 +160,7 @@ struct DayView: View {
             }
             .accessibilityLabel("Full screen")
             .accessibilityHint("Shows only the timeline, using the whole screen")
+            LegendButton()
             Button("+ Event") { model.sheet = .newEvent(day) }
                 .buttonStyle(.dtn())
         }
@@ -213,22 +213,6 @@ struct DayView: View {
                 }
             }
         }
-    }
-
-    private var legend: some View {
-        FlowLayout(spacing: 10) {
-            LegendItem(text: "Work: a rock, can’t move") { RoundedRectangle(cornerRadius: 4).fill(Theme.rock) }
-            LegendItem(text: "Your blocks: hold and drag, they bump each other") { RoundedRectangle(cornerRadius: 5).fill(Theme.block) }
-            LegendItem(text: model.state.settings.autoFill ? "Suggestions: soft, they flow around" : "Suggestions: off") {
-                RoundedRectangle(cornerRadius: 7).fill(Theme.soft)
-            }
-            LegendItem(text: "Events: drag the solid part to pick when you arrive") { RoundedRectangle(cornerRadius: 4).fill(Theme.core) }
-            LegendItem(text: "Jelly: extra time at the event, squeezable") {
-                RoundedRectangle(cornerRadius: 4).fill(Theme.jelly).overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.jellyLine, lineWidth: 1.5))
-            }
-            LegendItem(text: "Sleep: moves, but complains") { RoundedRectangle(cornerRadius: 4).fill(Theme.sleep) }
-        }
-        .accessibilityElement(children: .combine)
     }
 
     @ViewBuilder
@@ -308,18 +292,6 @@ struct StatCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.line))
         .accessibilityElement(children: .combine)
-    }
-}
-
-private struct LegendItem<Swatch: View>: View {
-    let text: String
-    @ViewBuilder var swatch: Swatch
-
-    var body: some View {
-        HStack(spacing: 6) {
-            swatch.frame(width: 14, height: 14)
-            Text(text).font(.caption).foregroundStyle(Theme.ink2)
-        }
     }
 }
 
