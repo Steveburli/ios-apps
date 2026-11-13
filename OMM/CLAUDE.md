@@ -41,6 +41,7 @@ If `xcodebuild` complains about the developer directory, ask the user to run `su
 - The duration slider remembers its last value.
 - Version 2 (from App HQ feedback, 2026-11-03): labeled, colored grid sections; recently trained groups fade; adjustable rest with a finish time; reps and a suggested weight; optional cardio; stretching after workouts (on by default) and on its own.
 - A local notification fires when rest ends while the app is in the background.
+- The home grid opens with one upper, one lower and one core group already picked (`NextGroups` in OMMKit, App HQ feedback 2026-11-13). Within each section the row (Chest, Back, Thighs, Calves …) trained least recently comes first, so rows rotate; inside that row a started group is finished first, else grid order. Tapping still changes a pick.
 
 ## How this repo is worked on
 
