@@ -108,6 +108,7 @@ final class AppModel {
         cardioMinutes = Cardio.minutesRange.contains(storedCardio) ? storedCardio : Cardio.defaultMinutes
         // Stretching is on until it's turned off.
         stretchAfter = defaults.object(forKey: Keys.stretchAfter) as? Bool ?? true
+        selection.fillSuggested(from: program)
     }
 
     /// Picks three groups and goes to the screen named by `-screenshots`.
@@ -181,6 +182,7 @@ final class AppModel {
     func resetProgram() {
         program = ProgramState()
         selection.clear()
+        selection.fillSuggested(from: program)
         quickLog = nil
         save()
     }
@@ -211,6 +213,7 @@ final class AppModel {
         quickLog = QuickLogNote(presetName: preset.name, sets: preset.totalSets,
                                 finished: finished.map { "\($0.area) · \($0.name)" }, previous: before)
         selection.removeCompleted(in: program)
+        selection.fillSuggested(from: program)
         if program.isComplete {
             screen = .complete(days: DayKey.daysInclusive(from: program.startDate ?? Date(), to: Date()))
         }
@@ -219,6 +222,7 @@ final class AppModel {
     func undoQuickLog() {
         guard let quickLog else { return }
         program = quickLog.previous
+        selection.fillSuggested(from: program)
         self.quickLog = nil
         save()
         screen = .home
@@ -230,6 +234,7 @@ final class AppModel {
 
     func goHome() {
         selection.clear()
+        selection.fillSuggested(from: program)
         screen = .home
     }
 
@@ -260,6 +265,7 @@ final class AppModel {
         session?.stop()
         session = nil
         selection.removeCompleted(in: program)
+        selection.fillSuggested(from: program)
         screen = .home
     }
 
@@ -297,6 +303,7 @@ final class AppModel {
         let areas = session?.plan.areas ?? []
         session = nil
         selection.clear()
+        selection.fillSuggested(from: program)
         if stretchAfter && !areas.isEmpty {
             startStretch(areas: areas, afterWorkout: true)
         } else {
