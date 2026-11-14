@@ -207,9 +207,17 @@ public struct Card: Identifiable, Codable, Equatable, Sendable {
     /// round and every stack, for everyone, until someone brings it back.
     public var retiredAt: Date?
     public var retiredBy: String?
+    /// When it happens, for event cards with a set time. Optional.
+    public var startsAt: Date?
+    /// True once someone took a card's time off, so the empty value still
+    /// reaches the server.
+    public var timeCleared: Bool?
     public var systemFields: Data?
 
     public var isRetired: Bool { retiredAt != nil }
+    /// Whether the card's record carries a `startsAt` field. Cards that never
+    /// had a time save exactly as before.
+    public var writesTime: Bool { startsAt != nil || timeCleared == true }
 
     public init(id: String = makeID(), groupID: String, deckID: String, draft: CardDraft, order: Double, createdAt: Date) {
         self.id = id
@@ -220,6 +228,7 @@ public struct Card: Identifiable, Codable, Equatable, Sendable {
         self.details = draft.details
         self.tags = draft.tags
         self.link = draft.link
+        self.startsAt = draft.startsAt
         self.order = order
         self.createdAt = createdAt
     }

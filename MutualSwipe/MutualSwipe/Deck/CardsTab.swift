@@ -13,6 +13,8 @@ struct CardsTab: View {
     @State private var details = ""
     @State private var link = ""
     @State private var tags = ""
+    @State private var hasTime = false
+    @State private var startsAt = CalendarPlan.placeholderStart(after: Date())
     @State private var deckTitle = ""
     @State private var deckBlurb = ""
     @State private var loaded = false
@@ -99,13 +101,23 @@ struct CardsTab: View {
                 Field(label: "Link", text: $link, placeholder: "https://", keyboard: .URL)
                 Field(label: "Tags", text: $tags, placeholder: "cozy, quick")
             }
+            Toggle("Happens at a set time", isOn: $hasTime)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.ink)
+                .tint(Theme.accent)
+            if hasTime {
+                DatePicker("When", selection: $startsAt)
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.ink)
+            }
             Button("Add card") {
-                guard let draft = CardText.clean(title: title, subtitle: subtitle, details: details, link: link, tags: tags) else {
+                guard var draft = CardText.clean(title: title, subtitle: subtitle, details: details, link: link, tags: tags) else {
                     titleFocused = true
                     return
                 }
+                draft.startsAt = hasTime ? startsAt : nil
                 if store.addCards([draft], to: deck.id) > 0 {
-                    title = ""; subtitle = ""; details = ""; link = ""; tags = ""
+                    title = ""; subtitle = ""; details = ""; link = ""; tags = ""; hasTime = false
                     session.show("Card added")
                     titleFocused = true
                 }

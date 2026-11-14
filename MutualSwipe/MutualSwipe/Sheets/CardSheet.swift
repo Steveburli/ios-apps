@@ -102,6 +102,7 @@ struct CardSheet: View {
                     }
                     .buttonStyle(.mutual(.quiet))
                 }
+                when(card, canWrite: store.canWrite(deck.groupID))
                 if starter?.website.isEmpty == false {
                     Text("From Mutual’s ready-made decks. Last checked \(Starter.lastChecked), so check hours before you go.")
                         .font(.footnote)
@@ -118,6 +119,12 @@ struct CardSheet: View {
                             Label("Add to calendar", systemImage: "calendar.badge.plus")
                         }
                         .buttonStyle(.mutual(isDecided ? .primary : .quiet))
+                        ShareLink(item: EventInvite(card: card),
+                                  preview: SharePreview(card.title, image: Image(systemName: "calendar"))) {
+                            Label("Send invite", systemImage: "square.and.arrow.up")
+                        }
+                        .buttonStyle(.mutual(.quiet))
+                        .accessibilityHint("Sends a calendar invite others can tap to add it to their own calendar.")
                         if store.canWrite(deck.groupID) {
                             Button {
                                 let name = me.flatMap { store.players[$0]?.name }
@@ -132,7 +139,7 @@ struct CardSheet: View {
                         }
                     }
                     Text(isDecided
-                         ? "Decided. Each person adds it to their own calendar."
+                         ? "Decided. Add it to a shared calendar, or send the invite so others can add it to theirs."
                          : "Mark it decided and it moves to the top of Results for everyone.")
                         .font(.footnote)
                         .foregroundStyle(Theme.muted)
@@ -235,6 +242,39 @@ struct CardSheet: View {
                 Label("Never, for good", systemImage: "nosign")
             }
             .buttonStyle(.mutual(.danger))
+        }
+    }
+
+    /// The card's optional date and time, for events. Anyone who can edit
+    /// the group can set, change or remove it.
+    @ViewBuilder
+    private func when(_ card: Card, canWrite: Bool) -> some View {
+        if let time = card.startsAt {
+            HStack(spacing: 8) {
+                if canWrite {
+                    DatePicker(selection: Binding(get: { time }, set: { store.setTime($0, card: card.id) })) {
+                        Label("When", systemImage: "clock").foregroundStyle(Theme.ink)
+                    }
+                    Button {
+                        store.setTime(nil, card: card.id)
+                        session.show("Time removed")
+                    } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(Theme.muted).frame(width: 32, height: 32)
+                    }
+                    .accessibilityLabel("Remove the time")
+                } else {
+                    Label(time.formatted(date: .abbreviated, time: .shortened), systemImage: "clock")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.ink)
+                }
+            }
+        } else if canWrite {
+            Button {
+                store.setTime(CalendarPlan.placeholderStart(after: Date()), card: card.id)
+            } label: {
+                Label("Add a date and time", systemImage: "clock.badge.plus")
+            }
+            .buttonStyle(.mutual(.quiet))
         }
     }
 

@@ -19,6 +19,8 @@ final class Session {
         case startRound(String)
         /// Pick a ready-made deck, opened on one deck when given.
         case starter(String?)
+        /// Put a deck's matches on a calendar in one go.
+        case calendar(String)
 
         var id: String {
             switch self {
@@ -31,6 +33,7 @@ final class Session {
             case .qr(let group): return "qr-" + group
             case .startRound(let deck): return "round-" + deck
             case .starter(let deck): return "starter-" + (deck ?? "all")
+            case .calendar(let deck): return "calendar-" + deck
             }
         }
     }

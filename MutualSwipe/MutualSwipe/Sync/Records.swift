@@ -84,6 +84,10 @@ enum Records {
             record["retiredAt"] = card.retiredAt
             record["retiredBy"] = card.retiredBy
         }
+        // Only written once a card has had a time, so other cards save as before.
+        if card.writesTime {
+            record["startsAt"] = card.startsAt
+        }
         return record
     }
 
@@ -166,6 +170,7 @@ enum Records {
                         order: record["order"] as? Double ?? 0, createdAt: date(record, "createdAt"))
         card.retiredAt = record["retiredAt"] as? Date
         card.retiredBy = record["retiredBy"] as? String
+        card.startsAt = record["startsAt"] as? Date
         card.systemFields = record.archivedSystemFields
         return card
     }
