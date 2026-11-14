@@ -67,6 +67,21 @@ struct DayItemSheet: View {
                         model.startFromDay(chunkID)
                     }
                 }
+                if model.canMoveSuggestion(chunk) {
+                    NavigationLink {
+                        MoveSuggestionView(chunk: chunk, from: pieces.first?.start)
+                    } label: {
+                        optionLabel("Move to…", detail: "Pick a time. It stays there after that")
+                    }
+                }
+                if let piece = pieces.first {
+                    NavigationLink {
+                        SwapSuggestionView(chunkID: chunkID, start: Reflow.snap(piece.start),
+                                           minutes: Int((piece.end - piece.start).rounded()))
+                    } label: {
+                        optionLabel("Swap for something else", detail: "Put a different task at \(f.time(plan.day, piece.start))")
+                    }
+                }
                 option(isMust ? "Remove from must-do" : "Must do \(which)",
                        detail: isMust ? "Let it flow like everything else" : "It goes first, even if bedtime gets pushed",
                        selected: isMust) {
@@ -87,12 +102,7 @@ struct DayItemSheet: View {
     private func option(_ title: String, detail: String?, selected: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.body.weight(.bold)).foregroundStyle(Theme.ink)
-                    if let detail {
-                        Text(detail).font(.footnote).foregroundStyle(Theme.ink3)
-                    }
-                }
+                optionLabel(title, detail: detail)
                 Spacer()
                 if selected {
                     Image(systemName: "checkmark").foregroundStyle(Theme.accent)
@@ -100,6 +110,97 @@ struct DayItemSheet: View {
             }
         }
         .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func optionLabel(_ title: String, detail: String?) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).font(.body.weight(.bold)).foregroundStyle(Theme.ink)
+            if let detail {
+                Text(detail).font(.footnote).foregroundStyle(Theme.ink3)
+            }
+        }
+    }
+}
+
+/// "Move to…" for a suggested task: the next open gaps, or any time you pick.
+/// Either way it becomes a block you placed, so it stays put.
+private struct MoveSuggestionView: View {
+    @Environment(AppModel.self) private var model
+    let chunk: Chunk
+    let from: Double?
+    @State private var time = Date()
+
+    var body: some View {
+        let day = model.dayShown
+        let f = model.formats
+        let gaps = model.openSlots(on: day, minutes: Int(chunk.minutes.rounded()))
+        List {
+            if !gaps.isEmpty {
+                Section("Open gaps") {
+                    ForEach(gaps, id: \.self) { start in
+                        Button(f.range(day, Double(start), Double(start) + chunk.minutes)) {
+                            model.pinSuggestion(chunk.id, at: start)
+                        }
+                        .foregroundStyle(Theme.ink)
+                    }
+                }
+            }
+            Section {
+                DatePicker("Start at", selection: $time, displayedComponents: .hourAndMinute)
+                Button("Put it here") {
+                    let parts = Calendar.current.dateComponents([.hour, .minute], from: time)
+                    let minute = (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
+                    model.pinSuggestion(chunk.id, at: Reflow.snap(Double(minute)))
+                }
+                .font(.body.weight(.bold))
+            } header: {
+                Text("Any time")
+            } footer: {
+                Text("Anything it lands on moves out of the way.")
+            }
+        }
+        .navigationTitle("Move “\(chunk.title)”")
+        .onAppear {
+            let minute = Int(from ?? Double(model.state.settings.wake))
+            time = Calendar.current.date(bySettingHour: min(23, minute / 60), minute: minute % 60, second: 0, of: Date()) ?? Date()
+        }
+    }
+}
+
+/// "Swap for something else": pick another task to put in this suggestion's slot.
+private struct SwapSuggestionView: View {
+    @Environment(AppModel.self) private var model
+    let chunkID: String
+    let start: Int
+    let minutes: Int
+
+    var body: some View {
+        let plan = model.engine.planDay(model.dayShown)
+        let candidates = model.swapCandidates(for: chunkID, in: plan)
+        List {
+            if candidates.isEmpty {
+                Text("Nothing else on your list to swap in.")
+                    .foregroundStyle(Theme.ink3)
+            } else {
+                Section {
+                    ForEach(candidates) { task in
+                        Button {
+                            model.swapSuggestion(chunkID, for: task.id, at: start, minutes: minutes)
+                        } label: {
+                            HStack {
+                                Text(task.title).foregroundStyle(Theme.ink)
+                                Spacer()
+                                Text(TimeText.duration(task.estimate > 0 ? task.estimate : 15))
+                                    .foregroundStyle(Theme.ink3)
+                            }
+                        }
+                    }
+                } footer: {
+                    Text("The one you swap in stays at \(model.formats.time(plan.day, Double(start))). The old suggestion finds another gap, or use “Not today” to drop it.")
+                }
+            }
+        }
+        .navigationTitle("Swap it")
     }
 }
 

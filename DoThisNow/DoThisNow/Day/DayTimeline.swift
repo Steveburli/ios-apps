@@ -109,9 +109,9 @@ struct DayTimeline: View {
 
             ForEach(Array(plan.items.enumerated()), id: \.offset) { _, item in
                 if let s = slot(item.start, item.end, r0) {
-                    itemBlock(item)
+                    SuggestionBlock(item: item, day: plan.day, movable: model.canMoveSuggestion(item.chunk))
                         .placed(width: blockWidth, slot: s, x: gutter)
-                        .zIndex(3)
+                        .zIndex(model.draggingSuggestion == suggestionKey(item) ? 9 : 3)
                 }
             }
 
@@ -330,37 +330,8 @@ struct DayTimeline: View {
             .accessibilityAction(named: "Options") { model.sheet = .block(block.id) }
     }
 
-    private func itemBlock(_ item: PlanItem) -> some View {
-        let f = model.formats
-        let chunk = item.chunk
-        var note = [f.range(plan.day, item.start, item.end)]
-        if item.parts > 1 { note.append("part \(item.part) of \(item.parts)") }
-        if item.squished { note.append("squeezed") }
-        if item.filler { note.append("if you have room") } else if chunk.must { note.append("must do") }
-        let radius: CGFloat = item.squished ? 5 : 14
-        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
-
-        return Button { model.sheet = .dayItem(chunk.id) } label: {
-            BlockLabel(title: chunk.title, detail: note.joined(separator: " · "))
-                .foregroundStyle(Theme.softInk)
-                .background {
-                    if item.filler {
-                        shape.fill(Theme.surface).overlay(Stripes(color: Theme.soft, spacing: 13, lineWidth: 7).clipShape(shape))
-                    } else {
-                        shape.fill(Theme.soft)
-                    }
-                }
-                .overlay {
-                    if item.squished {
-                        shape.strokeBorder(Theme.bad, lineWidth: 2)
-                    } else if item.filler {
-                        shape.strokeBorder(Theme.softLine, lineWidth: 1.5)
-                    } else {
-                        shape.strokeBorder(Theme.softLine.opacity(0.6), lineWidth: 1)
-                    }
-                }
-        }
-        .buttonStyle(.plain)
+    private func suggestionKey(_ item: PlanItem) -> String {
+        "\(item.chunk.id)#\(item.part)"
     }
 
     @ViewBuilder
@@ -380,6 +351,100 @@ struct DayTimeline: View {
             }
             .offset(x: gutter, y: top)
             .zIndex(3)
+    }
+}
+
+/// A task the planner suggested for a gap. Tap for options; touch and hold,
+/// then drag, to move it. Once dropped it becomes a block you placed, so it
+/// stays where you put it.
+private struct SuggestionBlock: View {
+    @Environment(AppModel.self) private var model
+    let item: PlanItem
+    let day: CalendarDay
+    let movable: Bool
+    @State private var offset: CGFloat = 0
+    @State private var lifted = false
+
+    private var key: String { "\(item.chunk.id)#\(item.part)" }
+
+    var body: some View {
+        let f = model.formats
+        let chunk = item.chunk
+        let px = DayTimeline.px
+        var note = [lifted ? f.time(day, Double(Reflow.snap(item.start + Double(offset / px)))) : f.range(day, item.start, item.end)]
+        if item.parts > 1 { note.append("part \(item.part) of \(item.parts)") }
+        if item.squished { note.append("squeezed") }
+        if item.filler { note.append("if you have room") } else if chunk.must { note.append("must do") }
+        let radius: CGFloat = item.squished ? 5 : 14
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+
+        return BlockLabel(title: chunk.title, detail: note.joined(separator: " · "))
+            .foregroundStyle(Theme.softInk)
+            .background {
+                if item.filler {
+                    shape.fill(Theme.surface).overlay(Stripes(color: Theme.soft, spacing: 13, lineWidth: 7).clipShape(shape))
+                } else {
+                    shape.fill(Theme.soft)
+                }
+            }
+            .overlay {
+                if lifted {
+                    shape.strokeBorder(Theme.ink, lineWidth: 2)
+                } else if item.squished {
+                    shape.strokeBorder(Theme.bad, lineWidth: 2)
+                } else if item.filler {
+                    shape.strokeBorder(Theme.softLine, lineWidth: 1.5)
+                } else {
+                    shape.strokeBorder(Theme.softLine.opacity(0.6), lineWidth: 1)
+                }
+            }
+            .scaleEffect(lifted ? 1.02 : 1)
+            .shadow(color: .black.opacity(lifted ? 0.25 : 0), radius: 10, y: 6)
+            .offset(y: offset)
+            .contentShape(shape)
+            .onTapGesture { model.sheet = .dayItem(chunk.id) }
+            .gesture(
+                LongPressGesture(minimumDuration: 0.3)
+                    .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .global))
+                    .onChanged { value in
+                        guard movable, case .second(true, let drag) = value else { return }
+                        if !lifted {
+                            lifted = true
+                            model.draggingSuggestion = key
+                        }
+                        if let drag {
+                            // Snap to five minutes so the time shown matches where it lands.
+                            let minutes = Double(Reflow.snap(Double(drag.translation.height / px)))
+                            offset = CGFloat(minutes) * px
+                            model.trackBlockDrag(at: drag.location)
+                        }
+                    }
+                    .onEnded { _ in
+                        guard lifted else { return }
+                        let moved = offset
+                        lifted = false
+                        offset = 0
+                        model.draggingSuggestion = nil
+                        model.dropSuggestion(chunk.id, from: item.start, by: moved, pointsPerMinute: px)
+                    },
+                including: movable ? .all : .subviews
+            )
+            .sensoryFeedback(.impact(weight: .medium), trigger: lifted) { _, now in now }
+            .sensoryFeedback(.selection, trigger: offset)
+            .accessibilityElement(children: .ignore)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel("Suggested: \(chunk.title)")
+            .accessibilityValue(f.range(day, item.start, item.end))
+            .accessibilityHint(movable ? "Swipe up or down to move it five minutes. It then stays where you put it." : "")
+            .accessibilityAdjustableAction { direction in
+                guard movable else { return }
+                switch direction {
+                case .increment: model.nudgeSuggestion(chunk.id, from: item.start, by: 5)
+                case .decrement: model.nudgeSuggestion(chunk.id, from: item.start, by: -5)
+                @unknown default: break
+                }
+            }
+            .accessibilityAction { model.sheet = .dayItem(chunk.id) }
     }
 }
 

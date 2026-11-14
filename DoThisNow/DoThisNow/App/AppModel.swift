@@ -139,6 +139,8 @@ final class AppModel {
     /// The Inbox task being dragged onto the timeline.
     var draggingKey: String?
     var draggingBlockID: String?
+    /// The suggestion being dragged on the timeline (`chunk id#part`), drawn on top.
+    var draggingSuggestion: String?
     @ObservationIgnored var blockDrag: BlockDrag?
     /// On iPad, a block dragged over the left column goes back to the Inbox when let go.
     var blockOverSideList = false
