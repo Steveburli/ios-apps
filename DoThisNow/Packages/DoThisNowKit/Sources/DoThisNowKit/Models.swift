@@ -321,10 +321,12 @@ public struct PlannerSettings: Codable, Equatable, Sendable {
     public var autoFill = true
     /// Color tasks from cold (blue) to hot (red), and let late ones grow.
     public var taskHeat = true
+    /// Minutes of focused work that earn one minute of break.
+    public var workPerBreak = 5
 
     public init() {}
 
-    private enum CodingKeys: String, CodingKey { case wake, bed, dinnerAt, dinner, work, cafeMinutes, sound, autoFill, taskHeat }
+    private enum CodingKeys: String, CodingKey { case wake, bed, dinnerAt, dinner, work, cafeMinutes, sound, autoFill, taskHeat, workPerBreak }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -337,6 +339,7 @@ public struct PlannerSettings: Codable, Equatable, Sendable {
         sound = try c.decodeIfPresent(Bool.self, forKey: .sound) ?? sound
         autoFill = try c.decodeIfPresent(Bool.self, forKey: .autoFill) ?? autoFill
         taskHeat = try c.decodeIfPresent(Bool.self, forKey: .taskHeat) ?? taskHeat
+        workPerBreak = try max(1, c.decodeIfPresent(Int.self, forKey: .workPerBreak) ?? workPerBreak)
     }
 }
 
@@ -454,13 +457,15 @@ public struct PlannerState: Codable, Equatable, Sendable {
     public var wake = WakeSettings()
     /// Changes made in a shared Reminders list, waiting for your answer.
     public var suggestions: [Suggestion] = []
+    /// Break time earned by focused work.
+    public var breaks = BreakBank()
     public var updatedAt = Date(timeIntervalSince1970: 0)
 
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
         case tasks, events, log, days, settings, context, cafeDismissed, active, blocks, inboxItems, inbox,
-             activities, timings, running, wake, suggestions, updatedAt
+             activities, timings, running, wake, suggestions, breaks, updatedAt
     }
 
     public init(from decoder: Decoder) throws {
@@ -481,6 +486,7 @@ public struct PlannerState: Codable, Equatable, Sendable {
         running = try c.decodeIfPresent(RunningTimer.self, forKey: .running)
         wake = try c.decodeIfPresent(WakeSettings.self, forKey: .wake) ?? WakeSettings()
         suggestions = try c.decodeIfPresent([Suggestion].self, forKey: .suggestions) ?? []
+        breaks = try c.decodeIfPresent(BreakBank.self, forKey: .breaks) ?? BreakBank()
         updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date(timeIntervalSince1970: 0)
     }
 

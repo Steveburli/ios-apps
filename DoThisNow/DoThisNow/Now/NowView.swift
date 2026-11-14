@@ -131,6 +131,8 @@ struct AskView: View {
                 .foregroundStyle(Theme.ink)
                 .accessibilityAddTraits(.isHeader)
 
+            BreakBalanceBar()
+
             if model.offersReminders {
                 RemindersOfferCard()
             }
