@@ -58,6 +58,23 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Toggle("Task heat colors", isOn: $draft.taskHeat)
+                    if draft.taskHeat {
+                        HStack(spacing: 8) {
+                            Text("Cold").font(.caption).foregroundStyle(Theme.ink3)
+                            LinearGradient(colors: stride(from: 0.0, through: 1.0, by: 0.25).map { Theme.heat(TaskHeat(value: $0)) },
+                                           startPoint: .leading, endPoint: .trailing)
+                                .frame(height: 8)
+                                .clipShape(Capsule())
+                            Text("Hot").font(.caption).foregroundStyle(Theme.ink3)
+                        }
+                        .accessibilityHidden(true)
+                    }
+                } footer: {
+                    Text("Blue is cold, red is hot, from priority and how close the deadline is. Each Not now warms a task up. Once a deadline passes, the task turns red and grows a little each day late, for up to 5 days. A later deadline is a fresh start.")
+                }
+
+                Section {
                     Toggle("Sounds", isOn: $draft.sound)
                 } footer: {
                     Text("A chime when your timer runs out, and Sleep grumbling when you push bedtime. Sounds follow the silent switch.")

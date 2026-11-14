@@ -241,6 +241,20 @@ final class AppModel {
 
     var today: CalendarDay { CalendarDay(now, calendar: calendar) }
 
+    /// How hot a task is, or nil when Task heat colors is off.
+    func heat(_ task: TaskItem) -> TaskHeat? {
+        guard state.settings.taskHeat else { return nil }
+        return task.heat(today: today, calendar: calendar)
+    }
+
+    /// Heat for an Inbox row or a block: its app task's heat when it has
+    /// one (so snoozes count), else the source's own due date and priority.
+    func heat(for ref: SourceRef, source: SourceTask? = nil) -> TaskHeat? {
+        guard state.settings.taskHeat else { return nil }
+        if let task = state.task(for: ref) { return task.heat(today: today, calendar: calendar) }
+        return source?.heat(today: today, calendar: calendar)
+    }
+
     var engine: Engine {
         Engine(state: state, now: now, formats: formats, preferredEventID: lastMovedEventID)
     }
@@ -492,7 +506,11 @@ final class AppModel {
         if isNew {
             state.tasks.append(task)
         } else {
-            state.updateTask(task.id) { $0 = task }
+            let before = state.task(task.id)?.deadline
+            state.updateTask(task.id) { saved in
+                saved = task
+                saved.coolIfDeadlineMovedLater(from: before)
+            }
         }
         if let reminderID = task.reminderID {
             reminderWrites += 1

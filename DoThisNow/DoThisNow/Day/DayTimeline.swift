@@ -285,6 +285,9 @@ struct DayTimeline: View {
             .foregroundStyle(Theme.blockInk)
             .strikethrough(block.done)
             .background(Theme.block.opacity(block.done ? 0.45 : 1), in: shape)
+            .overlay(alignment: .leading) {
+                heatStripe(block.done ? nil : model.heat(for: block.ref), shape: shape)
+            }
             .overlay(alignment: .trailing) {
                 Group {
                     if block.done {
@@ -359,8 +362,34 @@ struct DayTimeline: View {
                         shape.strokeBorder(Theme.softLine.opacity(0.6), lineWidth: 1)
                     }
                 }
+                .overlay(alignment: .leading) {
+                    heatStripe(hottest(chunk.tasks), shape: shape)
+                }
         }
         .buttonStyle(.plain)
+    }
+
+    /// The hottest of a chunk's tasks (an errand run can hold several).
+    private func hottest(_ tasks: [TaskItem]) -> TaskHeat? {
+        tasks.compactMap { model.heat($0) }.max { a, b in
+            (a.daysLate, a.value) < (b.daysLate, b.value)
+        }
+    }
+
+    /// A heat-colored stripe down a block's left edge, blue (cold) to red (hot).
+    @ViewBuilder
+    private func heatStripe(_ heat: TaskHeat?, shape: RoundedRectangle) -> some View {
+        if let heat {
+            HStack(spacing: 0) {
+                Rectangle()
+                    .fill(Theme.heat(heat))
+                    .frame(width: heat.isAngry ? 7 : 5)
+                Spacer(minLength: 0)
+            }
+            .clipShape(shape)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
     }
 
     @ViewBuilder

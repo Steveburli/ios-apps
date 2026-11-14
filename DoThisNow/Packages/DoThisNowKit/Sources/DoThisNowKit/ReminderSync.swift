@@ -61,7 +61,9 @@ extension PlannerState {
                     t.reminderListID = reminder.listID
                     t.title = reminder.title
                     t.notes = reminder.notes
+                    let before = t.deadline
                     t.deadline = reminder.due.map { CalendarDay($0, calendar: calendar) }
+                    t.coolIfDeadlineMovedLater(from: before)
                 }
             } else {
                 var task = TaskItem(title: reminder.title, created: now)

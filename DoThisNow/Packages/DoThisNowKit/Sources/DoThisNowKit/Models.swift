@@ -150,6 +150,8 @@ public struct TaskItem: Codable, Identifiable, Equatable, Sendable {
     public var doneAt: Date?
     public var archived: Bool = false
     public var snoozeUntil: Date?
+    /// Times you pressed Not now on it. Each one warms it up a little.
+    public var snoozes: Int = 0
     public var remindSeen: Bool = false
     public var nudgeUntil: Date?
     /// The Apple Reminder this task mirrors.
@@ -172,7 +174,7 @@ public struct TaskItem: Codable, Identifiable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case id, title, kind, tier, places, estimate, weekly, minBlock, place, deadline, stakes, binge,
              maxSession, focus, posture, outside, tv, notes, isExample, created, spent, lastDone, done,
-             doneAt, archived, snoozeUntil, remindSeen, nudgeUntil, reminderID, reminderClosed, reminderListID
+             doneAt, archived, snoozeUntil, snoozes, remindSeen, nudgeUntil, reminderID, reminderClosed, reminderListID
     }
 
     public init(from decoder: Decoder) throws {
@@ -203,6 +205,7 @@ public struct TaskItem: Codable, Identifiable, Equatable, Sendable {
         doneAt = try c.decodeIfPresent(Date.self, forKey: .doneAt)
         archived = try c.decodeIfPresent(Bool.self, forKey: .archived) ?? archived
         snoozeUntil = try c.decodeIfPresent(Date.self, forKey: .snoozeUntil)
+        snoozes = try c.decodeIfPresent(Int.self, forKey: .snoozes) ?? snoozes
         remindSeen = try c.decodeIfPresent(Bool.self, forKey: .remindSeen) ?? remindSeen
         nudgeUntil = try c.decodeIfPresent(Date.self, forKey: .nudgeUntil)
         reminderID = try c.decodeIfPresent(String.self, forKey: .reminderID)
@@ -311,10 +314,12 @@ public struct PlannerSettings: Codable, Equatable, Sendable {
     public var sound = true
     /// Suggest tasks for the gaps between the blocks you placed yourself.
     public var autoFill = true
+    /// Color tasks from cold (blue) to hot (red), and let late ones grow.
+    public var taskHeat = true
 
     public init() {}
 
-    private enum CodingKeys: String, CodingKey { case wake, bed, dinnerAt, dinner, work, cafeMinutes, sound, autoFill }
+    private enum CodingKeys: String, CodingKey { case wake, bed, dinnerAt, dinner, work, cafeMinutes, sound, autoFill, taskHeat }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -326,6 +331,7 @@ public struct PlannerSettings: Codable, Equatable, Sendable {
         cafeMinutes = try c.decodeIfPresent(Int.self, forKey: .cafeMinutes) ?? cafeMinutes
         sound = try c.decodeIfPresent(Bool.self, forKey: .sound) ?? sound
         autoFill = try c.decodeIfPresent(Bool.self, forKey: .autoFill) ?? autoFill
+        taskHeat = try c.decodeIfPresent(Bool.self, forKey: .taskHeat) ?? taskHeat
     }
 }
 
