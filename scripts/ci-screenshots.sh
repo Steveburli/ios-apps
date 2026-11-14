@@ -13,7 +13,7 @@ derived="$2"
 case "$app" in
   OMM)         bundle="com.steveburlison.omm";         screens="home quicklog preset workout weights cardio stretch complete" ;;
   MutualSwipe) bundle="com.steveburlison.mutualswipe"; screens="home swipe results card import spin round roundresults startround starter starterpreview starterswipe" ;;
-  DoThisNow)   bundle="com.steveburlison.dothisnow";   screens="now pick doing tasks day dayfull inbox inboxpage replan trip tripcatchup track wake" ;;
+  DoThisNow)   bundle="com.steveburlison.dothisnow";   screens="now pick doing tasks day dayfull week inbox inboxpage replan trip tripcatchup track wake" ;;
   *) echo "Unknown app: $app"; exit 1 ;;
 esac
 
@@ -80,7 +80,7 @@ print(sorted(ids)[-1] if ids else "")
       --batteryState charged --batteryLevel 100 || true
     xcrun simctl install "$ipad" "$app_path"
     pause=20
-    for screen in day replan trip; do
+    for screen in day week replan trip; do
       xcrun simctl launch --terminate-running-process "$ipad" "$bundle" -screenshots "$screen" > /dev/null || true
       sleep "$pause"
       pause=6
