@@ -10,9 +10,12 @@ A native SwiftUI (iOS 18+, iPhone, portrait) version of the OMM workout web app 
   - `ProgramState`: progress, weights, start date and daily sets, plus `lastTrained` (the grid's 7-day fade) and `lifts` (reps per set and a "too heavy" tick). It decodes saves that lack the newer fields.
   - `WorkoutPlan` (cardio minutes come out of the total) and `GroupSelection`
   - `WeightAdvice`: Steve's rule. First set 12+ and last set 9+ → up 5 lb; "too heavy" → down 5 lb; else same.
-  - `Cardio` and `Stretches`: the cardio list and two gentle stretches per body area
+  - `Cardio`: the cardio list
+  - `Stretches`: a library of about 35 stretches and yoga poses (each with body area, groups stretched, standing or floor), two per area for after workouts, `StretchRoutine` (saved routines with a hold time per move) and `StretchPlanner` (the Stretch tab's "For you today": groups trained today or yesterday, plus optionally the groups coming up next, fitted to 5, 10 or 15 minutes, standing moves first)
+  - `StretchFigures`: a simple line drawing for every library move, as points on a 100 × 100 grid
 - `OMM/App` has `AppModel`, which owns the state and saves `ProgramState` as JSON in UserDefaults (`program.v1`). Flow: sets → cardio (if on) → weight sheet → stretches (if on) → home.
-- `OMM/Workout/WorkoutSession` runs the set-by-set flow, the rest timer (±15 s for this workout only) and cardio. `OMM/Stretch` runs stretch routines, after a workout or from "Just Stretch".
+- `OMM/App/MainTabs` holds the bottom tabs (Workout and Stretch, `AppModel.tab`). A workout, a stretch routine and the completion screen still take the whole screen, outside the tabs.
+- `OMM/Workout/WorkoutSession` runs the set-by-set flow, the rest timer (±15 s for this workout only) and cardio. `OMM/Stretch` has the Stretch tab (For You Today, My Routines, By Body Area), the routine editor (saved under `stretchRoutines.v1`, apart from the program so Reset keeps them) and the hold screen used after workouts and from the tab.
 - `OMM/Presets`: Quick Log. People save their own presets (`Preset` in OMMKit, saved under `presets.v1`, apart from the program so Reset keeps them); one tap of Log adds a set per exercise to its group, with Undo. `GroupGuess` fills a group in from a typed machine name. Nothing about any one gym is built in.
 - `OMM/Support` has the theme, `Countdown` (shared by rest, cardio and stretch holds), the chime (a WAV built in memory) and the notification.
 - `Config/Info.plist` is merged into the generated Info.plist.
@@ -41,6 +44,7 @@ If `xcodebuild` complains about the developer directory, ask the user to run `su
 - The duration slider remembers its last value.
 - Version 2 (from App HQ feedback, 2026-11-03): labeled, colored grid sections; recently trained groups fade; adjustable rest with a finish time; reps and a suggested weight; optional cardio; stretching after workouts (on by default) and on its own.
 - A local notification fires when rest ends while the app is in the background.
+- Stretch tab (from App HQ feedback, 2026-11-13): a real bottom tab replaces "Just Stretch" on the home screen. It builds a routine from what was trained today and yesterday, saves your own routines with adjustable holds, and includes yoga poses with simple pictures.
 
 ## How this repo is worked on
 

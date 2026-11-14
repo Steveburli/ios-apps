@@ -7,19 +7,27 @@ import OMMKit
 @MainActor
 final class StretchSession {
     let steps: [StretchStep]
+    /// A saved routine's name, or nil for the automatic and after-workout ones.
+    let title: String?
     /// True when it follows a workout, so a just-finished program shows its
     /// completion screen afterwards.
     let afterWorkout: Bool
     let timer = Countdown()
     private(set) var index = 0
 
-    init(steps: [StretchStep], afterWorkout: Bool) {
+    init(steps: [StretchStep], title: String? = nil, afterWorkout: Bool) {
         self.steps = steps
+        self.title = title
         self.afterWorkout = afterWorkout
     }
 
     var step: StretchStep {
         steps[index]
+    }
+
+    /// The hold after this one, for the "Next up" preview.
+    var nextStep: StretchStep? {
+        isLast ? nil : steps[index + 1]
     }
 
     var isLast: Bool {
@@ -32,8 +40,8 @@ final class StretchSession {
     }
 
     func startHold() {
-        let body = isLast ? "That was the last one." : "Next up: \(steps[index + 1].title)."
-        timer.start(seconds: step.stretch.holdSeconds, title: "Stretch done", body: body)
+        let body = nextStep.map { "Next up: \($0.title)." } ?? "That was the last one."
+        timer.start(seconds: step.holdSeconds, title: "Stretch done", body: body)
     }
 
     func next() {
