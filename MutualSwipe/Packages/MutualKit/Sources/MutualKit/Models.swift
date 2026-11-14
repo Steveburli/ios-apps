@@ -170,9 +170,13 @@ public struct Deck: Identifiable, Codable, Equatable, Sendable {
     public var roundChain: [String]?
     /// Each round's winner, oldest first.
     public var roundHistory: [RoundResult]?
+    /// Questions people answer before they swipe, like flight times for a trip.
+    public var questions: [FormQuestion]?
     public var systemFields: Data?
 
     public var decidedCards: [String] { decided ?? [] }
+
+    public var formQuestions: [FormQuestion] { questions ?? [] }
 
     /// The ID of the round running now, or nil.
     public var activeRound: String? {

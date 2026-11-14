@@ -19,6 +19,12 @@ final class Session {
         case startRound(String)
         /// Pick a ready-made deck, opened on one deck when given.
         case starter(String?)
+        /// Write or change a deck's questions.
+        case questions(String)
+        /// Fill in one person's answers to a deck's questions: (deck, person).
+        case answer(String, String)
+        /// Everyone's answers to a deck's questions.
+        case allAnswers(String)
 
         var id: String {
             switch self {
@@ -31,6 +37,9 @@ final class Session {
             case .qr(let group): return "qr-" + group
             case .startRound(let deck): return "round-" + deck
             case .starter(let deck): return "starter-" + (deck ?? "all")
+            case .questions(let deck): return "questions-" + deck
+            case .answer(let deck, let player): return "answer-" + deck + "-" + player
+            case .allAnswers(let deck): return "answers-" + deck
             }
         }
     }
@@ -56,6 +65,8 @@ final class Session {
     var vettingShown: Set<String> = []
     /// The player picker opens by itself once per launch.
     var pickerShown = false
+    /// Deck~person pairs whose questions already opened by themselves this launch.
+    var formShown: Set<String> = []
     /// A file opened in Mutual from another app, waiting for the import sheet.
     var pendingImport: PendingImport?
     /// Deck ID → when this phone last saw its "just decided" banner.
@@ -136,6 +147,16 @@ final class Session {
             sheet = .starter("dinners")
         case "starterswipe":
             path = [Screenshots.starterDeckID]
+        case "questions":
+            path = [Screenshots.tripDeckID]
+            sheet = .questions(Screenshots.tripDeckID)
+        case "answer":
+            // Alex filled these in for Sam; Sam looks them over and confirms.
+            path = [Screenshots.tripDeckID]
+            sheet = .answer(Screenshots.tripDeckID, Screenshots.meID)
+        case "allanswers":
+            path = [Screenshots.tripDeckID]
+            sheet = .allAnswers(Screenshots.tripDeckID)
         default:
             break
         }
