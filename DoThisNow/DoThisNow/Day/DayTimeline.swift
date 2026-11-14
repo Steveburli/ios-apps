@@ -285,6 +285,9 @@ struct DayTimeline: View {
             .foregroundStyle(Theme.blockInk)
             .strikethrough(block.done)
             .background(Theme.block.opacity(block.done ? 0.45 : 1), in: shape)
+            .overlay(alignment: .leading) {
+                heatStripe(block.done ? nil : model.heat(for: block.ref), shape: shape)
+            }
             .overlay(alignment: .trailing) {
                 Group {
                     if block.done {
@@ -354,6 +357,30 @@ struct DayTimeline: View {
     }
 }
 
+/// The hottest of a chunk's tasks (an errand run can hold several).
+@MainActor
+private func hottest(_ tasks: [TaskItem], in model: AppModel) -> TaskHeat? {
+    tasks.compactMap { model.heat($0) }.max { a, b in
+        (a.daysLate, a.value) < (b.daysLate, b.value)
+    }
+}
+
+/// A heat-colored stripe down a block's left edge, blue (cold) to red (hot).
+@ViewBuilder
+private func heatStripe(_ heat: TaskHeat?, shape: RoundedRectangle) -> some View {
+    if let heat {
+        HStack(spacing: 0) {
+            Rectangle()
+                .fill(Theme.heat(heat))
+                .frame(width: heat.isAngry ? 7 : 5)
+            Spacer(minLength: 0)
+        }
+        .clipShape(shape)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
 /// A task the planner suggested for a gap. Tap for options; touch and hold,
 /// then drag, to move it. Once dropped it becomes a block you placed, so it
 /// stays where you put it.
@@ -397,6 +424,9 @@ private struct SuggestionBlock: View {
                 } else {
                     shape.strokeBorder(Theme.softLine.opacity(0.6), lineWidth: 1)
                 }
+            }
+            .overlay(alignment: .leading) {
+                heatStripe(hottest(chunk.tasks, in: model), shape: shape)
             }
             .scaleEffect(lifted ? 1.02 : 1)
             .shadow(color: .black.opacity(lifted ? 0.25 : 0), radius: 10, y: 6)

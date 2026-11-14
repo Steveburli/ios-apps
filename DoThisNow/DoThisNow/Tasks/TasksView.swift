@@ -209,8 +209,14 @@ private struct TaskRow: View {
     @Environment(AppModel.self) private var model
     @Environment(\.editMode) private var editMode
     let task: TaskItem
+    @ScaledMetric(relativeTo: .body) private var titleSize: CGFloat = 17
 
     var body: some View {
+        let heat = model.heat(task)
+        let scale = CGFloat(heat?.scale ?? 1)
+        let anger = CGFloat(heat?.anger ?? 0)
+        let angry = heat?.isAngry == true
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
         HStack(alignment: .top, spacing: 0) {
             finishControl
             Button {
@@ -218,22 +224,44 @@ private struct TaskRow: View {
             } label: {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(task.title)
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(Theme.ink)
+                        .font(.system(size: titleSize * scale, weight: angry ? .heavy : .semibold))
+                        .foregroundStyle(angry ? Theme.bad : Theme.ink)
                         .multilineTextAlignment(.leading)
                     FlowLayout(spacing: 6) {
                         meta
                     }
                 }
                 .padding(.trailing, 14)
-                .padding(.vertical, 11)
+                .padding(.vertical, 11 * scale)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.line))
+        .background {
+            shape.fill(Theme.surface)
+            if let heat, heat.isAngry {
+                shape.fill(Theme.heat(heat).opacity(0.08 + 0.12 * anger))
+            }
+        }
+        // The heat stripe down the left edge: blue is cold, red is hot.
+        .overlay(alignment: .leading) {
+            if let heat {
+                Rectangle()
+                    .fill(Theme.heat(heat))
+                    .frame(width: 5 + 3 * anger)
+                    .accessibilityHidden(true)
+            }
+        }
+        .clipShape(shape)
+        .overlay {
+            if let heat, heat.isAngry {
+                shape.strokeBorder(Theme.heat(heat), lineWidth: 1 + 1.5 * anger)
+            } else {
+                shape.strokeBorder(Theme.line)
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: heat)
         .swipeActions(edge: .leading) {
             if task.kind != .recurring {
                 Button("Done") { model.markTaskDone(task.id) }

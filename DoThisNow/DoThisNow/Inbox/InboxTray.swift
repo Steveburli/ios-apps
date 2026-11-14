@@ -125,6 +125,7 @@ struct InboxRow: View {
     var body: some View {
         let task = entry.task
         HStack(spacing: 12) {
+            HeatBar(heat: model.heat(for: task.ref, source: task))
             SourceBadge(source: task.ref.source)
             VStack(alignment: .leading, spacing: 2) {
                 Text(task.title)
@@ -181,6 +182,21 @@ struct InboxRow: View {
             parts.insert(model.engine.deadlineLabel(CalendarDay(due, calendar: model.calendar)), at: 0)
         }
         return parts.isEmpty ? task.ref.source.label : parts.joined(separator: " · ")
+    }
+}
+
+/// A thin bar in a task's heat color, blue (cold) to red (hot). Late tasks
+/// get a wider bar. Nothing when Task heat colors is off.
+struct HeatBar: View {
+    let heat: TaskHeat?
+
+    var body: some View {
+        if let heat {
+            Capsule()
+                .fill(Theme.heat(heat))
+                .frame(width: heat.isAngry ? 6 : 4, height: 34)
+                .accessibilityHidden(true)
+        }
     }
 }
 
