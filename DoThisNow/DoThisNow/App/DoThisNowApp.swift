@@ -10,6 +10,13 @@ struct DoThisNowApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var model = AppModel.shared
 
+    init() {
+        // Widget and Lock Screen buttons run here when iOS launches the app for them.
+        TimerControl.handler = { command in
+            AppModel.shared.handleTimerCommand(command)
+        }
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

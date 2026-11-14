@@ -16,6 +16,8 @@
 	<string>Do This Now uses where you are to work out travel times when you tap “We’re off schedule” on a trip, and to start and stop Track timers at places you choose. It isn’t saved or sent anywhere.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>To start and stop Track timers when you arrive at or leave places you choose, like starting “Gym” when you leave home, even with the app closed. Do This Now only checks those places, and where you are isn’t saved or sent anywhere.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>CKSharingSupported</key>
 	<true/>
 	<key>UIBackgroundModes</key>
