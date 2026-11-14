@@ -62,7 +62,7 @@ final class FormsTests: XCTestCase {
         XCTAssertFalse(Forms.needsAnswers(questions: [], answers: nil))
     }
 
-    func testQuestionsRoundTripAndClean() {
+    func testQuestionsRoundTripAndClean() throws {
         let question = FormQuestion(id: "q1", kind: .choice, prompt: "  Pace?  ",
                                     options: ["Chill", "", "chill", " Packed "])
         let cleaned = question.cleaned()

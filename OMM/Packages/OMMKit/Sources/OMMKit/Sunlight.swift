@@ -197,8 +197,9 @@ public struct SunlightLog: Codable, Equatable, Sendable {
     @discardableResult
     public mutating func stopOutside(at date: Date, kind: SunlightKind, minutes: Int? = nil) -> SunlightEntry? {
         guard let since = outsideSince else { return nil }
-        outsideSince = nil
+        // Measure before clearing the start, or the timer always reads 0.
         let length = min(Self.maxEntryMinutes, minutes ?? elapsedMinutes(now: date))
+        outsideSince = nil
         guard length >= 1 else { return nil }
         let entry = SunlightEntry(start: since, minutes: length, kind: kind)
         entries.append(entry)

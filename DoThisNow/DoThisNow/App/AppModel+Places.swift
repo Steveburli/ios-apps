@@ -4,9 +4,8 @@ import DoThisNowKit
 
 /// Track timers that start and stop by place.
 extension AppModel {
-    /// One model for the app, so a place crossing that relaunches the app in
-    /// the background reaches the same state the screens use.
-    static let shared = AppModel()
+    // `AppModel.shared` (in AppModel.swift) is the one model, so a place
+    // crossing that relaunches the app in the background reaches the same state.
 
     /// The phone crossed a watched place's edge: run its rules, save, and say what happened.
     func placeCrossed(_ placeID: String, _ crossing: PlaceCrossing, at time: Date) {
