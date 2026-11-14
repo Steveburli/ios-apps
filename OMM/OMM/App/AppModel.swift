@@ -120,6 +120,10 @@ final class AppModel {
             startWorkout()
             session?.advance(startingRest: true)
             session?.adjustRest(by: WorkoutSession.restStep)
+        case "howto":
+            // Mid chest has the how-to drawings; the workout row opens the first one.
+            if let mid = Catalog.group("Mid") { toggle(mid) }
+            startWorkout()
         case "weights":
             startWorkout()
             session?.toggleWeight("100", forKey: "Hams|Romanian Deadlift (Barbell/Dumbbell)")
