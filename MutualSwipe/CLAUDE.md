@@ -26,7 +26,7 @@ A native SwiftUI (iOS 18+, iPhone, portrait, light and dark) version of the user
   - the models
   - `DeckState` (the artifact's `classify` and `deckState`, ported exactly)
   - `CardText` (cleaning, link safety, the initial letter, the color hash, "Paste a list" parsing)
-- `MutualSwipe/` holds the app: `App/` (entry point, `AppDelegate`/`SceneDelegate`, `Session`), `Sync/`, `Home/`, `Deck/` (the Swipe, Results and Cards tabs), `Sheets/`, and `Support/Theme`.
+- `MutualSwipe/` holds the app: `App/` (entry point, `AppDelegate`/`SceneDelegate`, `Session`), `Sync/`, `Home/`, `Deck/` (the Swipe, Results, Overlap and Cards tabs), `Sheets/`, and `Support/Theme`.
 - `Config/MutualSwipe.entitlements` holds iCloud (CloudKit), the container `iCloud.com.steveburlison.mutualswipe`, and `aps-environment`. `Config/Info.plist` sets `CKSharingSupported` and the `remote-notification` background mode.
 
 ## Commands

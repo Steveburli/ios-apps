@@ -2,7 +2,7 @@ import Foundation
 import MutualKit
 
 /// The cloud build launches the app with `-screenshots <screen>` to photograph
-/// each screen with sample decks: home, swipe, results, card, import, spin,
+/// each screen with sample decks: home, swipe, results, overlap, card, import, spin,
 /// round, roundresults, startround, starter, starterpreview or starterswipe. Nothing here
 /// runs in normal use, and it never touches iCloud.
 enum Screenshots {
