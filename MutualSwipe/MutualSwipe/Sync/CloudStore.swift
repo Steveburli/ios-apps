@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import CloudKit
 import Observation
 import MutualKit
@@ -20,6 +21,8 @@ final class CloudStore: CKSyncEngineDelegate {
     private(set) var cards: [String: Card] = [:]
     private(set) var players: [String: Player] = [:]
     private(set) var picks: [String: Pick] = [:]
+    /// Photos people added to cards. The images are files, see `PhotoFiles`.
+    private(set) var photos: [String: CardPhoto] = [:]
     private(set) var accountStatus: CKAccountStatus = .couldNotDetermine
     private(set) var isSyncing = false
     /// A message for the person, shown once as a toast.
@@ -41,6 +44,8 @@ final class CloudStore: CKSyncEngineDelegate {
         var cards: [Card] = []
         var players: [Player] = []
         var picks: [Pick] = []
+        /// Optional so a file saved before card photos existed still loads.
+        var photos: [CardPhoto]?
         var privateState: CKSyncEngine.State.Serialization?
         var sharedState: CKSyncEngine.State.Serialization?
     }
@@ -224,7 +229,61 @@ final class CloudStore: CKSyncEngineDelegate {
         enqueueDelete(id, in: group)
         cards[id] = nil
         picks = picks.filter { $0.value.cardID != id }
+        removePhotosLocally { $0.cardID == id }
         scheduleSave()
+    }
+
+    // MARK: Card photos
+
+    /// A card's photos, in the order they show.
+    func photos(of cardID: String) -> [CardPhoto] {
+        CardPhotos.sorted(photos.values.filter { $0.cardID == cardID })
+    }
+
+    /// The pictures a card shows: the photos people added, else the
+    /// ready-made deck's bundled photo, else none (its color and initial).
+    func images(for card: Card) -> [UIImage] {
+        let added = photos(of: card.id).compactMap { PhotoFiles.image(for: $0.id) }
+        if !added.isEmpty { return added }
+        return StarterPhoto.image(for: card).map { [$0] } ?? []
+    }
+
+    func coverImage(for card: Card) -> UIImage? {
+        images(for: card).first
+    }
+
+    /// Adds photos to a card, up to `CardPhotos.limit`. Returns how many were added.
+    @discardableResult
+    func addPhotos(_ images: [UIImage], to cardID: String, by name: String?) -> Int {
+        guard let card = cards[cardID], let group = groups[card.groupID] else { return 0 }
+        let existing = photos(of: cardID)
+        let base = max(Date().timeIntervalSince1970 * 1000, (existing.last?.order ?? 0) + 1)
+        var added = 0
+        for image in images.prefix(CardPhotos.room(after: existing.count)) {
+            let photo = CardPhoto(groupID: group.id, deckID: card.deckID, cardID: cardID, order: base + Double(added),
+                                  addedBy: name ?? "", createdAt: Date())
+            guard PhotoFiles.save(image, as: photo.id) else { continue }
+            photos[photo.id] = photo
+            enqueueSave(photo.id, in: group)
+            added += 1
+        }
+        scheduleSave()
+        return added
+    }
+
+    func removePhoto(_ id: String) {
+        guard let photo = photos[id], let group = groups[photo.groupID] else { return }
+        enqueueDelete(id, in: group)
+        photos[id] = nil
+        PhotoFiles.remove(id)
+        scheduleSave()
+    }
+
+    private func removePhotosLocally(where matches: (CardPhoto) -> Bool) {
+        for photo in photos.values where matches(photo) {
+            photos[photo.id] = nil
+            PhotoFiles.remove(photo.id)
+        }
     }
 
     // MARK: After a match
@@ -611,6 +670,7 @@ final class CloudStore: CKSyncEngineDelegate {
         if let card = cards[name] { return Records.record(card, zoneID: zone) }
         if let player = players[name] { return Records.record(player, zoneID: zone) }
         if let pick = picks[name] { return Records.record(pick, zoneID: zone) }
+        if let photo = photos[name] { return Records.record(photo, zoneID: zone) }
         return nil
     }
 
@@ -635,6 +695,8 @@ final class CloudStore: CKSyncEngineDelegate {
             players[record.recordID.recordName] = Records.player(from: record, groupID: groupID)
         case Records.Kind.pick:
             if let pick = Records.pick(from: record, groupID: groupID) { picks[pick.id] = pick }
+        case Records.Kind.photo:
+            photos[record.recordID.recordName] = Records.photo(from: record, groupID: groupID)
         default:
             break
         }
@@ -669,10 +731,14 @@ final class CloudStore: CKSyncEngineDelegate {
         case Records.Kind.card:
             cards[name] = nil
             picks = picks.filter { $0.value.cardID != name }
+            removePhotosLocally { $0.cardID == name }
         case Records.Kind.player:
             players[name] = nil
         case Records.Kind.pick:
             picks[name] = nil
+        case Records.Kind.photo:
+            photos[name] = nil
+            PhotoFiles.remove(name)
         default:
             break
         }
@@ -691,6 +757,8 @@ final class CloudStore: CKSyncEngineDelegate {
             players[name]?.systemFields = data
         } else if picks[name] != nil {
             picks[name]?.systemFields = data
+        } else if photos[name] != nil {
+            photos[name]?.systemFields = data
         }
     }
 
@@ -701,6 +769,7 @@ final class CloudStore: CKSyncEngineDelegate {
         cards[name]?.systemFields = nil
         players[name]?.systemFields = nil
         picks[name]?.systemFields = nil
+        photos[name]?.systemFields = nil
     }
 
     private func handleFailedSave(_ record: CKRecord, error: CKError, engine: CKSyncEngine) {
@@ -745,6 +814,7 @@ final class CloudStore: CKSyncEngineDelegate {
         let cardIDs = Set(cards.values.filter { $0.deckID == id }.map(\.id))
         cards = cards.filter { !cardIDs.contains($0.key) }
         picks = picks.filter { $0.value.deckID != id }
+        removePhotosLocally { $0.deckID == id }
     }
 
     private func dropGroup(_ id: String) {
@@ -765,6 +835,7 @@ final class CloudStore: CKSyncEngineDelegate {
         for (id, var card) in cards where card.groupID == groupID { card.systemFields = nil; cards[id] = card; names.append(id) }
         for (id, var player) in players where player.groupID == groupID { player.systemFields = nil; players[id] = player; names.append(id) }
         for (id, var pick) in picks where pick.groupID == groupID { pick.systemFields = nil; picks[id] = pick; names.append(id) }
+        for (id, var photo) in photos where photo.groupID == groupID { photo.systemFields = nil; photos[id] = photo; names.append(id) }
         for name in names { enqueueSave(name, in: group) }
     }
 
@@ -774,6 +845,8 @@ final class CloudStore: CKSyncEngineDelegate {
         cards = [:]
         players = [:]
         picks = [:]
+        photos = [:]
+        PhotoFiles.removeAll()
         privateState = nil
         sharedState = nil
         startEngines()
@@ -790,6 +863,7 @@ final class CloudStore: CKSyncEngineDelegate {
         cards = Dictionary(snapshot.cards.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
         players = Dictionary(snapshot.players.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
         picks = Dictionary(snapshot.picks.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
+        photos = Dictionary((snapshot.photos ?? []).map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
         privateState = snapshot.privateState
         sharedState = snapshot.sharedState
     }
@@ -808,7 +882,7 @@ final class CloudStore: CKSyncEngineDelegate {
     func writeNow() {
         guard !Screenshots.isActive else { return }
         let snapshot = Snapshot(groups: Array(groups.values), decks: Array(decks.values), cards: Array(cards.values),
-                                players: Array(players.values), picks: Array(picks.values),
+                                players: Array(players.values), picks: Array(picks.values), photos: Array(photos.values),
                                 privateState: privateState, sharedState: sharedState)
         if let data = try? JSONEncoder().encode(snapshot) {
             try? data.write(to: fileURL, options: .atomic)
@@ -846,14 +920,24 @@ final class CloudStore: CKSyncEngineDelegate {
             }
         }
 
-        if Screenshots.screen == "starterswipe" {
+        if Screenshots.screen == "starterswipe" || Screenshots.screen == "cardphotos" {
             let deck = Deck(id: Screenshots.starterDeckID, groupID: group.id, title: Starter.dates.title, kind: Starter.dates.kind,
                             blurb: Starter.dates.blurb, createdAt: now)
             decks[deck.id] = deck
-            for (index, starter) in Starter.dates.cards.filter({ $0.hasPhoto }).prefix(6).enumerated() {
+            let starters = Starter.dates.cards.filter({ $0.hasPhoto }).prefix(6)
+            for (index, starter) in starters.enumerated() {
                 let card = Card(id: "indy-" + starter.id, groupID: group.id, deckID: deck.id, draft: starter.draft,
                                 order: Double(index), createdAt: now)
                 cards[card.id] = card
+            }
+            // Stand-in "vibe" photos on the first card, borrowed from the bundled ones.
+            if Screenshots.screen == "cardphotos", let first = starters.first {
+                for (index, starter) in starters.enumerated() {
+                    guard index < 5, let image = StarterPhoto.image(named: starter.photoName) else { continue }
+                    let photo = CardPhoto(id: "photo_sample\(index)", groupID: group.id, deckID: deck.id, cardID: "indy-" + first.id,
+                                          order: Double(index), addedBy: "Sam", createdAt: now)
+                    if PhotoFiles.save(image, as: photo.id) { photos[photo.id] = photo }
+                }
             }
         }
 

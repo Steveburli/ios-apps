@@ -133,6 +133,9 @@ final class Session {
             sheet = .starter("dinners")
         case "starterswipe":
             path = [Screenshots.starterDeckID]
+        case "cardphotos":
+            path = [Screenshots.starterDeckID]
+            sheet = .card(Screenshots.photoCardID)
         default:
             break
         }

@@ -7,7 +7,7 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSCameraUsageDescription</key>
-	<string>Take a photo of a menu or a list, and Mutual turns each line into a card.</string>
+	<string>Take a photo of a menu or a list to turn into cards, or a photo of a place to add to its card.</string>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>

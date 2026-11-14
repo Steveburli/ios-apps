@@ -1,7 +1,8 @@
 import SwiftUI
+import PhotosUI
 import MutualKit
 
-/// A card's details, your vote, and everyone else's once you've voted.
+/// A card's details, its photos, your vote, and everyone else's once you've voted.
 struct CardSheet: View {
     @Environment(CloudStore.self) private var store
     @Environment(Session.self) private var session
@@ -9,6 +10,14 @@ struct CardSheet: View {
     let cardID: String
     @State private var addingEvent = false
     @State private var confirmingRetire = false
+    @State private var photoItems: [PhotosPickerItem] = []
+    @State private var showCamera = false
+    @State private var addingPhotos = false
+    @State private var viewing: PhotoViewer?
+
+    private struct PhotoViewer: Identifiable {
+        let id: String
+    }
 
     var body: some View {
         NavigationStack {
@@ -33,6 +42,130 @@ struct CardSheet: View {
                     .ignoresSafeArea()
             }
         }
+        .onChange(of: photoItems) { _, items in
+            guard !items.isEmpty else { return }
+            Task { await addPicked(items) }
+        }
+        .fullScreenCover(isPresented: $showCamera) {
+            CameraPicker { image in
+                showCamera = false
+                if let image { add([image]) }
+            }
+            .ignoresSafeArea()
+        }
+        .fullScreenCover(item: $viewing) { start in
+            PhotoPager(photos: store.photos(of: cardID), startID: start.id)
+        }
+    }
+
+    // MARK: Photos
+
+    private func photoSection(_ card: Card, deck: Deck) -> some View {
+        let added = store.photos(of: card.id)
+        let room = CardPhotos.room(after: added.count)
+        let canWrite = store.canWrite(deck.groupID)
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                heading("Photos")
+                Spacer()
+                if !added.isEmpty {
+                    Text("\(added.count) of \(CardPhotos.limit)")
+                        .font(.footnote.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(Theme.muted)
+                }
+            }
+            if !added.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(added) { photo in
+                            Button {
+                                viewing = PhotoViewer(id: photo.id)
+                            } label: {
+                                PhotoTile(id: photo.id, size: 96)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(photo.addedBy.isEmpty ? "Photo" : "Photo added by \(photo.addedBy)")
+                            .contextMenu {
+                                if canWrite {
+                                    Button("Remove photo", systemImage: "trash", role: .destructive) {
+                                        store.removePhoto(photo.id)
+                                        session.show("Photo removed")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                .scrollClipDisabled()
+            }
+            if canWrite {
+                if room > 0 {
+                    Text(CardPhotos.tip)
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                    FlowLayout {
+                        if let maps = CardPhotos.mapsURL(for: card) {
+                            Link(destination: maps) {
+                                Label("Find photos in Google Maps", systemImage: "map")
+                            }
+                            .buttonStyle(.mutual(.quiet))
+                        }
+                        PhotosPicker(selection: $photoItems, maxSelectionCount: room, matching: .images) {
+                            Label(added.isEmpty ? "Add photos" : "Add more", systemImage: "photo.on.rectangle")
+                        }
+                        .buttonStyle(.mutual(.quiet))
+                        .disabled(addingPhotos)
+                        if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                            Button {
+                                showCamera = true
+                            } label: {
+                                Label("Take a photo", systemImage: "camera")
+                            }
+                            .buttonStyle(.mutual(.quiet))
+                            .disabled(addingPhotos)
+                        }
+                    }
+                    if addingPhotos {
+                        ProgressView().controlSize(.small)
+                    }
+                } else {
+                    Text("This card has \(CardPhotos.limit) photos, the most it holds. Press and hold one to remove it.")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                }
+                if !added.isEmpty && room > 0 {
+                    Text("Press and hold a photo to remove it.")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                }
+            }
+        }
+    }
+
+    private func addPicked(_ items: [PhotosPickerItem]) async {
+        addingPhotos = true
+        var images: [UIImage] = []
+        for item in items {
+            if let data = try? await item.loadTransferable(type: Data.self), let image = UIImage(data: data) {
+                images.append(image)
+            }
+        }
+        photoItems = []
+        addingPhotos = false
+        add(images)
+    }
+
+    private func add(_ images: [UIImage]) {
+        guard let card = store.cards[cardID], !images.isEmpty else { return }
+        let name = session.me(in: card.groupID, store: store).flatMap { store.players[$0]?.name }
+        let added = store.addPhotos(images, to: cardID, by: name)
+        if added == 0 {
+            session.show("Couldn’t add that photo")
+        } else if added < images.count {
+            session.show("Added \(added). A card holds \(CardPhotos.limit) photos.")
+        } else {
+            session.show(added == 1 ? "Photo added" : "\(added) photos added")
+        }
     }
 
     private func content(_ card: Card, deck: Deck) -> some View {
@@ -43,6 +176,7 @@ struct CardSheet: View {
         let verdict = state.verdict(for: card)
         let round = session.showsRound(deck) ? deck.activeRound : nil
         let starter = Starter.match(card)
+        let cover = store.coverImage(for: card)
 
         return ScrollView {
             VStack(alignment: .leading, spacing: 12) {
@@ -60,11 +194,11 @@ struct CardSheet: View {
                 .foregroundStyle(Color.white)
                 .padding(18)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(minHeight: starter?.hasPhoto == true ? 200 : 0, alignment: .bottomLeading)
+                .frame(minHeight: cover != nil ? 200 : 0, alignment: .bottomLeading)
                 .background {
                     ZStack {
                         Theme.cardColor(card.id)
-                        if let photo = StarterPhoto.image(named: starter?.photoName) {
+                        if let photo = cover {
                             GeometryReader { box in
                                 Image(uiImage: photo)
                                     .resizable()
@@ -107,6 +241,8 @@ struct CardSheet: View {
                         .font(.footnote)
                         .foregroundStyle(Theme.muted)
                 }
+
+                photoSection(card, deck: deck)
 
                 let isDecided = deck.decidedCards.contains(card.id)
                 if isDecided || verdict.isMatch {

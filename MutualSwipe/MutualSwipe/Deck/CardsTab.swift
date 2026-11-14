@@ -141,7 +141,7 @@ struct CardsTab: View {
             }
             ForEach(state.cards) { card in
                 HStack(spacing: 10) {
-                    CardThumb(title: card.title, colorID: card.id, photo: StarterPhoto.image(for: card))
+                    CardThumb(title: card.title, colorID: card.id, photo: store.coverImage(for: card))
                     Button {
                         session.sheet = .card(card.id)
                     } label: {

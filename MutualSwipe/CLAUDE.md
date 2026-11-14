@@ -11,6 +11,8 @@ A native SwiftUI (iOS 18+, iPhone, portrait, light and dark) version of the user
   - `Card` (`deck` reference, `.deleteSelf`)
   - `Player`
   - `Pick` (`card` reference, `.deleteSelf`)
+  - `Photo` (`card` reference, `.deleteSelf`; the image is an Asset)
+- A **Photo** is one picture on a card, named `photo_<id>`. Anyone in the group can add up to 6 per card (`CardPhotos.limit`) from their photo library or camera, or remove one. Photos are shrunk to 1280 px and kept as files in Application Support/card-photos (`Sync/PhotoFiles`). A card shows its added photos first, else its ready-made deck photo; on the swipe card, tapping the left or right of the photo flips between them. The card sheet has "Find photos in Google Maps", which opens a search for the place so you can browse its Vibe and Food & Drink photos.
 - A **Pick** is one person's vote on one card, stored as its own record named `pick_<card>_<player>`. Two people swiping at once never overwrite each other.
 - **Vetting and rounds.** A deck's first pass is its vetting: plain picks with no `roundID`. A **round** (`Deck.roundID`) is a quick pick for right now. Its votes are separate picks named `pick_<card>_<player>_r<round>`, the down swipe reads "Not tonight", and starting a new round saves the winner to `roundHistory`, then deletes the old round's picks. `Rounds.plan` picks the round's cards: a vetted deck uses the cards everyone liked. A chain (`roundChain`) goes on to other decks, narrowed by each winner's title (`roundFilter`). "Never, for good" sets `Card.retiredAt`, which hides the card everywhere until someone brings it back.
 - Deleting a deck cascades through the references on the server. Picks reference their card, not the deck, which keeps them under CloudKit's limit of 750 `.deleteSelf` references per target.
@@ -51,6 +53,7 @@ TestFlight and App Store builds use CloudKit's **Production** environment. That 
    | `Card` | `deck` (Reference), `deckID` (String), `title` (String), `subtitle` (String), `details` (String), `tags` (String List), `link` (String), `order` (Double), `createdAt` (Date/Time); build B adds `retiredAt` (Date/Time), `retiredBy` (String) |
    | `Player` | `name` (String), `color` (Int(64)), `createdAt` (Date/Time) |
    | `Pick` | `card` (Reference), `deckID` (String), `cardID` (String), `playerID` (String), `vote` (String), `updatedAt` (Date/Time); build B adds `roundID` (String) |
+   | `Photo` (card photos, Nov 2026) | `card` (Reference), `deckID` (String), `cardID` (String), `order` (Double), `addedBy` (String), `createdAt` (Date/Time), `image` (Asset) |
 
 4. **Deploy.** In the console, press **Deploy Schema Changes** to copy them to **Production**.
 
