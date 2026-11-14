@@ -42,6 +42,8 @@ enum Notifier {
             content.sound = .default
             add(center, id: reminderPrefix + task.id, content: content, at: date, now: now)
         }
+
+        PlaceNotices.sync(state, now: now)
     }
 
     private static func add(_ center: UNUserNotificationCenter, id: String, content: UNNotificationContent, at date: Date, now: Date) {

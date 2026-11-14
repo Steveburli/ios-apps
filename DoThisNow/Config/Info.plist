@@ -11,7 +11,9 @@
 	<key>NSAlarmKitUsageDescription</key>
 	<string>Do This Now rings your wake-up alarm at the time that fits your morning, even in silent mode.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>When you tap “We’re off schedule” on a trip, Do This Now uses where you are to work out travel times to what’s next. It isn’t saved or sent anywhere.</string>
+	<string>Do This Now uses where you are to work out travel times when you tap “We’re off schedule” on a trip, and to start and stop Track timers at places you choose. It isn’t saved or sent anywhere.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>To start and stop Track timers when you arrive at or leave places you choose, like starting “Gym” when you leave home, even with the app closed. Do This Now only checks those places, and where you are isn’t saved or sent anywhere.</string>
 	<key>CKSharingSupported</key>
 	<true/>
 	<key>UIBackgroundModes</key>

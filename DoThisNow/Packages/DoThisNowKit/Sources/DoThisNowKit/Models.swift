@@ -441,13 +441,15 @@ public struct PlannerState: Codable, Equatable, Sendable {
     public var timings: [Timing] = []
     public var running: RunningTimer?
     public var wake = WakeSettings()
+    /// Track timers that start and stop by place.
+    public var placeTimers = PlaceTimers()
     public var updatedAt = Date(timeIntervalSince1970: 0)
 
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
         case tasks, events, log, days, settings, context, cafeDismissed, active, blocks, inboxItems, inbox,
-             activities, timings, running, wake, updatedAt
+             activities, timings, running, wake, placeTimers, updatedAt
     }
 
     public init(from decoder: Decoder) throws {
@@ -467,6 +469,7 @@ public struct PlannerState: Codable, Equatable, Sendable {
         timings = try c.decodeIfPresent([Timing].self, forKey: .timings) ?? []
         running = try c.decodeIfPresent(RunningTimer.self, forKey: .running)
         wake = try c.decodeIfPresent(WakeSettings.self, forKey: .wake) ?? WakeSettings()
+        placeTimers = try c.decodeIfPresent(PlaceTimers.self, forKey: .placeTimers) ?? PlaceTimers()
         updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date(timeIntervalSince1970: 0)
     }
 

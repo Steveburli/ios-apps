@@ -56,6 +56,8 @@ struct TrackView: View {
                     }
                 }
 
+                PlaceRulesCard()
+
                 TodayTimings()
             }
             .padding(.horizontal, 16)
@@ -148,6 +150,44 @@ private struct ActivityTile: View {
         .accessibilityValue(isRunning ? "Timing" : count == 0 ? "Not timed yet" : "Usually \(TimeText.duration(estimate.minutes))")
         .accessibilityHint(isRunning ? "Stops and saves the time" : "Starts timing it")
         .accessibilityAction(named: "History and details") { model.sheet = .activity(activity.id) }
+    }
+}
+
+/// The way into place rules, with a warning when location isn't set to Always.
+private struct PlaceRulesCard: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let rules = model.state.placeTimers.rules.filter(\.on)
+        if !model.state.activities.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Button { model.sheet = .places } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "location.circle")
+                            .font(.title3)
+                            .foregroundStyle(Theme.accent)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Start and stop by place")
+                                .font(.subheadline.weight(.bold))
+                                .foregroundStyle(Theme.ink)
+                            Text(rules.isEmpty ? "Like starting Gym when you leave home"
+                                 : "\(rules.count) rule\(rules.count == 1 ? "" : "s") on")
+                                .font(.caption)
+                                .foregroundStyle(Theme.ink2)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(Theme.ink3)
+                    }
+                }
+                .buttonStyle(.plain)
+                if !rules.isEmpty && !PlaceWatcher.shared.isAlways {
+                    LocationWarning()
+                }
+            }
+            .card(padding: 14)
+        }
     }
 }
 
