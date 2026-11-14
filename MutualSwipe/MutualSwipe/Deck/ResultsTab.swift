@@ -359,7 +359,7 @@ private struct ResultRow: View {
             session.sheet = .card(card.id)
         } label: {
             HStack(spacing: 12) {
-                CardThumb(title: card.title, colorID: card.id, photo: StarterPhoto.image(for: card), size: 40)
+                CardThumb(title: card.title, colorID: card.id, photo: store.coverImage(for: card), size: 40)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(card.title).font(.body.weight(.semibold)).lineLimit(1).foregroundStyle(Theme.ink)
                     if !card.subtitle.isEmpty {

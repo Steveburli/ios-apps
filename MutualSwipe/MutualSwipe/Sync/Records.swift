@@ -2,7 +2,7 @@ import CloudKit
 import MutualKit
 
 /// How each model maps to a CloudKit record. Every group is a zone holding a
-/// "Group" record plus its decks, cards, players and picks.
+/// "Group" record plus its decks, cards, players, picks and card photos.
 ///
 /// Field names are part of the production schema once it's deployed, so
 /// never rename one. Add new fields instead.
@@ -16,6 +16,7 @@ enum Records {
         static let player = "Player"
         static let pick = "Pick"
         static let answer = "Answer"
+        static let photo = "Photo"
     }
 
     /// Starts from the last record the server sent, so the save carries its
@@ -132,6 +133,21 @@ enum Records {
         return record
     }
 
+    static func record(_ photo: CardPhoto, zoneID: CKRecordZone.ID) -> CKRecord {
+        let record = base(Kind.photo, name: photo.id, zoneID: zoneID, systemFields: photo.systemFields)
+        // Like picks, photos hang off their card, so deleting the card (or its deck) deletes them.
+        record["card"] = CKRecord.Reference(recordID: CKRecord.ID(recordName: photo.cardID, zoneID: zoneID), action: .deleteSelf)
+        record["deckID"] = photo.deckID
+        record["cardID"] = photo.cardID
+        record["order"] = photo.order
+        record["addedBy"] = photo.addedBy
+        record["createdAt"] = photo.createdAt
+        if PhotoFiles.exists(photo.id) {
+            record["image"] = CKAsset(fileURL: PhotoFiles.url(for: photo.id))
+        }
+        return record
+    }
+
     /// Round history entries are saved as small JSON strings in a String List.
     private static func encode(_ result: RoundResult) -> String? {
         (try? JSONEncoder().encode(result)).flatMap { String(data: $0, encoding: .utf8) }
@@ -201,6 +217,18 @@ enum Records {
                             color: max(0, min(7, color)), createdAt: date(record, "createdAt"))
         player.systemFields = record.archivedSystemFields
         return player
+    }
+
+    /// Copies the downloaded image into the phone's photo folder.
+    static func photo(from record: CKRecord, groupID: String) -> CardPhoto {
+        var photo = CardPhoto(id: record.recordID.recordName, groupID: groupID, deckID: string(record, "deckID"),
+                              cardID: string(record, "cardID"), order: record["order"] as? Double ?? 0,
+                              addedBy: string(record, "addedBy"), createdAt: date(record, "createdAt"))
+        if let asset = record["image"] as? CKAsset, let file = asset.fileURL {
+            PhotoFiles.copy(from: file, as: photo.id)
+        }
+        photo.systemFields = record.archivedSystemFields
+        return photo
     }
 
     static func pick(from record: CKRecord, groupID: String) -> Pick? {

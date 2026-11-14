@@ -160,6 +160,9 @@ final class Session {
         case "allanswers":
             path = [Screenshots.tripDeckID]
             sheet = .allAnswers(Screenshots.tripDeckID)
+        case "cardphotos":
+            path = [Screenshots.starterDeckID]
+            sheet = .card(Screenshots.photoCardID)
         default:
             break
         }

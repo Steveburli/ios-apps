@@ -162,7 +162,7 @@ struct SwipeTab: View {
         // While the top card flies off, the next one moves up into its place.
         let position = flying != nil && index > 0 ? index - 1 : index
         let isTop = index == 0
-        CardFace(card: card, kind: deck.kind, stamp: isTop ? stamp : nil, round: round != nil)
+        CardFace(card: card, kind: deck.kind, photos: store.images(for: card), stamp: isTop ? stamp : nil, round: round != nil)
             .frame(width: size.width, height: max(0, size.height - 20))
             .scaleEffect(position == 0 ? 1 : position == 1 ? 0.95 : 0.9)
             .offset(y: position == 0 ? 0 : position == 1 ? 12 : 24)
@@ -172,7 +172,7 @@ struct SwipeTab: View {
             .gesture(dragGesture(card, size: size))
             .onTapGesture { if isTop { session.sheet = .card(card.id) } }
             .accessibilityHidden(!isTop)
-            .accessibilityHint("Double-tap for details. Swipe up or down for actions.")
+            .accessibilityHint("Double-tap for details and photos. Swipe up or down for actions.")
             .accessibilityActions {
                 ForEach(Vote.allCases) { vote in
                     Button(vote.long(round: round != nil)) { fling(card, vote, size: size) }
@@ -307,24 +307,33 @@ private struct StackMessage<Content: View>: View {
 }
 
 /// The colored card: a big faded initial, the title, quick facts, details and tags.
+/// With photos, the photo fills the card; with several, tapping the left or
+/// right side of the photo flips between them, and bars at the top show which.
 struct CardFace: View {
     let card: Card
     let kind: DeckKind
+    /// The photos people added, or the ready-made deck's one photo.
+    var photos: [UIImage] = []
     var stamp: (vote: Vote, opacity: Double)?
     /// In a round, the down swipe reads "Not tonight".
     var round = false
+    @State private var photoIndex = 0
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
+        let shown = photos.isEmpty ? nil : photos[min(photoIndex, photos.count - 1)]
         ZStack(alignment: .topLeading) {
             Theme.cardColor(card.id)
-            if let photo = StarterPhoto.image(for: card) {
+            if let photo = shown {
                 GeometryReader { box in
                     Image(uiImage: photo)
                         .resizable()
                         .scaledToFill()
                         .frame(width: box.size.width, height: box.size.height)
                         .clipped()
+                        .overlay(alignment: .top) {
+                            if photos.count > 1 { flipZones.frame(height: box.size.height * 0.55) }
+                        }
                 }
                 .accessibilityHidden(true)
                 LinearGradient(stops: [.init(color: .black.opacity(0.45), location: 0), .init(color: .clear, location: 0.22),
@@ -340,6 +349,16 @@ struct CardFace: View {
                     .accessibilityHidden(true)
             }
             VStack(alignment: .leading, spacing: 9) {
+                if photos.count > 1 {
+                    HStack(spacing: 4) {
+                        ForEach(photos.indices, id: \.self) { index in
+                            Capsule()
+                                .fill(Color.white.opacity(index == min(photoIndex, photos.count - 1) ? 0.95 : 0.4))
+                                .frame(height: 3)
+                        }
+                    }
+                    .allowsHitTesting(false)
+                }
                 HStack {
                     Text(kind.label.uppercased())
                     Spacer()
@@ -388,7 +407,20 @@ struct CardFace: View {
         .shadow(color: .black.opacity(0.2), radius: 20, y: 18)
         .contentShape(shape)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel([card.title, card.subtitle, card.details].filter { !$0.isEmpty }.joined(separator: ". "))
+        .accessibilityLabel(([card.title, card.subtitle, card.details] + (photos.count > 1 ? ["\(photos.count) photos"] : []))
+            .filter { !$0.isEmpty }.joined(separator: ". "))
+    }
+
+    /// Two invisible halves over the top of the photo: left goes back, right goes on.
+    private var flipZones: some View {
+        HStack(spacing: 0) {
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture { photoIndex = max(0, min(photoIndex, photos.count - 1) - 1) }
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture { photoIndex = (min(photoIndex, photos.count - 1) + 1) % photos.count }
+        }
     }
 
     @ViewBuilder
