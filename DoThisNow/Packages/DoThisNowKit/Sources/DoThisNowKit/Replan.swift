@@ -45,9 +45,12 @@ public enum Leftover: String, CaseIterable, Sendable {
 extension Engine {
     /// The first starts on `day` with `minutes` free, on the five-minute
     /// mark, after now on today. `alsoBusy` holds time already promised.
+    /// With meetings brought in from a locked calendar, work hours are open
+    /// for your own tasks and only the meetings themselves are off limits.
     public func openSlots(on day: CalendarDay, minutes: Int, limit: Int = 4, alsoBusy: [TimeSpan] = []) -> [Int] {
         let plan = planDay(day)
-        var busy = plan.rocks + plan.blocks.map { TimeSpan(start: Double($0.start), end: Double($0.end)) }
+        var busy = state.meetingSettings.on ? plan.locked : plan.rocks
+        busy += plan.blocks.map { TimeSpan(start: Double($0.start), end: Double($0.end)) }
         busy += plan.live.map { TimeSpan(start: $0.coreStart, end: $0.leave + $0.travel) }
         busy += plan.doing.map { TimeSpan(start: $0.start, end: $0.end) }
         if let meal = plan.meal { busy.append(meal) }

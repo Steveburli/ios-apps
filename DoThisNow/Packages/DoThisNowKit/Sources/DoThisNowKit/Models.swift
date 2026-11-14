@@ -459,13 +459,16 @@ public struct PlannerState: Codable, Equatable, Sendable {
     public var suggestions: [Suggestion] = []
     /// Break time earned by focused work.
     public var breaks = BreakBank()
+    /// Meetings from locked calendars (Alignops to start), refreshed from Calendar.
+    public var meetings: [Meeting] = []
+    public var meetingSettings = MeetingSettings()
     public var updatedAt = Date(timeIntervalSince1970: 0)
 
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
         case tasks, events, log, days, settings, context, cafeDismissed, active, blocks, inboxItems, inbox,
-             activities, timings, running, wake, suggestions, breaks, updatedAt
+             activities, timings, running, wake, suggestions, breaks, meetings, meetingSettings, updatedAt
     }
 
     public init(from decoder: Decoder) throws {
@@ -487,6 +490,8 @@ public struct PlannerState: Codable, Equatable, Sendable {
         wake = try c.decodeIfPresent(WakeSettings.self, forKey: .wake) ?? WakeSettings()
         suggestions = try c.decodeIfPresent([Suggestion].self, forKey: .suggestions) ?? []
         breaks = try c.decodeIfPresent(BreakBank.self, forKey: .breaks) ?? BreakBank()
+        meetings = try c.decodeIfPresent([Meeting].self, forKey: .meetings) ?? []
+        meetingSettings = try c.decodeIfPresent(MeetingSettings.self, forKey: .meetingSettings) ?? MeetingSettings()
         updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date(timeIntervalSince1970: 0)
     }
 
@@ -544,5 +549,6 @@ public struct PlannerState: Codable, Equatable, Sendable {
         let eventCutoff = today.adding(days: -14, calendar: calendar)
         events.removeAll { $0.day < eventCutoff }
         blocks.removeAll { $0.day < eventCutoff }
+        meetings.removeAll { $0.day < eventCutoff }
     }
 }

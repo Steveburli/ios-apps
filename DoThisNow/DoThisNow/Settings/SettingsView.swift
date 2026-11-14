@@ -53,6 +53,28 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Toggle("Lock my work meetings", isOn: Binding(
+                        get: { model.state.meetingSettings.on },
+                        set: { on in Task { await model.setMeetingsOn(on) } }))
+                    if model.state.meetingSettings.on {
+                        if let problem = model.meetingsProblem {
+                            Text(problem)
+                                .font(.footnote)
+                                .foregroundStyle(Theme.ink2)
+                        }
+                        ForEach(model.meetingCalendars) { list in
+                            Toggle(list.name, isOn: Binding(
+                                get: { model.state.meetingSettings.locks(calendarID: list.id, name: list.name) },
+                                set: { model.setCalendarLocked(list, $0) }))
+                        }
+                    }
+                } header: {
+                    Text("Work meetings")
+                } footer: {
+                    Text("Meetings from the calendars switched on here (Alignops to start) keep their exact times and show a lock. You can still put tasks in work hours: anything dropped on a meeting moves to the next open gap.")
+                }
+
+                Section {
                     MinuteStepper(title: "Suggest a coffee shop or library when computer work piles up past",
                                   minutes: $draft.cafeMinutes, range: 15...960, step: 15)
                 }
@@ -126,6 +148,7 @@ struct SettingsView: View {
                 Text("This can’t be undone.")
             }
             .onAppear {
+                model.refreshMeetings()
                 if !loaded {
                     draft = model.state.settings
                     loaded = true

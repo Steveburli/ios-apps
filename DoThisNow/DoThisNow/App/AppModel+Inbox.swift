@@ -22,6 +22,7 @@ extension AppModel {
     /// Reads Reminders again and brings the task list in line with them.
     func refreshSources() async {
         guard !Screenshots.isActive else { return }
+        refreshMeetings()
         let reminders = RemindersSource.shared
         guard reminders.isAuthorized else {
             reminderLists = []
@@ -166,7 +167,14 @@ extension AppModel {
         sheet = nil
         dayShown = day
         commit()
-        show("“\(block.title)” at \(formats.time(day, Double(state.block(block.id)?.start ?? block.start)))")
+        let landed = state.block(block.id)?.start ?? block.start
+        // Dropped on a locked meeting: it went to the gap right after.
+        let meetings = landed == block.start ? [] : engine.planDay(day).meetings
+        if let meeting = meetings.first(where: { $0.end == landed }) {
+            show("“\(block.title)” at \(formats.time(day, Double(landed))), after \(meeting.title)")
+        } else {
+            show("“\(block.title)” at \(formats.time(day, Double(landed)))")
+        }
     }
 
     func scheduleInNextGap(_ key: String, on day: CalendarDay) {
@@ -212,11 +220,12 @@ extension AppModel {
     /// put, and nothing gets pushed into the past.
     func reflowed(_ blocks: [TimeBlock], moving id: String, to minute: Int, day: CalendarDay) -> [TimeBlock] {
         let setup = reflowSetup(blocks, moving: id, day: day)
-        return merge(Reflow.move(id, to: minute, in: setup.movable, obstacles: setup.obstacles, earliest: setup.earliest), into: blocks)
+        return merge(Reflow.move(id, to: minute, in: setup.movable, obstacles: setup.obstacles, locked: setup.locked,
+                                 earliest: setup.earliest), into: blocks)
     }
 
     private func reflowSetup(_ blocks: [TimeBlock], moving id: String, day: CalendarDay)
-        -> (movable: [TimeBlock], obstacles: [TimeSpan], earliest: Int) {
+        -> (movable: [TimeBlock], obstacles: [TimeSpan], locked: [TimeSpan], earliest: Int) {
         let plan = engine.planDay(day)
         let n = plan.isToday ? plan.now : -1
         let onDay = blocks.filter { $0.day == day }
@@ -226,7 +235,7 @@ extension AppModel {
         let obstacles = plan.live.map { TimeSpan(start: $0.coreStart, end: $0.coreEnd) }
             + fixed.map { TimeSpan(start: Double($0.start), end: Double($0.end)) }
         let earliest = plan.isToday ? Int(plan.dayStart) : min(Int(plan.wake), movable.map(\.start).min() ?? Int(plan.wake))
-        return (movable, obstacles, earliest)
+        return (movable, obstacles, plan.locked, earliest)
     }
 
     private func merge(_ changed: [TimeBlock], into blocks: [TimeBlock]) -> [TimeBlock] {
@@ -241,7 +250,7 @@ extension AppModel {
             guard let block = state.block(id) else { return }
             let setup = reflowSetup(state.blocks, moving: id, day: block.day)
             blockDrag = BlockDrag(id: id, original: state.blocks, movable: setup.movable, start: block.start,
-                                  obstacles: setup.obstacles, earliest: setup.earliest, target: block.start,
+                                  obstacles: setup.obstacles, locked: setup.locked, earliest: setup.earliest, target: block.start,
                                   push: engine.planDay(block.day).push)
             draggingBlockID = id
         }
@@ -250,7 +259,8 @@ extension AppModel {
         guard target != drag.target else { return }
         drag.target = target
         blockDrag = drag
-        state.blocks = merge(Reflow.move(id, to: target, in: drag.movable, obstacles: drag.obstacles, earliest: drag.earliest),
+        state.blocks = merge(Reflow.move(id, to: target, in: drag.movable, obstacles: drag.obstacles, locked: drag.locked,
+                                         earliest: drag.earliest),
                              into: drag.original)
     }
 

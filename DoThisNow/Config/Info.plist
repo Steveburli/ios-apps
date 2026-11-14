@@ -6,6 +6,8 @@
 	<false/>
 	<key>NSRemindersFullAccessUsageDescription</key>
 	<string>Do This Now turns your reminders into tasks it can pick from and plan your day around, and ticks them off when you finish them.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Do This Now reads the meetings on your work calendar so it can keep them locked in place and plan your tasks around them. It never changes your calendar.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>The camera scans the barcode or QR code that turns your wake-up alarm off. Nothing is recorded or saved.</string>
 	<key>NSAlarmKitUsageDescription</key>

@@ -23,11 +23,20 @@ struct DayTimeline: View {
             let early = min(p.wake, blockStarts.min() ?? p.wake)
             start = max((early / 60).rounded(.down) * 60, ((p.now - 60) / 60).rounded(.down) * 60)
         } else {
-            let earliest = ([p.wake] + p.rocks.map(\.start) + p.events.map(\.coreStart) + blockStarts).min() ?? p.wake
+            var firsts: [Double] = [p.wake]
+            firsts += p.rocks.map(\.start)
+            firsts += p.locked.map(\.start)
+            firsts += p.events.map(\.coreStart)
+            firsts += blockStarts
+            let earliest = firsts.min() ?? p.wake
             start = max(0, (earliest / 60).rounded(.down) * 60)
         }
-        let latest = ([p.sleepStart + 75, start + 240] + p.events.map { $0.winEnd + $0.travel } + p.rocks.map(\.end)
-                      + p.blocks.map { Double($0.end) }).max() ?? start + 240
+        var lasts: [Double] = [p.sleepStart + 75, start + 240]
+        lasts += p.events.map { $0.winEnd + $0.travel }
+        lasts += p.rocks.map(\.end)
+        lasts += p.locked.map(\.end)
+        lasts += p.blocks.map { Double($0.end) }
+        let latest = lasts.max() ?? start + 240
         return (start, (latest / 60).rounded(.up) * 60)
     }
 
@@ -90,6 +99,29 @@ struct DayTimeline: View {
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                         .placed(width: blockWidth, slot: s, x: gutter)
                         .zIndex(2)
+                }
+            }
+
+            ForEach(plan.meetings) { meeting in
+                if let s = slot(Double(meeting.start), Double(meeting.end), r0) {
+                    BlockLabel(title: meeting.title,
+                               detail: "\(f.range(day, Double(meeting.start), Double(meeting.end))) · \(meeting.calendar.isEmpty ? "meeting" : meeting.calendar) · locked",
+                               trailingPadding: 30)
+                        .foregroundStyle(Theme.rockInk)
+                        .background(Theme.rock, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(Theme.ink.opacity(0.55), lineWidth: 1.5))
+                        .overlay(alignment: .topTrailing) {
+                            Image(systemName: "lock.fill")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(Theme.rockInk.opacity(0.9))
+                                .padding(.top, 5)
+                                .padding(.trailing, 10)
+                        }
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("\(meeting.title), locked meeting")
+                        .accessibilityValue(f.range(day, Double(meeting.start), Double(meeting.end)))
+                        .placed(width: blockWidth, slot: s, x: gutter)
+                        .zIndex(3)
                 }
             }
 

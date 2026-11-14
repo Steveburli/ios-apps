@@ -82,6 +82,8 @@ final class AppModel {
         let movable: [TimeBlock]
         let start: Int
         let obstacles: [TimeSpan]
+        /// Locked meetings: the dragged block can't land on them.
+        let locked: [TimeSpan]
         let earliest: Int
         var target: Int
         let push: Double
@@ -126,6 +128,10 @@ final class AppModel {
 
     /// Your lists in Reminders, for the task source filters.
     var reminderLists: [SourceList] = []
+    /// Your calendars, for picking which ones bring in locked meetings.
+    var meetingCalendars: [SourceList] = []
+    /// Why meetings couldn't be read, for Settings.
+    var meetingsProblem: String?
     /// Counts changes sent to Reminders, so a read that overlapped one starts over.
     @ObservationIgnored var reminderWrites = 0
     /// Why a source couldn't be read, for the Inbox settings.
