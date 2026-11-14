@@ -2,7 +2,7 @@ import Foundation
 import OMMKit
 
 /// The cloud build launches the app with `-screenshots <screen>` to photograph
-/// each screen with sample data: home, workout, weights, cardio, stretch or
+/// each screen with sample data: home, workout, howto, weights, cardio, stretch or
 /// complete. Nothing here runs in normal use.
 enum Screenshots {
     static let screen: String? = {
