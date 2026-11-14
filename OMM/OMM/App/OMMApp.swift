@@ -3,11 +3,13 @@ import SwiftUI
 @main
 struct OMMApp: App {
     @State private var model = AppModel()
+    @State private var sunlight = SunlightModel()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(model)
+                .environment(sunlight)
         }
     }
 }

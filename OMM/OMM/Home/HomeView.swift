@@ -12,6 +12,7 @@ struct HomeView: View {
             VStack(spacing: 14) {
                 header
                 StatsCard(program: model.program)
+                SunlightCard()
                 QuickLogCard()
                 Card(padding: 6) {
                     MuscleGrid()
