@@ -2,7 +2,8 @@ import SwiftUI
 import DoThisNowKit
 
 /// The Day timeline on its own, over the whole screen. The close button or a
-/// swipe down on the top bar goes back to the Day tab.
+/// swipe down on the top bar goes back to the Day tab. Swipe sideways for
+/// another day; the Week button swaps in the week view.
 struct DayFullScreen: View {
     @Environment(AppModel.self) private var model
 
@@ -13,22 +14,34 @@ struct DayFullScreen: View {
         let offset = model.today.days(until: day, calendar: model.calendar)
 
         VStack(spacing: 0) {
-            bar(plan: plan, offset: offset)
-            ScrollViewReader { proxy in
-                ScrollView {
-                    DayTimeline(plan: plan, engine: engine)
-                        .padding(.horizontal, 8)
-                        .padding(.top, 4)
-                        .padding(.bottom, 24)
-                }
-                .onAppear {
-                    model.scrollDayToNow = true
-                    scrollToNow(proxy)
-                }
-                .onChange(of: model.scrollDayToNow) { scrollToNow(proxy) }
+            if model.weekShown {
+                WeekView(onClose: close)
+            } else {
+                bar(plan: plan, offset: offset)
+                timeline(plan: plan, engine: engine)
             }
         }
         .background(Theme.bg.ignoresSafeArea())
+    }
+
+    private func timeline(plan: DayPlan, engine: Engine) -> some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                DayTimeline(plan: plan, engine: engine)
+                    .padding(.horizontal, 8)
+                    .padding(.top, 4)
+                    .padding(.bottom, 24)
+                    .id(plan.day)
+                    .transition(.asymmetric(insertion: .move(edge: model.daySlideEdge).combined(with: .opacity),
+                                            removal: .opacity))
+            }
+            .daySwipes()
+            .onAppear {
+                model.scrollDayToNow = true
+                scrollToNow(proxy)
+            }
+            .onChange(of: model.scrollDayToNow) { scrollToNow(proxy) }
+        }
     }
 
     private func scrollToNow(_ proxy: ScrollViewProxy) {
@@ -54,7 +67,7 @@ struct DayFullScreen: View {
                     Image(systemName: "xmark").font(.headline).frame(width: 40, height: 40)
                 }
                 .accessibilityLabel("Close full screen")
-                Button { model.showDay(offset: -1) } label: {
+                Button { withAnimation(.snappy(duration: 0.25)) { model.showDay(offset: -1) } } label: {
                     Image(systemName: "chevron.left").frame(width: 36, height: 40)
                 }
                 .disabled(offset <= 0)
@@ -63,19 +76,27 @@ struct DayFullScreen: View {
                     Text(name)
                         .font(Theme.display(22))
                         .foregroundStyle(Theme.ink)
-                    Text("\(f.shortDate(plan.day)) · \(bedtime)")
-                        .font(.caption)
-                        .foregroundStyle(plan.push > 0 ? Theme.bad : Theme.ink3)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    HStack(spacing: 6) {
+                        if offset != 0 {
+                            TodayPill { withAnimation(.snappy(duration: 0.25)) { model.goToToday() } }
+                        }
+                        Text("\(f.shortDate(plan.day)) · \(bedtime)")
+                            .font(.caption)
+                            .foregroundStyle(plan.push > 0 ? Theme.bad : Theme.ink3)
+                            .lineLimit(1)
+                    }
                 }
-                .accessibilityElement(children: .combine)
+                .accessibilityElement(children: .contain)
                 .accessibilityAddTraits(.isHeader)
-                Button { model.showDay(offset: 1) } label: {
+                Button { withAnimation(.snappy(duration: 0.25)) { model.showDay(offset: 1) } } label: {
                     Image(systemName: "chevron.right").frame(width: 36, height: 40)
                 }
-                .disabled(offset >= 13)
+                .disabled(offset >= AppModel.daysAhead)
                 .accessibilityLabel("Next day")
                 Spacer(minLength: 4)
+                WeekButton()
                 Button("+ Event") { model.sheet = .newEvent(plan.day) }
                     .buttonStyle(.dtn(size: .small))
             }

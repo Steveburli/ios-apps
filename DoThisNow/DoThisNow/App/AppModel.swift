@@ -132,6 +132,10 @@ final class AppModel {
     var sourceProblem: [TaskSource: String] = [:]
     var inboxOpen = false
     var dayPage: DayPage = .timeline
+    /// The Day tab shows the whole week (Monday to Sunday) instead of one day.
+    var weekShown = false
+    /// Which side the next day slides in from after a swipe or an arrow.
+    var daySlideEdge: Edge = .trailing
     /// The Day timeline fills the screen. Remembered, so the Day tab opens the way you left it.
     var dayFullScreen: Bool {
         didSet { UserDefaults.standard.set(dayFullScreen, forKey: Keys.dayFullScreen) }
@@ -186,7 +190,7 @@ final class AppModel {
     }
 
     /// Goes to the screen named by `-screenshots`: now, pick, doing, tasks, day,
-    /// dayfull, inbox, inboxpage, replan, trip, tripcatchup, track or wake.
+    /// dayfull, week, inbox, inboxpage, replan, trip, tripcatchup, track or wake.
     private func openScreenshotScreen() {
         switch Screenshots.screen {
         case "pick":
@@ -205,6 +209,10 @@ final class AppModel {
             tab = .day
             openDayTab()
             dayFullScreen = true
+        case "week":
+            tab = .day
+            openDayTab()
+            weekShown = true
         case "inbox":
             tab = .day
             openDayTab()
@@ -573,11 +581,21 @@ final class AppModel {
 
     // MARK: Day
 
+    /// How far ahead the Day tab goes: today plus 13 days.
+    static let daysAhead = 13
+
     func showDay(offset: Int) {
         let target = dayShown.adding(days: offset, calendar: calendar)
         let distance = today.days(until: target, calendar: calendar)
-        guard (0...13).contains(distance) else { return }
+        guard (0...Self.daysAhead).contains(distance) else { return }
+        daySlideEdge = offset < 0 ? .leading : .trailing
         dayShown = target
+    }
+
+    /// True while a block, an event's arrival or an Inbox task is being
+    /// dragged on the Day, so a sideways swipe doesn't change the day under it.
+    var isDraggingOnDay: Bool {
+        drag != nil || draggingBlockID != nil || draggingKey != nil
     }
 
     func openDayTab() {

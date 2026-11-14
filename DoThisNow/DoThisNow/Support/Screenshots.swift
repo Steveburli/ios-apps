@@ -1,7 +1,7 @@
 import Foundation
 
 /// The cloud build launches the app with `-screenshots <screen>` to photograph
-/// each screen with the example tasks: now, pick, doing, tasks, day, dayfull,
+/// each screen with the example tasks: now, pick, doing, tasks, day, dayfull, week,
 /// inbox, inboxpage, replan, trip, tripcatchup, track or wake. On iPad, day
 /// shows the two-column layout.
 /// Nothing here runs in normal use.

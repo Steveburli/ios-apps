@@ -14,15 +14,18 @@ struct DayView: View {
             // The Inbox already sits in the left column, so iPad only
             // switches between the day and the trip.
             VStack(spacing: 0) {
-                Picker("Show", selection: Binding(get: { model.dayPage == .trip ? AppModel.DayPage.trip : .timeline },
-                                                  set: { model.dayPage = $0 })) {
-                    Text("Day").tag(AppModel.DayPage.timeline)
-                    Text("Trip").tag(AppModel.DayPage.trip)
+                HStack(spacing: 8) {
+                    Picker("Show", selection: Binding(get: { model.dayPage == .trip ? AppModel.DayPage.trip : .timeline },
+                                                      set: { model.dayPage = $0 })) {
+                        Text("Day").tag(AppModel.DayPage.timeline)
+                        Text("Trip").tag(AppModel.DayPage.trip)
+                    }
+                    .pickerStyle(.segmented)
+                    WeekButton()
                 }
-                .pickerStyle(.segmented)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 6)
-                .frame(maxWidth: 360)
+                .frame(maxWidth: 420)
                 if model.dayPage == .trip {
                     TripView()
                 } else {
@@ -30,18 +33,25 @@ struct DayView: View {
                         SideList(day: model.dayShown)
                             .frame(width: 360)
                         Divider().overlay(Theme.line)
-                        timeline(tray: false)
+                        if model.weekShown {
+                            WeekView()
+                        } else {
+                            timeline(tray: false)
+                        }
                     }
                 }
             }
         } else {
             VStack(spacing: 0) {
-                Picker("Show", selection: $model.dayPage) {
-                    Text("Day").tag(AppModel.DayPage.timeline)
-                    Text("Inbox (\(model.inboxEntries.count))").tag(AppModel.DayPage.inbox)
-                    Text("Trip").tag(AppModel.DayPage.trip)
+                HStack(spacing: 8) {
+                    Picker("Show", selection: $model.dayPage) {
+                        Text("Day").tag(AppModel.DayPage.timeline)
+                        Text("Inbox (\(model.inboxEntries.count))").tag(AppModel.DayPage.inbox)
+                        Text("Trip").tag(AppModel.DayPage.trip)
+                    }
+                    .pickerStyle(.segmented)
+                    WeekButton()
                 }
-                .pickerStyle(.segmented)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 6)
                 .frame(maxWidth: 760)
@@ -49,6 +59,8 @@ struct DayView: View {
                     InboxPage(day: model.dayShown)
                 } else if model.dayPage == .trip {
                     TripView()
+                } else if model.weekShown {
+                    WeekView()
                 } else {
                     timeline(tray: true)
                 }
@@ -79,7 +91,11 @@ struct DayView: View {
                 .padding(.bottom, 32)
                 .frame(maxWidth: 760)
                 .frame(maxWidth: .infinity)
+                .id(day)
+                .transition(.asymmetric(insertion: .move(edge: model.daySlideEdge).combined(with: .opacity),
+                                        removal: .opacity))
             }
+            .daySwipes()
             .onAppear { scrollToNow(proxy) }
             .onChange(of: model.scrollDayToNow) { scrollToNow(proxy) }
             .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -133,8 +149,8 @@ struct DayView: View {
     private func header(day: CalendarDay, offset: Int) -> some View {
         let name = offset == 0 ? "Today" : offset == 1 ? "Tomorrow" : model.formats.weekdayName(day)
         return HStack(spacing: 6) {
-            Button { model.showDay(offset: -1) } label: {
-                Image(systemName: "chevron.left").frame(width: 40, height: 40)
+            Button { withAnimation(.snappy(duration: 0.25)) { model.showDay(offset: -1) } } label: {
+                Image(systemName: "chevron.left").frame(width: 36, height: 40)
             }
             .disabled(offset <= 0)
             .accessibilityLabel("Previous day")
@@ -142,18 +158,25 @@ struct DayView: View {
                 Text(name)
                     .font(Theme.display(30))
                     .foregroundStyle(Theme.ink)
-                Text(model.formats.shortDate(day))
-                    .font(.footnote)
-                    .foregroundStyle(Theme.ink3)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                HStack(spacing: 6) {
+                    Text(model.formats.shortDate(day))
+                        .font(.footnote)
+                        .foregroundStyle(Theme.ink3)
+                    if offset != 0 {
+                        TodayPill { withAnimation(.snappy(duration: 0.25)) { model.goToToday() } }
+                    }
+                }
             }
-            .accessibilityElement(children: .combine)
+            .accessibilityElement(children: .contain)
             .accessibilityAddTraits(.isHeader)
-            Button { model.showDay(offset: 1) } label: {
-                Image(systemName: "chevron.right").frame(width: 40, height: 40)
+            Button { withAnimation(.snappy(duration: 0.25)) { model.showDay(offset: 1) } } label: {
+                Image(systemName: "chevron.right").frame(width: 36, height: 40)
             }
-            .disabled(offset >= 13)
+            .disabled(offset >= AppModel.daysAhead)
             .accessibilityLabel("Next day")
-            Spacer()
+            Spacer(minLength: 0)
             Button {
                 withAnimation(.snappy(duration: 0.3)) { model.setDayFullScreen(true) }
             } label: {
