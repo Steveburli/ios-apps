@@ -35,7 +35,7 @@ final class Session {
         }
     }
 
-    enum DeckTab: Hashable { case swipe, results, cards }
+    enum DeckTab: Hashable { case swipe, results, overlap, cards }
 
     struct Toast: Identifiable, Equatable {
         let id = UUID()
@@ -106,6 +106,9 @@ final class Session {
             path = [deck]
         case "results":
             openingTab[deck] = .results
+            path = [deck]
+        case "overlap":
+            openingTab[deck] = .overlap
             path = [deck]
         case "card":
             path = [deck]

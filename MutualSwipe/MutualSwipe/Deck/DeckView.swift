@@ -1,7 +1,7 @@
 import SwiftUI
 import MutualKit
 
-/// One deck: Swipe, Results and Cards. While a round is running, Swipe and
+/// One deck: Swipe, Results, Overlap and Cards. While a round is running, Swipe and
 /// Results show the round; the bar on top switches back to vetting.
 struct DeckView: View {
     @Environment(CloudStore.self) private var store
@@ -18,6 +18,7 @@ struct DeckView: View {
                 Picker("Deck view", selection: $tab) {
                     Text("Swipe").tag(Session.DeckTab.swipe)
                     Text(state.matchCount > 0 ? "Results (\(state.matchCount))" : "Results").tag(Session.DeckTab.results)
+                    Text("Overlap").tag(Session.DeckTab.overlap)
                     Text(vetting.cards.isEmpty ? "Cards" : "Cards (\(vetting.cards.count))").tag(Session.DeckTab.cards)
                 }
                 .pickerStyle(.segmented)
@@ -36,6 +37,8 @@ struct DeckView: View {
                     SwipeTab(deck: deck, state: state, showTab: { tab = $0 })
                 case .results:
                     ResultsTab(deck: deck, state: state, showTab: { tab = $0 })
+                case .overlap:
+                    OverlapTab(deck: deck, state: state)
                 case .cards:
                     CardsTab(deck: deck, state: vetting)
                 }
