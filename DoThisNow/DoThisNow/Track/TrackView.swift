@@ -28,6 +28,8 @@ struct TrackView: View {
                     .font(.footnote)
                     .foregroundStyle(Theme.ink2)
 
+                BreakBankCard()
+
                 if let running = model.state.running {
                     RunningCard(running: running)
                 }

@@ -228,6 +228,8 @@ final class AppModel {
             tab = .track
             state.running = RunningTimer(activityID: state.activities.first?.id, title: state.activities.first?.name ?? "Shower",
                                          startedAt: now.addingTimeInterval(-7 * 60 - 12))
+            state.breaks.day = today
+            state.breaks.seconds = 18 * 60
         case "wake":
             tab = .wake
             state.wake.alarm.on = true
@@ -291,6 +293,7 @@ final class AppModel {
             if state.settings.sound { Sounds.chime() }
             commit()
         }
+        checkBreak(date)
         checkAlarm()
     }
 
@@ -409,6 +412,7 @@ final class AppModel {
     }
 
     func endSession(finished: Bool) {
+        earnBreakForSession(at: Date())
         let message = state.endSession(finished: finished, at: Date())
         nowStep = .ask
         commit()

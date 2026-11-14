@@ -58,6 +58,22 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Stepper(value: $draft.workPerBreak, in: 1...30) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Minutes of focus for 1 minute of break")
+                            Text("\(draft.workPerBreak) min")
+                                .font(.subheadline.monospacedDigit().weight(.semibold))
+                                .foregroundStyle(Theme.accent)
+                        }
+                    }
+                    .accessibilityValue("\(draft.workPerBreak) minutes")
+                } header: {
+                    Text("Break bank")
+                } footer: {
+                    Text("Focus time and timed sessions earn break time. Leftover break time is gone the next morning, but time you owe carries over.")
+                }
+
+                Section {
                     Toggle("Sounds", isOn: $draft.sound)
                 } footer: {
                     Text("A chime when your timer runs out, and Sleep grumbling when you push bedtime. Sounds follow the silent switch.")

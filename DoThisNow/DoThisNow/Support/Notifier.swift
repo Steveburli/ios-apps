@@ -7,6 +7,8 @@ import DoThisNowKit
 enum Notifier {
     private static let sessionID = "session-end"
     private static let reminderPrefix = "reminder-"
+    private static let breakEndID = "break-end"
+    private static let stillWorkingID = "still-working"
     /// iOS keeps 64 pending notifications per app.
     private static let reminderLimit = 40
 
@@ -27,6 +29,22 @@ enum Notifier {
             content.body = "You planned \(TimeText.duration(session.planned)) for “\(session.title)”. Keep going, or call it here?"
             content.sound = .default
             add(center, id: sessionID, content: content, at: endsAt, now: now)
+        }
+
+        center.removePendingNotificationRequests(withIdentifiers: [breakEndID, stillWorkingID])
+        if let current = state.breaks.current {
+            let content = UNMutableNotificationContent()
+            content.title = "Break’s over"
+            content.body = "Back to it? Start the focus timer to earn your next break."
+            content.sound = .default
+            add(center, id: breakEndID, content: content, at: current.endsAt, now: now)
+        }
+        if let focus = state.breaks.focus {
+            let content = UNMutableNotificationContent()
+            content.title = "Still working?"
+            content.body = "Your focus timer has run 90 minutes. Open Do This Now to keep earning break time."
+            content.sound = .default
+            add(center, id: stillWorkingID, content: content, at: focus.checkedAt.addingTimeInterval(BreakBank.checkAfter), now: now)
         }
 
         center.removePendingNotificationRequests(withIdentifiers: state.tasks.map { reminderPrefix + $0.id })
