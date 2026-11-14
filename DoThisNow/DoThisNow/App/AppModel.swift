@@ -7,6 +7,10 @@ import DoThisNowKit
 @Observable
 @MainActor
 final class AppModel {
+    /// One model for the whole app, so widget and Lock Screen buttons can
+    /// reach it even when iOS runs them with no window open.
+    static let shared = AppModel()
+
     enum Tab: String { case now, tasks, day, track, wake }
     enum NowStep { case ask, pick }
     enum PickPanel { case done, later }
@@ -183,6 +187,8 @@ final class AppModel {
             state = PlannerState()
         }
         takeDroppedTasks()
+        takeTimerCommands()
+        syncTimers()
     }
 
     /// Goes to the screen named by `-screenshots`: now, pick, doing, tasks, day,
@@ -267,6 +273,7 @@ final class AppModel {
         }
         Notifier.sync(state, now: Date())
         syncAlarms()
+        syncTimers()
     }
 
     func show(_ message: String) {
@@ -292,6 +299,7 @@ final class AppModel {
             commit()
         }
         checkAlarm()
+        takeTimerCommands()
     }
 
     func refreshNow() {

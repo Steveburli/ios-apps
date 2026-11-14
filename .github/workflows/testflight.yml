@@ -68,7 +68,9 @@ jobs:
           fi
           case "$app" in
             OMM) bundle=com.steveburlison.omm ;;
-            DoThisNow) bundle=com.steveburlison.dothisnow ;;
+            DoThisNow) bundle=com.steveburlison.dothisnow
+              # The Lock Screen and Home Screen widgets, with their own App ID and profile.
+              echo "WIDGETS_BUNDLE_ID=com.steveburlison.dothisnow.widgets" >> "$GITHUB_ENV" ;;
             MutualSwipe) bundle=com.steveburlison.mutualswipe ;;
             *)
               echo "::error::Unknown app \"$app\". Name the tag testflight-OMM-1, testflight-DoThisNow-1 or testflight-MutualSwipe-1."
@@ -95,31 +97,53 @@ jobs:
           "$RUNNER_TEMP/tools/bin/pip" install --quiet codemagic-cli-tools
           echo "$RUNNER_TEMP/tools/bin" >> "$GITHUB_PATH"
 
-      - name: Get the signing certificate and profile
+      - name: Get the signing certificate and profiles
         run: |
           keychain initialize
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --platform IOS \
-            --type IOS_APP_STORE \
-            --certificate-key=@env:CERTIFICATE_PRIVATE_KEY \
-            --create
+          # The app, plus its widgets extension when it has one (WIDGETS_BUNDLE_ID).
+          for bundle in "$BUNDLE_ID" ${WIDGETS_BUNDLE_ID:+"$WIDGETS_BUNDLE_ID"}; do
+            app-store-connect fetch-signing-files "$bundle" \
+              --platform IOS \
+              --type IOS_APP_STORE \
+              --certificate-key=@env:CERTIFICATE_PRIVATE_KEY \
+              --create
+          done
           keychain add-certificates
 
-          # Xcode 16 and later read profiles from a new folder; put the profile in both.
+          # Xcode 16 and later read profiles from a new folder; put each profile in both.
           old="$HOME/Library/MobileDevice/Provisioning Profiles"
           new="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
           mkdir -p "$old" "$new"
-          # ls fails when one folder is empty, which is normal; the check below catches "none at all".
-          profile="$(ls -t "$old"/*.mobileprovision "$new"/*.mobileprovision 2>/dev/null | head -1 || true)"
-          if [ -z "$profile" ]; then
-            echo "::error::No provisioning profile was downloaded."
-            exit 1
-          fi
-          cp "$profile" "$old/" 2>/dev/null || true
-          cp "$profile" "$new/" 2>/dev/null || true
-          name="$(security cms -D -i "$profile" | plutil -extract Name raw -o - -)"
-          echo "PROFILE_NAME=$name" >> "$GITHUB_ENV"
-          echo "Using provisioning profile: $name"
+
+          # The newest downloaded profile for a bundle ID, matched by its application-identifier.
+          profile_for() {
+            local bundle="$1" file
+            # ls fails when one folder is empty, which is normal.
+            for file in $(ls -t "$old"/*.mobileprovision "$new"/*.mobileprovision 2>/dev/null || true); do
+              id="$(security cms -D -i "$file" | plutil -extract Entitlements.application-identifier raw -o - - 2>/dev/null || true)"
+              if [ "$id" = "$TEAM_ID.$bundle" ]; then
+                echo "$file"
+                return
+              fi
+            done
+          }
+          IFS=$'\n'
+          for bundle in "$BUNDLE_ID" ${WIDGETS_BUNDLE_ID:+"$WIDGETS_BUNDLE_ID"}; do
+            profile="$(profile_for "$bundle")"
+            if [ -z "$profile" ]; then
+              echo "::error::No provisioning profile was downloaded for $bundle."
+              exit 1
+            fi
+            cp "$profile" "$old/" 2>/dev/null || true
+            cp "$profile" "$new/" 2>/dev/null || true
+            name="$(security cms -D -i "$profile" | plutil -extract Name raw -o - -)"
+            if [ "$bundle" = "$BUNDLE_ID" ]; then
+              echo "PROFILE_NAME=$name" >> "$GITHUB_ENV"
+            else
+              echo "WIDGETS_PROFILE_NAME=$name" >> "$GITHUB_ENV"
+            fi
+            echo "Using provisioning profile for $bundle: $name"
+          done
 
       - name: Archive
         run: |
@@ -136,6 +160,7 @@ jobs:
             SHIP_CODE_SIGN_STYLE=Manual \
             SHIP_CODE_SIGN_IDENTITY="Apple Distribution" \
             SHIP_PROVISIONING_PROFILE="$PROFILE_NAME" \
+            SHIP_WIDGETS_PROVISIONING_PROFILE="${WIDGETS_PROFILE_NAME:-}" \
             archive 2>&1 | tee archive.log
 
       - name: Sign and upload to App Store Connect
@@ -144,6 +169,11 @@ jobs:
           mkdir -p "$key_dir"
           key_path="$key_dir/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8"
           printf '%s\n' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$key_path"
+
+          widgets_profile=""
+          if [ -n "${WIDGETS_BUNDLE_ID:-}" ]; then
+            widgets_profile="<key>${WIDGETS_BUNDLE_ID}</key><string>${WIDGETS_PROFILE_NAME}</string>"
+          fi
 
           cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>
@@ -158,6 +188,7 @@ jobs:
             <key>provisioningProfiles</key>
             <dict>
               <key>${BUNDLE_ID}</key><string>${PROFILE_NAME}</string>
+              ${widgets_profile}
             </dict>
             <key>uploadSymbols</key><true/>
             <key>manageAppVersionAndBuildNumber</key><false/>

@@ -7,6 +7,9 @@ struct SettingsView: View {
     @State private var draft = PlannerSettings()
     @State private var loaded = false
     @State private var confirmingErase = false
+    /// The activities with start buttons on widgets; set when you change them here.
+    @State private var widgetIDs: [String] = []
+    @State private var widgetIDsChanged = false
 
     private let weekdays: [(index: Int, label: String)] = [
         (1, "Mon"), (2, "Tue"), (3, "Wed"), (4, "Thu"), (5, "Fri"), (6, "Sat"), (0, "Sun"),
@@ -58,6 +61,18 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    NavigationLink {
+                        WidgetButtonsPicker(ids: $widgetIDs, changed: $widgetIDsChanged)
+                    } label: {
+                        LabeledContent("Start buttons", value: widgetSummary)
+                    }
+                } header: {
+                    Text("Widgets and Lock Screen")
+                } footer: {
+                    Text("Pick what the Home Screen and Lock Screen widgets can start. Running timers also show on the Lock Screen and in the Dynamic Island, with a Stop button.")
+                }
+
+                Section {
                     Toggle("Sounds", isOn: $draft.sound)
                 } footer: {
                     Text("A chime when your timer runs out, and Sleep grumbling when you push bedtime. Sounds follow the silent switch.")
@@ -83,7 +98,10 @@ struct SettingsView: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { model.saveSettings(draft) }
+                    Button("Save") {
+                        if widgetIDsChanged { model.setWidgetActivities(widgetIDs) }
+                        model.saveSettings(draft)
+                    }
                         .fontWeight(.bold)
                 }
             }
@@ -95,10 +113,17 @@ struct SettingsView: View {
             .onAppear {
                 if !loaded {
                     draft = model.state.settings
+                    widgetIDs = model.widgetActivities.map(\.id)
                     loaded = true
                 }
             }
         }
+    }
+
+    private var widgetSummary: String {
+        if model.state.activities.isEmpty { return "Add activities on Track" }
+        let names = model.state.activities.filter { widgetIDs.contains($0.id) }.map(\.name)
+        return names.isEmpty ? "None" : names.joined(separator: ", ")
     }
 
     private func toggle(_ weekday: Int) {
