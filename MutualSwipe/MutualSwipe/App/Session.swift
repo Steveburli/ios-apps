@@ -25,6 +25,8 @@ final class Session {
         case answer(String, String)
         /// Everyone's answers to a deck's questions.
         case allAnswers(String)
+        /// Put a deck's matches on a calendar in one go.
+        case calendar(String)
 
         var id: String {
             switch self {
@@ -40,6 +42,7 @@ final class Session {
             case .questions(let deck): return "questions-" + deck
             case .answer(let deck, let player): return "answer-" + deck + "-" + player
             case .allAnswers(let deck): return "answers-" + deck
+            case .calendar(let deck): return "calendar-" + deck
             }
         }
     }

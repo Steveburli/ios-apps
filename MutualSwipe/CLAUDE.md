@@ -50,7 +50,7 @@ TestFlight and App Store builds use CloudKit's **Production** environment. That 
    |---|---|
    | `Group` | `name` (String), `createdAt` (Date/Time) |
    | `Deck` | `title` (String), `kind` (String), `blurb` (String), `createdAt` (Date/Time); version 2 adds `decided` (String List), `decidedAt` (Date/Time), `decidedBy` (String), `spinCardID` (String), `spinAt` (Date/Time); version 2 build B adds `roundID` (String), `roundQuestion` (String), `roundStartedAt` (Date/Time), `roundCards` (String List), `roundFilter` (String List), `roundChain` (String List), `roundHistory` (String List); deck questions add `questions` (String List) |
-   | `Card` | `deck` (Reference), `deckID` (String), `title` (String), `subtitle` (String), `details` (String), `tags` (String List), `link` (String), `order` (Double), `createdAt` (Date/Time); build B adds `retiredAt` (Date/Time), `retiredBy` (String) |
+   | `Card` | `deck` (Reference), `deckID` (String), `title` (String), `subtitle` (String), `details` (String), `tags` (String List), `link` (String), `order` (Double), `createdAt` (Date/Time); build B adds `retiredAt` (Date/Time), `retiredBy` (String); the calendar build adds `startsAt` (Date/Time) |
    | `Player` | `name` (String), `color` (Int(64)), `createdAt` (Date/Time) |
    | `Pick` | `card` (Reference), `deckID` (String), `cardID` (String), `playerID` (String), `vote` (String), `updatedAt` (Date/Time); build B adds `roundID` (String) |
    | `Answer` | `deck` (Reference), `deckID` (String), `playerID` (String), `values` (String), `filledBy` (String), `confirmedAt` (Date/Time), `updatedAt` (Date/Time), `ideasMade` (String List) |

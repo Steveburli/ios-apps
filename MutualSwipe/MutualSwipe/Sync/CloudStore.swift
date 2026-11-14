@@ -470,6 +470,16 @@ final class CloudStore: CKSyncEngineDelegate {
         scheduleSave()
     }
 
+    /// Sets when an event card happens, for everyone. Nil takes the time off.
+    func setTime(_ date: Date?, card cardID: String) {
+        guard var card = cards[cardID], let group = groups[card.groupID], card.startsAt != date else { return }
+        if date == nil && card.startsAt != nil { card.timeCleared = true }
+        card.startsAt = date
+        cards[cardID] = card
+        enqueueSave(cardID, in: group)
+        scheduleSave()
+    }
+
     // MARK: Sharing
 
     enum ShareError: LocalizedError {

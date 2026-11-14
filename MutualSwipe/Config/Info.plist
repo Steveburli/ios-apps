@@ -6,6 +6,8 @@
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Add the plans your group agreed on to the calendar you pick, such as a shared family calendar, and skip ones already on it.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Take a photo of a menu or a list, and Mutual turns each line into a card.</string>
 	<key>CFBundleDocumentTypes</key>

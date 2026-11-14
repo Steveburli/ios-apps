@@ -7,13 +7,17 @@ public struct CardDraft: Equatable, Sendable {
     public var details: String
     public var link: String
     public var tags: [String]
+    /// When it happens, for an event with a set time. Optional.
+    public var startsAt: Date?
 
-    public init(title: String, subtitle: String = "", details: String = "", link: String = "", tags: [String] = []) {
+    public init(title: String, subtitle: String = "", details: String = "", link: String = "", tags: [String] = [],
+                startsAt: Date? = nil) {
         self.title = title
         self.subtitle = subtitle
         self.details = details
         self.link = link
         self.tags = tags
+        self.startsAt = startsAt
     }
 }
 
@@ -34,7 +38,7 @@ public enum CardText {
             .prefix(6)
             .map { String($0.prefix(30)) }
         return CardDraft(title: title, subtitle: limit(draft.subtitle, 160), details: limit(draft.details, 1500),
-                         link: safeURL(draft.link), tags: Array(tags))
+                         link: safeURL(draft.link), tags: Array(tags), startsAt: draft.startsAt)
     }
 
     public static func splitTags(_ text: String) -> [String] {

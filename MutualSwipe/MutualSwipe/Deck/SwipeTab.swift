@@ -356,6 +356,12 @@ struct CardFace: View {
                 if !card.subtitle.isEmpty {
                     Text(card.subtitle).font(.subheadline.weight(.semibold)).opacity(0.95)
                 }
+                if let time = card.startsAt {
+                    Label(time.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()),
+                          systemImage: "clock")
+                        .font(.subheadline.weight(.semibold))
+                        .opacity(0.95)
+                }
                 if !card.details.isEmpty {
                     Text(card.details).font(.subheadline).lineLimit(4).opacity(0.94)
                 }
