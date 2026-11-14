@@ -36,6 +36,8 @@ final class AppModel {
         case alarm
         /// Catching up on what you missed earlier today.
         case replan
+        /// Places and the rules that start and stop Track timers by them.
+        case places
 
         var id: String {
             switch self {
@@ -57,6 +59,7 @@ final class AppModel {
             case .sleep: return "sleep"
             case .alarm: return "alarm"
             case .replan: return "replan"
+            case .places: return "places"
             }
         }
     }
@@ -198,7 +201,7 @@ final class AppModel {
     }
 
     /// Goes to the screen named by `-screenshots`: now, pick, doing, tasks, day,
-    /// dayfull, week, inbox, inboxpage, replan, trip, tripcatchup, track or wake.
+    /// dayfull, week, inbox, inboxpage, replan, trip, tripcatchup, track, places or wake.
     private func openScreenshotScreen() {
         switch Screenshots.screen {
         case "pick":
@@ -246,6 +249,10 @@ final class AppModel {
                                          startedAt: now.addingTimeInterval(-7 * 60 - 12))
             state.breaks.day = today
             state.breaks.seconds = 18 * 60
+        case "places":
+            tab = .track
+            loadPlaceExample()
+            sheet = .places
         case "wake":
             tab = .wake
             state.wake.alarm.on = true

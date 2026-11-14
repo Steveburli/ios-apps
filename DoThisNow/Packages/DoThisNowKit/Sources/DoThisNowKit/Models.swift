@@ -462,13 +462,15 @@ public struct PlannerState: Codable, Equatable, Sendable {
     /// Meetings from locked calendars (Alignops to start), refreshed from Calendar.
     public var meetings: [Meeting] = []
     public var meetingSettings = MeetingSettings()
+    /// Track timers that start and stop by place.
+    public var placeTimers = PlaceTimers()
     public var updatedAt = Date(timeIntervalSince1970: 0)
 
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
         case tasks, events, log, days, settings, context, cafeDismissed, active, blocks, inboxItems, inbox,
-             activities, timings, running, wake, suggestions, breaks, meetings, meetingSettings, updatedAt
+             activities, timings, running, wake, suggestions, breaks, meetings, meetingSettings, placeTimers, updatedAt
     }
 
     public init(from decoder: Decoder) throws {
@@ -492,6 +494,7 @@ public struct PlannerState: Codable, Equatable, Sendable {
         breaks = try c.decodeIfPresent(BreakBank.self, forKey: .breaks) ?? BreakBank()
         meetings = try c.decodeIfPresent([Meeting].self, forKey: .meetings) ?? []
         meetingSettings = try c.decodeIfPresent(MeetingSettings.self, forKey: .meetingSettings) ?? MeetingSettings()
+        placeTimers = try c.decodeIfPresent(PlaceTimers.self, forKey: .placeTimers) ?? PlaceTimers()
         updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date(timeIntervalSince1970: 0)
     }
 
