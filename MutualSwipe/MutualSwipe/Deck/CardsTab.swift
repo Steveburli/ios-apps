@@ -45,6 +45,7 @@ struct CardsTab: View {
                 } else {
                     addMany
                     addCard
+                    questions
                 }
                 cardList
                 retiredList
@@ -201,6 +202,31 @@ struct CardsTab: View {
                             .controlSize(.small)
                         }
                     }
+                }
+            }
+        }
+    }
+
+    /// Questions people answer before they swipe.
+    private var questions: some View {
+        Panel {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Questions before swiping").font(Theme.display(18, weight: .bold))
+                if !deck.formQuestions.isEmpty {
+                    Text("\(deck.formQuestions.count)").font(.subheadline.weight(.bold).monospacedDigit()).foregroundStyle(Theme.muted)
+                }
+            }
+            Text(deck.formQuestions.isEmpty
+                 ? "Ask everyone a few things first, like flight times, budget or the vibe they want. Start from a ready-made Trip, Dinner out or Night out set. Their ideas become cards."
+                 : "Everyone answers these before they swipe, and everyone sees the answers.")
+                .font(.footnote)
+                .foregroundStyle(Theme.muted)
+            FlowLayout {
+                Button(deck.formQuestions.isEmpty ? "Add questions" : "Edit questions") { session.sheet = .questions(deck.id) }
+                    .buttonStyle(.mutual(deck.formQuestions.isEmpty ? .primary : .quiet))
+                if !deck.formQuestions.isEmpty {
+                    Button("See answers") { session.sheet = .allAnswers(deck.id) }
+                        .buttonStyle(.mutual(.quiet))
                 }
             }
         }

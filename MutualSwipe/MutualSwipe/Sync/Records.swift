@@ -15,6 +15,7 @@ enum Records {
         static let card = "Card"
         static let player = "Player"
         static let pick = "Pick"
+        static let answer = "Answer"
     }
 
     /// Starts from the last record the server sent, so the save carries its
@@ -64,6 +65,24 @@ enum Records {
         if let history = deck.roundHistory, !history.isEmpty {
             record["roundHistory"] = history.compactMap(encode)
         }
+        // Only written once a deck has had questions, so other decks save as before.
+        if let questions = deck.questions {
+            record["questions"] = questions.isEmpty ? nil : questions.compactMap(\.encoded)
+        }
+        return record
+    }
+
+    static func record(_ answers: FormAnswers, zoneID: CKRecordZone.ID) -> CKRecord {
+        let record = base(Kind.answer, name: answers.id, zoneID: zoneID, systemFields: answers.systemFields)
+        // Deleting a deck deletes everyone's answers to it on the server.
+        record["deck"] = CKRecord.Reference(recordID: CKRecord.ID(recordName: answers.deckID, zoneID: zoneID), action: .deleteSelf)
+        record["deckID"] = answers.deckID
+        record["playerID"] = answers.playerID
+        record["values"] = (try? JSONEncoder().encode(answers.values)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+        record["filledBy"] = answers.filledBy
+        record["confirmedAt"] = answers.confirmedAt
+        record["updatedAt"] = answers.updatedAt
+        record["ideasMade"] = answers.ideasMade.isEmpty ? nil : answers.ideasMade
         return record
     }
 
@@ -154,6 +173,7 @@ enum Records {
         deck.roundFilter = record["roundFilter"] as? [String]
         deck.roundChain = record["roundChain"] as? [String]
         deck.roundHistory = (record["roundHistory"] as? [String])?.compactMap(decode)
+        deck.questions = (record["questions"] as? [String])?.compactMap(FormQuestion.decode)
         deck.systemFields = record.archivedSystemFields
         return deck
     }
@@ -186,6 +206,18 @@ enum Records {
         pick.roundID = record["roundID"] as? String
         pick.systemFields = record.archivedSystemFields
         return pick
+    }
+
+    static func answers(from record: CKRecord, groupID: String) -> FormAnswers? {
+        let deckID = string(record, "deckID"), playerID = string(record, "playerID")
+        guard !deckID.isEmpty, !playerID.isEmpty else { return nil }
+        let values = (try? JSONDecoder().decode([String: String].self, from: Data(string(record, "values").utf8))) ?? [:]
+        var answers = FormAnswers(groupID: groupID, deckID: deckID, playerID: playerID, values: values,
+                                  filledBy: string(record, "filledBy"), confirmedAt: record["confirmedAt"] as? Date,
+                                  updatedAt: date(record, "updatedAt"), ideasMade: record["ideasMade"] as? [String] ?? [])
+        answers.id = record.recordID.recordName
+        answers.systemFields = record.archivedSystemFields
+        return answers
     }
 }
 

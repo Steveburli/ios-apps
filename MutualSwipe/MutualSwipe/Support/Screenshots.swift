@@ -3,7 +3,8 @@ import MutualKit
 
 /// The cloud build launches the app with `-screenshots <screen>` to photograph
 /// each screen with sample decks: home, swipe, results, card, import, spin,
-/// round, roundresults, startround, starter, starterpreview or starterswipe. Nothing here
+/// round, roundresults, startround, starter, starterpreview, starterswipe,
+/// questions, answer or allanswers. Nothing here
 /// runs in normal use, and it never touches iCloud.
 enum Screenshots {
     static let screen: String? = {
@@ -25,6 +26,29 @@ enum Screenshots {
     static let roundID = "round-sample"
     /// A deck copied from the ready-made Indy date nights, so its cards show photos.
     static let starterDeckID = "deck-indy"
+    /// The trip deck, which has the ready-made Trip questions on the
+    /// "questions", "answer" and "allanswers" screens.
+    static let tripDeckID = "deck-trip"
+
+    /// The Trip questions with fixed IDs, and sample answers to them.
+    static var tripQuestions: [FormQuestion] {
+        FormTemplate.trip.questions.enumerated().map { index, question in
+            var copy = question
+            copy.id = "q\(index)"
+            return copy
+        }
+    }
+
+    /// Alex's own answers (confirmed), and what Alex filled in for Sam.
+    static func tripAnswers(now: Date) -> (alex: [String: String], forSam: [String: String]) {
+        let day = { (offset: Double) in Forms.dayString(now.addingTimeInterval(offset * 86_400)) }
+        let alex = ["q0": day(14), "q1": "Delta 1432, lands 4:10 pm", "q2": day(18), "q3": "Delta 877, 11:05 am",
+                    "q4": "The Alexander downtown", "q5": "yes", "q6": "Thu 9–3 from the hotel, free for lunch",
+                    "q7": "A good mix", "q8": "Food and drinks", "q10": "Rooftop dinner\nCanal kayaks"]
+        let forSam = ["q0": day(15), "q1": "Southwest, gets in around 6", "q4": "The Alexander downtown", "q5": "no",
+                      "q7": "Lots of chill time"]
+        return (alex, forSam)
+    }
     /// Round votes for the "round" and "roundresults" screens.
     static let alexRound: [(String, Vote)] = [("card-curry", .like), ("card-fajitas", .nope), ("card-salmon", .love), ("card-pizza", .never)]
     static let samRound: [(String, Vote)] = [("card-curry", .love), ("card-fajitas", .like), ("card-salmon", .like), ("card-pizza", .like)]

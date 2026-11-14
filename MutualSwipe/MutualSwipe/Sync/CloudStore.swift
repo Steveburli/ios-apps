@@ -20,6 +20,8 @@ final class CloudStore: CKSyncEngineDelegate {
     private(set) var cards: [String: Card] = [:]
     private(set) var players: [String: Player] = [:]
     private(set) var picks: [String: Pick] = [:]
+    /// Everyone's answers to deck questions, by record name.
+    private(set) var answers: [String: FormAnswers] = [:]
     private(set) var accountStatus: CKAccountStatus = .couldNotDetermine
     private(set) var isSyncing = false
     /// A message for the person, shown once as a toast.
@@ -41,6 +43,8 @@ final class CloudStore: CKSyncEngineDelegate {
         var cards: [Card] = []
         var players: [Player] = []
         var picks: [Pick] = []
+        /// Optional so files saved before deck questions still load.
+        var answers: [FormAnswers]?
         var privateState: CKSyncEngine.State.Serialization?
         var sharedState: CKSyncEngine.State.Serialization?
     }
@@ -128,6 +132,17 @@ final class CloudStore: CKSyncEngineDelegate {
         return Vetting(state: state(of: deckID, me: nil), players: players(in: groupID).map { $0.id })
     }
 
+    /// One person's answers to a deck's questions, if they have any.
+    func answers(deck deckID: String, player playerID: String) -> FormAnswers? {
+        answers[FormAnswers.id(deckID: deckID, playerID: playerID)]
+    }
+
+    /// Whether this person still has to fill in or confirm the deck's questions.
+    func needsAnswers(deck deckID: String, player playerID: String?) -> Bool {
+        guard let playerID, let deck = decks[deckID] else { return false }
+        return Forms.needsAnswers(questions: deck.formQuestions, answers: answers(deck: deckID, player: playerID))
+    }
+
     func canWrite(_ groupID: String) -> Bool {
         !(groups[groupID]?.readOnly ?? true)
     }
@@ -205,18 +220,85 @@ final class CloudStore: CKSyncEngineDelegate {
     /// Returns how many were added.
     @discardableResult
     func addCards(_ drafts: [CardDraft], to deckID: String) -> Int {
-        guard let deck = decks[deckID], let group = groups[deck.groupID] else { return 0 }
+        addCardIDs(drafts, to: deckID).count
+    }
+
+    /// Adds cards and returns the new cards' IDs.
+    @discardableResult
+    private func addCardIDs(_ drafts: [CardDraft], to deckID: String) -> [String] {
+        guard let deck = decks[deckID], let group = groups[deck.groupID] else { return [] }
         let base = Date().timeIntervalSince1970 * 1000
-        var added = 0
+        var added: [String] = []
         for (i, draft) in drafts.enumerated() {
             guard let clean = CardText.clean(draft) else { continue }
             let card = Card(groupID: group.id, deckID: deckID, draft: clean, order: base + Double(i), createdAt: Date())
             cards[card.id] = card
             enqueueSave(card.id, in: group)
-            added += 1
+            added.append(card.id)
         }
         scheduleSave()
         return added
+    }
+
+    // MARK: Deck questions
+
+    /// Replaces a deck's questions. Answers to removed questions stay saved
+    /// but aren't shown.
+    func setQuestions(_ questions: [FormQuestion], deck deckID: String) {
+        guard var deck = decks[deckID], let group = groups[deck.groupID] else { return }
+        deck.questions = Array(questions.compactMap { $0.cleaned() }.prefix(30))
+        decks[deckID] = deck
+        enqueueSave(deckID, in: group)
+        scheduleSave()
+    }
+
+    /// What happened when someone saved answers.
+    struct AnswerResult {
+        /// New cards made from the person's ideas.
+        var newCards = 0
+        /// Ideas that were already cards, which got their Love instead.
+        var matched = 0
+    }
+
+    /// Saves a person's answers. When they save their own, that confirms
+    /// them, and their ideas become cards with a Love from them. When someone
+    /// fills in for them, the answers wait for them to look over and confirm.
+    @discardableResult
+    func saveAnswers(_ values: [String: String], deck deckID: String, player playerID: String, by me: String) -> AnswerResult {
+        guard let deck = decks[deckID], let group = groups[deck.groupID] else { return AnswerResult() }
+        let questions = deck.formQuestions
+        let asked = Set(questions.map(\.id))
+        var kept: [String: String] = [:]
+        for (key, value) in values where asked.contains(key) {
+            let trimmed = String(value.trimmingCharacters(in: .whitespacesAndNewlines).prefix(2000))
+            if !trimmed.isEmpty { kept[key] = trimmed }
+        }
+        let id = FormAnswers.id(deckID: deckID, playerID: playerID)
+        var saved = answers[id] ?? FormAnswers(groupID: group.id, deckID: deckID, playerID: playerID, filledBy: me, updatedAt: Date())
+        // Answers to questions taken off the deck stay as they were.
+        for (key, value) in saved.values where !asked.contains(key) { kept[key] = value }
+        saved.values = kept
+        saved.filledBy = me
+        saved.updatedAt = Date()
+        saved.confirmedAt = me == playerID ? Date() : nil
+        var result = AnswerResult()
+        if me == playerID {
+            let plan = Forms.ideaPlan(questions: questions, values: kept, alreadyMade: saved.ideasMade,
+                                      cards: cards.values.filter { $0.deckID == deckID }.inSwipeOrder())
+            saved.ideasMade = plan.made
+            let name = players[playerID]?.name ?? ""
+            let drafts = plan.newCards.map { CardDraft(title: $0, subtitle: Forms.ideaSubtitle(by: name), tags: ["idea"]) }
+            let made = addCardIDs(drafts, to: deckID)
+            for cardID in made + plan.matchingCards {
+                setVote(.love, card: cardID, player: playerID)
+            }
+            result.newCards = made.count
+            result.matched = plan.matchingCards.count
+        }
+        answers[id] = saved
+        enqueueSave(id, in: group)
+        scheduleSave()
+        return result
     }
 
     func deleteCard(_ id: String) {
@@ -611,6 +693,7 @@ final class CloudStore: CKSyncEngineDelegate {
         if let card = cards[name] { return Records.record(card, zoneID: zone) }
         if let player = players[name] { return Records.record(player, zoneID: zone) }
         if let pick = picks[name] { return Records.record(pick, zoneID: zone) }
+        if let answer = answers[name] { return Records.record(answer, zoneID: zone) }
         return nil
     }
 
@@ -635,6 +718,8 @@ final class CloudStore: CKSyncEngineDelegate {
             players[record.recordID.recordName] = Records.player(from: record, groupID: groupID)
         case Records.Kind.pick:
             if let pick = Records.pick(from: record, groupID: groupID) { picks[pick.id] = pick }
+        case Records.Kind.answer:
+            if let answer = Records.answers(from: record, groupID: groupID) { answers[answer.id] = answer }
         default:
             break
         }
@@ -673,6 +758,8 @@ final class CloudStore: CKSyncEngineDelegate {
             players[name] = nil
         case Records.Kind.pick:
             picks[name] = nil
+        case Records.Kind.answer:
+            answers[name] = nil
         default:
             break
         }
@@ -691,6 +778,8 @@ final class CloudStore: CKSyncEngineDelegate {
             players[name]?.systemFields = data
         } else if picks[name] != nil {
             picks[name]?.systemFields = data
+        } else if answers[name] != nil {
+            answers[name]?.systemFields = data
         }
     }
 
@@ -701,6 +790,7 @@ final class CloudStore: CKSyncEngineDelegate {
         cards[name]?.systemFields = nil
         players[name]?.systemFields = nil
         picks[name]?.systemFields = nil
+        answers[name]?.systemFields = nil
     }
 
     private func handleFailedSave(_ record: CKRecord, error: CKError, engine: CKSyncEngine) {
@@ -745,6 +835,7 @@ final class CloudStore: CKSyncEngineDelegate {
         let cardIDs = Set(cards.values.filter { $0.deckID == id }.map(\.id))
         cards = cards.filter { !cardIDs.contains($0.key) }
         picks = picks.filter { $0.value.deckID != id }
+        answers = answers.filter { $0.value.deckID != id }
     }
 
     private func dropGroup(_ id: String) {
@@ -765,6 +856,11 @@ final class CloudStore: CKSyncEngineDelegate {
         for (id, var card) in cards where card.groupID == groupID { card.systemFields = nil; cards[id] = card; names.append(id) }
         for (id, var player) in players where player.groupID == groupID { player.systemFields = nil; players[id] = player; names.append(id) }
         for (id, var pick) in picks where pick.groupID == groupID { pick.systemFields = nil; picks[id] = pick; names.append(id) }
+        for (id, var answer) in answers where answer.groupID == groupID {
+            answer.systemFields = nil
+            answers[id] = answer
+            names.append(id)
+        }
         for name in names { enqueueSave(name, in: group) }
     }
 
@@ -774,6 +870,7 @@ final class CloudStore: CKSyncEngineDelegate {
         cards = [:]
         players = [:]
         picks = [:]
+        answers = [:]
         privateState = nil
         sharedState = nil
         startEngines()
@@ -790,6 +887,7 @@ final class CloudStore: CKSyncEngineDelegate {
         cards = Dictionary(snapshot.cards.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
         players = Dictionary(snapshot.players.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
         picks = Dictionary(snapshot.picks.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
+        answers = Dictionary((snapshot.answers ?? []).map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
         privateState = snapshot.privateState
         sharedState = snapshot.sharedState
     }
@@ -809,6 +907,7 @@ final class CloudStore: CKSyncEngineDelegate {
         guard !Screenshots.isActive else { return }
         let snapshot = Snapshot(groups: Array(groups.values), decks: Array(decks.values), cards: Array(cards.values),
                                 players: Array(players.values), picks: Array(picks.values),
+                                answers: Array(answers.values),
                                 privateState: privateState, sharedState: sharedState)
         if let data = try? JSONEncoder().encode(snapshot) {
             try? data.write(to: fileURL, options: .atomic)
@@ -855,6 +954,19 @@ final class CloudStore: CKSyncEngineDelegate {
                                 order: Double(index), createdAt: now)
                 cards[card.id] = card
             }
+        }
+
+        // The trip deck asks the Trip questions. Alex confirmed theirs and
+        // filled some in for Sam, who hasn't confirmed yet.
+        if var trip = decks[Screenshots.tripDeckID] {
+            trip.questions = Screenshots.tripQuestions
+            decks[trip.id] = trip
+            let sample = Screenshots.tripAnswers(now: now)
+            let alexAnswers = FormAnswers(groupID: group.id, deckID: trip.id, playerID: alex.id, values: sample.alex,
+                                          filledBy: alex.id, confirmedAt: now, updatedAt: now)
+            let samAnswers = FormAnswers(groupID: group.id, deckID: trip.id, playerID: sam.id, values: sample.forSam,
+                                         filledBy: alex.id, updatedAt: now)
+            answers = [alexAnswers.id: alexAnswers, samAnswers.id: samAnswers]
         }
 
         // The dinners deck is vetted and has tonight's round going, with two past winners.
