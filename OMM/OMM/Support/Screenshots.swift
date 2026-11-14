@@ -2,8 +2,8 @@ import Foundation
 import OMMKit
 
 /// The cloud build launches the app with `-screenshots <screen>` to photograph
-/// each screen with sample data: home, workout, howto, weights, cardio, stretch or
-/// complete. Nothing here runs in normal use.
+/// each screen with sample data: home, quicklog, preset, workout, howto, weights,
+/// cardio, stretch, stretchtab, routine or complete. Nothing here runs in normal use.
 enum Screenshots {
     static let screen: String? = {
         let arguments = ProcessInfo.processInfo.arguments
@@ -51,6 +51,26 @@ enum Screenshots {
         state.lifts["Hams|Kettlebell Swings"] = LiftLog(weight: "35", reps: [12, 12, 11], tooHeavy: true)
         state.lifts["Hams|Seated Leg Curl Machine"] = LiftLog(weight: "70", reps: [12, 10, 8])
         return state
+    }
+
+    /// Two saved stretch routines.
+    static func sampleRoutines() -> [StretchRoutine] {
+        [
+            StretchRoutine(name: "Morning Loosen-Up", items: [
+                .init(stretchID: "upward-reach", holdSeconds: 20),
+                .init(stretchID: "side-reach", holdSeconds: 20),
+                .init(stretchID: "forward-fold", holdSeconds: 30),
+                .init(stretchID: "cat-cow", holdSeconds: 45),
+                .init(stretchID: "low-lunge", holdSeconds: 30),
+                .init(stretchID: "childs-pose", holdSeconds: 60),
+            ]),
+            StretchRoutine(name: "Desk Neck and Shoulders", items: [
+                .init(stretchID: "neck-tilt", holdSeconds: 30),
+                .init(stretchID: "cross-arm", holdSeconds: 30),
+                .init(stretchID: "eagle-arms", holdSeconds: 20),
+                .init(stretchID: "doorway-opener", holdSeconds: 45),
+            ]),
+        ]
     }
 
     /// A machine circuit and a short core routine, groups filled in by guess.
