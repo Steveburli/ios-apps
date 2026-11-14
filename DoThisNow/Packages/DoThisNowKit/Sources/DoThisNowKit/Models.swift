@@ -158,6 +158,9 @@ public struct TaskItem: Codable, Identifiable, Equatable, Sendable {
     public var reminderClosed: Bool = false
     /// The Reminders list it came from, for that list's label.
     public var reminderListID: String?
+    /// The reminder's priority (0 to 3) at the last sync, so a change made in a
+    /// shared list shows up as a suggestion.
+    public var reminderPriority: Int?
 
     public init(id: String = newID(), title: String, created: Date) {
         self.id = id
@@ -172,7 +175,8 @@ public struct TaskItem: Codable, Identifiable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case id, title, kind, tier, places, estimate, weekly, minBlock, place, deadline, stakes, binge,
              maxSession, focus, posture, outside, tv, notes, isExample, created, spent, lastDone, done,
-             doneAt, archived, snoozeUntil, remindSeen, nudgeUntil, reminderID, reminderClosed, reminderListID
+             doneAt, archived, snoozeUntil, remindSeen, nudgeUntil, reminderID, reminderClosed, reminderListID,
+             reminderPriority
     }
 
     public init(from decoder: Decoder) throws {
@@ -208,6 +212,7 @@ public struct TaskItem: Codable, Identifiable, Equatable, Sendable {
         reminderID = try c.decodeIfPresent(String.self, forKey: .reminderID)
         reminderClosed = try c.decodeIfPresent(Bool.self, forKey: .reminderClosed) ?? reminderClosed
         reminderListID = try c.decodeIfPresent(String.self, forKey: .reminderListID)
+        reminderPriority = try c.decodeIfPresent(Int.self, forKey: .reminderPriority)
     }
 }
 
@@ -441,13 +446,15 @@ public struct PlannerState: Codable, Equatable, Sendable {
     public var timings: [Timing] = []
     public var running: RunningTimer?
     public var wake = WakeSettings()
+    /// Changes made in a shared Reminders list, waiting for your answer.
+    public var suggestions: [Suggestion] = []
     public var updatedAt = Date(timeIntervalSince1970: 0)
 
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
         case tasks, events, log, days, settings, context, cafeDismissed, active, blocks, inboxItems, inbox,
-             activities, timings, running, wake, updatedAt
+             activities, timings, running, wake, suggestions, updatedAt
     }
 
     public init(from decoder: Decoder) throws {
@@ -467,6 +474,7 @@ public struct PlannerState: Codable, Equatable, Sendable {
         timings = try c.decodeIfPresent([Timing].self, forKey: .timings) ?? []
         running = try c.decodeIfPresent(RunningTimer.self, forKey: .running)
         wake = try c.decodeIfPresent(WakeSettings.self, forKey: .wake) ?? WakeSettings()
+        suggestions = try c.decodeIfPresent([Suggestion].self, forKey: .suggestions) ?? []
         updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date(timeIntervalSince1970: 0)
     }
 

@@ -65,6 +65,12 @@ struct TasksView: View {
                     .plainRow()
                 }
 
+                let suggestions = model.state.pendingSuggestions
+                if !suggestions.isEmpty && !Screenshots.isActive {
+                    SuggestionsCard(suggestions: suggestions)
+                        .plainRow()
+                }
+
                 ForEach(Screenshots.isActive ? [] : Array(engine.nudges().prefix(3))) { nudge in
                     NudgeCard(nudge: nudge)
                         .plainRow()
@@ -320,6 +326,9 @@ private struct TaskRow: View {
             Tag(text: label, tone: .hot)
         } else if task.reminderID != nil {
             Tag(text: "Reminders")
+        }
+        if let change = model.state.priorityChange(for: task.id) {
+            Tag(text: change.changedBy, tone: .warn)
         }
     }
 }
