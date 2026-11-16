@@ -162,8 +162,14 @@ struct InboxRow: View {
             Button("Next gap") { model.scheduleInNextGap(entry.id, on: day) }
                 .tint(Theme.block)
         }
+        .contextMenu {
+            Button { model.sheet = .sendToDay(entry.id) } label: {
+                Label("Send to a day…", systemImage: "calendar")
+            }
+        }
         .accessibilityElement(children: .combine)
         .accessibilityHint("Opens times for it. Or drag it onto the timeline.")
+        .accessibilityAction(named: "Send to a day") { model.sheet = .sendToDay(entry.id) }
         .accessibilityAction(named: "Done") { model.completeEntry(entry.id) }
         .accessibilityAction(named: "Hide from the Inbox") { model.hideFromInbox(entry.id) }
     }

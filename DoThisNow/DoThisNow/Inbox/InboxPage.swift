@@ -126,8 +126,14 @@ private struct PickRow: View {
             Button("Hide") { model.hideFromInbox(entry.id) }
                 .tint(Theme.ink3)
         }
+        .contextMenu {
+            Button { model.sheet = .sendToDay(entry.id) } label: {
+                Label("Send to a day…", systemImage: "calendar")
+            }
+        }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(picked ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAction(named: "Send to a day") { model.sheet = .sendToDay(entry.id) }
         .accessibilityAction(named: "Done") { model.completeEntry(entry.id) }
         .accessibilityAction(named: "Hide from the Inbox") { model.hideFromInbox(entry.id) }
     }

@@ -4,8 +4,10 @@ import DoThisNowKit
 
 /// The whole week, Monday to Sunday, on one screen: a thin column per day
 /// with colored bars and small symbols for the time that's spoken for (work,
-/// events, dinner, sleep, the alarm) and a dot for each task you placed. It's
-/// look-only: tap a day to open it on the Day, swipe sideways for another week.
+/// events, dinner, sleep, the alarm), a dot for each task you placed, and a
+/// count of tasks waiting to be placed. Tap a day to open it on the Day, swipe
+/// sideways for another week, or drop a task on a day (from the task list on
+/// iPad) to send it there with no time. Nothing else moves here.
 struct WeekView: View {
     @Environment(AppModel.self) private var model
     /// Set in full screen, where the week has its own close button.
@@ -13,6 +15,7 @@ struct WeekView: View {
 
     private let gutter: CGFloat = 30
     private let labelHeight: CGFloat = 40
+    @State private var dropDay: CalendarDay?
 
     var body: some View {
         let days = model.week(of: model.dayShown)
@@ -139,7 +142,7 @@ struct WeekView: View {
 
         return Button { withAnimation(.snappy(duration: 0.3)) { model.openDayFromWeek(day) } } label: {
             VStack(spacing: 0) {
-                dayLabel(day, isToday: isToday)
+                dayLabel(day, isToday: isToday, waiting: column.queued)
                     .frame(height: labelHeight)
                 ZStack(alignment: .top) {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -179,7 +182,9 @@ struct WeekView: View {
                 .frame(width: inner, height: plotHeight, alignment: .top)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay {
-                    if selected {
+                    if dropDay == day {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.block, lineWidth: 3)
+                    } else if selected {
                         RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.ink3, lineWidth: 1.5)
                     }
                 }
@@ -190,13 +195,20 @@ struct WeekView: View {
         .buttonStyle(.plain)
         .disabled(!open)
         .opacity(open ? 1 : 0.4)
+        .dropDestination(for: String.self) { keys, _ in
+            guard open, let key = keys.first else { return false }
+            model.sendToDay(key, day)
+            return true
+        } isTargeted: { targeted in
+            if targeted { dropDay = day } else if dropDay == day { dropDay = nil }
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(summary(column))
         .accessibilityHint(Text(open ? "Opens this day" : ""))
         .accessibilityAddTraits(open ? .isButton : [])
     }
 
-    private func dayLabel(_ day: CalendarDay, isToday: Bool) -> some View {
+    private func dayLabel(_ day: CalendarDay, isToday: Bool, waiting: Int) -> some View {
         let calendar = model.calendar
         let symbols = calendar.veryShortWeekdaySymbols
         let index = day.weekdayIndex(calendar: calendar)
@@ -209,6 +221,17 @@ struct WeekView: View {
                 .foregroundStyle(isToday ? Theme.accentInk : Theme.ink)
                 .frame(width: 24, height: 24)
                 .background { if isToday { Circle().fill(Theme.accent) } }
+                .overlay(alignment: .topTrailing) {
+                    if waiting > 0 {
+                        Text("\(waiting)")
+                            .font(.system(size: 9, weight: .heavy).monospacedDigit())
+                            .foregroundStyle(Theme.blockInk)
+                            .padding(.horizontal, 4)
+                            .frame(minWidth: 15, minHeight: 15)
+                            .background(Theme.block, in: Capsule())
+                            .offset(x: 9, y: -5)
+                    }
+                }
         }
     }
 
@@ -315,6 +338,8 @@ struct WeekView: View {
         let pushed: Bool
         let eventCount: Int
         let workHours: Double
+        /// Tasks waiting in this day’s "To place" queue.
+        let queued: Int
     }
 
     private func column(for day: CalendarDay, engine: Engine) -> DayColumn {
@@ -343,7 +368,8 @@ struct WeekView: View {
         return DayColumn(day: day, wake: plan.wake, bars: bars, dots: dots, alarm: alarm,
                          now: plan.isToday ? plan.now : nil, pushed: plan.push > 0,
                          eventCount: plan.live.count,
-                         workHours: plan.rocks.reduce(0) { $0 + $1.end - $1.start } / 60)
+                         workHours: plan.rocks.reduce(0) { $0 + $1.end - $1.start } / 60,
+                         queued: engine.queued(on: day).count)
     }
 
     /// One time range for the whole week, so the columns line up: from an
@@ -370,6 +396,7 @@ struct WeekView: View {
         if column.eventCount > 0 { parts.append("\(column.eventCount) event\(column.eventCount == 1 ? "" : "s")") }
         if !column.dots.isEmpty { parts.append("\(column.dots.count) task\(column.dots.count == 1 ? "" : "s") placed") }
         if let alarm = column.alarm { parts.append("alarm at \(f.time(day, alarm))") }
+        if column.queued > 0 { parts.append("\(column.queued) waiting to be placed") }
         if column.pushed { parts.append("bedtime pushed") }
         if !model.canShow(day) { parts.append(day < model.today ? "past" : "too far ahead") }
         return parts.joined(separator: ", ")

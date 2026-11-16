@@ -27,13 +27,16 @@ struct DayFullScreen: View {
     private func timeline(plan: DayPlan, engine: Engine) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
-                DayTimeline(plan: plan, engine: engine)
-                    .padding(.horizontal, 8)
-                    .padding(.top, 4)
-                    .padding(.bottom, 24)
-                    .id(plan.day)
-                    .transition(.asymmetric(insertion: .move(edge: model.daySlideEdge).combined(with: .opacity),
-                                            removal: .opacity))
+                VStack(spacing: 8) {
+                    DayQueueRow(day: plan.day)
+                    DayTimeline(plan: plan, engine: engine)
+                }
+                .padding(.horizontal, 8)
+                .padding(.top, 4)
+                .padding(.bottom, 24)
+                .id(plan.day)
+                .transition(.asymmetric(insertion: .move(edge: model.daySlideEdge).combined(with: .opacity),
+                                        removal: .opacity))
             }
             .daySwipes()
             .onAppear {

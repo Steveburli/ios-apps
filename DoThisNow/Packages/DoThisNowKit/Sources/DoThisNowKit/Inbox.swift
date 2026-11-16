@@ -229,11 +229,12 @@ extension Engine {
 
     /// What the Inbox shows: tasks from every source that's on, through that
     /// source's filters, minus what you swiped away and what's already on a
-    /// day. Soonest due first, then highest priority.
+    /// day (as a block, or waiting in a day's queue). Soonest due first, then
+    /// highest priority.
     public func inbox(external: [SourceTask]) -> [InboxEntry] {
         let settings = state.inbox
         let hidden = Set(settings.hidden)
-        let planned = state.plannedKeys(from: today)
+        let planned = state.plannedKeys(from: today).union(state.queuedKeys(from: today))
         let all = appSourceTasks() + inboxSourceTasks() + external
         let kept = all.filter { task in
             let filter = settings[task.ref.source]

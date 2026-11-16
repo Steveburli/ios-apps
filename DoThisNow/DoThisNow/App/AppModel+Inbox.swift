@@ -10,8 +10,9 @@ extension AppModel {
         engine.inbox(external: [])
     }
 
+    /// An Inbox task, or one waiting in a day's "To place" queue.
     func inboxEntry(_ key: String) -> InboxEntry? {
-        inboxEntries.first { $0.id == key }
+        inboxEntries.first { $0.id == key } ?? queuedEntry(key)
     }
 
     /// The Now tab offers to connect Reminders until you answer.
@@ -143,6 +144,7 @@ extension AppModel {
 
     func hideFromInbox(_ key: String) {
         if !state.inbox.hidden.contains(key) { state.inbox.hidden.append(key) }
+        state.removeFromQueues(key)
         sheet = nil
         commit()
         show("Hidden from the Inbox. Inbox settings can bring it back.")
@@ -160,6 +162,7 @@ extension AppModel {
         guard let entry = inboxEntry(key) else { return }
         let block = TimeBlock(ref: entry.task.ref, title: entry.task.title, day: day, start: max(0, minute),
                               minutes: minutes ?? entry.estimate.minutes)
+        state.removeFromQueues(key)
         state.blocks.append(block)
         state.blocks = reflowed(state.blocks, moving: block.id, to: block.start, day: day)
         draggingKey = nil
@@ -184,6 +187,7 @@ extension AppModel {
         for key in keys {
             guard let entry = inboxEntry(key),
                   let start = openSlots(on: day, minutes: entry.estimate.minutes, limit: 1).first else { continue }
+            state.removeFromQueues(key)
             state.blocks.append(TimeBlock(ref: entry.task.ref, title: entry.task.title, day: day, start: start,
                                           minutes: entry.estimate.minutes))
             placed += 1

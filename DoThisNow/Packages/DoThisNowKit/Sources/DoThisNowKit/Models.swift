@@ -362,10 +362,12 @@ public struct DayConfig: Codable, Equatable, Sendable {
     public var must: [String] = []
     public var dinner: DinnerMode?
     public var noWork = false
+    /// Tasks sent to this day without a time yet: its "To place" queue, in order.
+    public var queue: [SourceRef] = []
 
     public init() {}
 
-    private enum CodingKeys: String, CodingKey { case skip, must, dinner, noWork }
+    private enum CodingKeys: String, CodingKey { case skip, must, dinner, noWork, queue }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -373,6 +375,7 @@ public struct DayConfig: Codable, Equatable, Sendable {
         must = try c.decodeIfPresent([String].self, forKey: .must) ?? []
         dinner = try c.decodeIfPresent(DinnerMode.self, forKey: .dinner)
         noWork = try c.decodeIfPresent(Bool.self, forKey: .noWork) ?? false
+        queue = try c.decodeIfPresent([SourceRef].self, forKey: .queue) ?? []
     }
 }
 

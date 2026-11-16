@@ -80,6 +80,7 @@ struct DayView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     header(day: day, offset: offset)
                     if offset == 0 { replanCard }
+                    DayQueueRow(day: day)
                     stats(plan)
                     fixes(plan)
                     legend

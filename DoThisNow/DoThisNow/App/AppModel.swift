@@ -36,6 +36,8 @@ final class AppModel {
         case alarm
         /// Catching up on what you missed earlier today.
         case replan
+        /// Picking a day, with no time, for a task (by source key).
+        case sendToDay(String)
 
         var id: String {
             switch self {
@@ -57,6 +59,7 @@ final class AppModel {
             case .sleep: return "sleep"
             case .alarm: return "alarm"
             case .replan: return "replan"
+            case .sendToDay(let key): return "send-to-day-" + key
             }
         }
     }
@@ -213,6 +216,10 @@ final class AppModel {
             tab = .day
             openDayTab()
             weekShown = true
+            // One task waiting on tomorrow, so the count shows.
+            if let entry = inboxEntries.first {
+                state.sendToDay(entry.task.ref, today.adding(days: 1, calendar: calendar), today: today)
+            }
         case "inbox":
             tab = .day
             openDayTab()

@@ -220,6 +220,8 @@ private struct SheetContent: View {
             AlarmSettingsView()
         case .replan:
             ReplanSheet()
+        case .sendToDay(let key):
+            SendToDaySheet(key: key)
         }
     }
 }

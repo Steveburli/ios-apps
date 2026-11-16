@@ -53,6 +53,38 @@ extension AppModel {
         return sunday >= today && monday <= lastDayAhead
     }
 
+    // MARK: The "To place" queue
+
+    /// The tasks waiting on `day` for a time.
+    func queued(on day: CalendarDay) -> [InboxEntry] {
+        engine.queued(on: day)
+    }
+
+    /// A task waiting in some day's queue, by source key.
+    func queuedEntry(_ key: String) -> InboxEntry? {
+        guard let day = state.queuedDay(for: key) else { return nil }
+        return engine.queued(on: day).first { $0.id == key }
+    }
+
+    /// Sends a task to a day with no time yet. It waits at the top of that day.
+    func sendToDay(_ key: String, _ day: CalendarDay) {
+        guard canShow(day), let entry = inboxEntry(key) else { return }
+        state.sendToDay(entry.task.ref, day, today: today)
+        draggingKey = nil
+        sheet = nil
+        commit()
+        let name = day == today ? "today" : day == today.adding(days: 1, calendar: calendar) ? "tomorrow" : formats.weekdayName(day)
+        show("“\(entry.task.title)” is waiting on \(name)")
+    }
+
+    /// Out of the day's queue and back to the Inbox.
+    func unqueue(_ key: String) {
+        let title = queuedEntry(key)?.task.title ?? ""
+        state.removeFromQueues(key)
+        commit()
+        show("“\(title)” is back in the Inbox")
+    }
+
     /// Moves the week view a week back or ahead. The day shown becomes that
     /// week's first day the Day tab can show.
     func showWeek(offset: Int) {
