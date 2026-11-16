@@ -13,6 +13,8 @@ struct CardsTab: View {
     @State private var details = ""
     @State private var link = ""
     @State private var tags = ""
+    @State private var hasTime = false
+    @State private var startsAt = CalendarPlan.placeholderStart(after: Date())
     @State private var deckTitle = ""
     @State private var deckBlurb = ""
     @State private var loaded = false
@@ -45,6 +47,7 @@ struct CardsTab: View {
                 } else {
                     addMany
                     addCard
+                    questions
                 }
                 cardList
                 retiredList
@@ -99,13 +102,23 @@ struct CardsTab: View {
                 Field(label: "Link", text: $link, placeholder: "https://", keyboard: .URL)
                 Field(label: "Tags", text: $tags, placeholder: "cozy, quick")
             }
+            Toggle("Happens at a set time", isOn: $hasTime)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.ink)
+                .tint(Theme.accent)
+            if hasTime {
+                DatePicker("When", selection: $startsAt)
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.ink)
+            }
             Button("Add card") {
-                guard let draft = CardText.clean(title: title, subtitle: subtitle, details: details, link: link, tags: tags) else {
+                guard var draft = CardText.clean(title: title, subtitle: subtitle, details: details, link: link, tags: tags) else {
                     titleFocused = true
                     return
                 }
+                draft.startsAt = hasTime ? startsAt : nil
                 if store.addCards([draft], to: deck.id) > 0 {
-                    title = ""; subtitle = ""; details = ""; link = ""; tags = ""
+                    title = ""; subtitle = ""; details = ""; link = ""; tags = ""; hasTime = false
                     session.show("Card added")
                     titleFocused = true
                 }
@@ -141,7 +154,7 @@ struct CardsTab: View {
             }
             ForEach(state.cards) { card in
                 HStack(spacing: 10) {
-                    CardThumb(title: card.title, colorID: card.id, photo: StarterPhoto.image(for: card))
+                    CardThumb(title: card.title, colorID: card.id, photo: store.coverImage(for: card))
                     Button {
                         session.sheet = .card(card.id)
                     } label: {
@@ -201,6 +214,31 @@ struct CardsTab: View {
                             .controlSize(.small)
                         }
                     }
+                }
+            }
+        }
+    }
+
+    /// Questions people answer before they swipe.
+    private var questions: some View {
+        Panel {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Questions before swiping").font(Theme.display(18, weight: .bold))
+                if !deck.formQuestions.isEmpty {
+                    Text("\(deck.formQuestions.count)").font(.subheadline.weight(.bold).monospacedDigit()).foregroundStyle(Theme.muted)
+                }
+            }
+            Text(deck.formQuestions.isEmpty
+                 ? "Ask everyone a few things first, like flight times, budget or the vibe they want. Start from a ready-made Trip, Dinner out or Night out set. Their ideas become cards."
+                 : "Everyone answers these before they swipe, and everyone sees the answers.")
+                .font(.footnote)
+                .foregroundStyle(Theme.muted)
+            FlowLayout {
+                Button(deck.formQuestions.isEmpty ? "Add questions" : "Edit questions") { session.sheet = .questions(deck.id) }
+                    .buttonStyle(.mutual(deck.formQuestions.isEmpty ? .primary : .quiet))
+                if !deck.formQuestions.isEmpty {
+                    Button("See answers") { session.sheet = .allAnswers(deck.id) }
+                        .buttonStyle(.mutual(.quiet))
                 }
             }
         }

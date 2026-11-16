@@ -51,6 +51,7 @@ struct ResultsTab: View {
                 decisionBanner(me: me)
                 nextInChain
                 decided
+                calendarBar
                 spinBar
 
                 ForEach(Verdict.shown, id: \.self) { verdict in
@@ -205,6 +206,35 @@ struct ResultsTab: View {
         }
     }
 
+    /// Every Super match and Match onto one calendar, in one tap.
+    @ViewBuilder
+    private var calendarBar: some View {
+        let matches = CalendarPlan.matches(in: state)
+        if !matches.isEmpty {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(matches.count == 1 ? "1 match to plan" : "\(matches.count) matches to plan")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(Theme.ink)
+                    Text("Put them all on a shared calendar at once.")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                }
+                Spacer(minLength: 6)
+                Button {
+                    session.sheet = .calendar(deck.id)
+                } label: {
+                    Label("Add", systemImage: "calendar.badge.plus")
+                }
+                .buttonStyle(.mutual())
+                .accessibilityLabel("Add matches to calendar")
+            }
+            .padding(14)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.line))
+        }
+    }
+
     /// Spin for it, when there's more than one match.
     @ViewBuilder
     private var spinBar: some View {
@@ -329,7 +359,7 @@ private struct ResultRow: View {
             session.sheet = .card(card.id)
         } label: {
             HStack(spacing: 12) {
-                CardThumb(title: card.title, colorID: card.id, photo: StarterPhoto.image(for: card), size: 40)
+                CardThumb(title: card.title, colorID: card.id, photo: store.coverImage(for: card), size: 40)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(card.title).font(.body.weight(.semibold)).lineLimit(1).foregroundStyle(Theme.ink)
                     if !card.subtitle.isEmpty {

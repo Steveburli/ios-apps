@@ -99,6 +99,7 @@ struct DayFullScreen: View {
                 .disabled(offset >= AppModel.daysAhead)
                 .accessibilityLabel("Next day")
                 Spacer(minLength: 4)
+                LegendButton(size: 36)
                 WeekButton()
                 Button("+ Event") { model.sheet = .newEvent(plan.day) }
                     .buttonStyle(.dtn(size: .small))

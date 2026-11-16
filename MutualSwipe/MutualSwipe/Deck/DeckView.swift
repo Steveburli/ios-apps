@@ -1,7 +1,7 @@
 import SwiftUI
 import MutualKit
 
-/// One deck: Swipe, Results and Cards. While a round is running, Swipe and
+/// One deck: Swipe, Results, Overlap and Cards. While a round is running, Swipe and
 /// Results show the round; the bar on top switches back to vetting.
 struct DeckView: View {
     @Environment(CloudStore.self) private var store
@@ -18,12 +18,19 @@ struct DeckView: View {
                 Picker("Deck view", selection: $tab) {
                     Text("Swipe").tag(Session.DeckTab.swipe)
                     Text(state.matchCount > 0 ? "Results (\(state.matchCount))" : "Results").tag(Session.DeckTab.results)
+                    Text("Overlap").tag(Session.DeckTab.overlap)
                     Text(vetting.cards.isEmpty ? "Cards" : "Cards (\(vetting.cards.count))").tag(Session.DeckTab.cards)
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal, 16)
                 .padding(.top, 4)
                 .padding(.bottom, 10)
+
+                if !deck.formQuestions.isEmpty && tab != .cards {
+                    QuestionsBar(deck: deck, me: me)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 10)
+                }
 
                 if !vetting.cards.isEmpty && tab != .cards {
                     RoundBar(deck: deck, me: me)
@@ -36,6 +43,8 @@ struct DeckView: View {
                     SwipeTab(deck: deck, state: state, showTab: { tab = $0 })
                 case .results:
                     ResultsTab(deck: deck, state: state, showTab: { tab = $0 })
+                case .overlap:
+                    OverlapTab(deck: deck, state: state)
                 case .cards:
                     CardsTab(deck: deck, state: vetting)
                 }
@@ -54,11 +63,29 @@ struct DeckView: View {
                     session.pickerShown = true
                     session.sheet = .player(deck.groupID)
                 }
+                openQuestionsIfNeeded()
             }
+            // After picking a name, or when the questions arrive from iCloud.
+            .onChange(of: session.sheet?.id) { _, _ in openQuestionsIfNeeded() }
+            .onChange(of: deck.formQuestions.count) { _, _ in openQuestionsIfNeeded() }
         } else {
             ContentUnavailableView("This deck was deleted", systemImage: "rectangle.stack.badge.minus",
                                    description: Text("Someone in the group deleted it."))
         }
+    }
+
+    /// A deck with questions shows them first: once per launch, before
+    /// swiping, until this person has confirmed their answers.
+    private func openQuestionsIfNeeded() {
+        guard session.sheet == nil, session.path.last == deckID, let deck = store.decks[deckID],
+              store.canWrite(deck.groupID),
+              let me = session.me(in: deck.groupID, store: store),
+              store.needsAnswers(deck: deckID, player: me) else { return }
+        let key = deckID + "~" + me
+        guard !session.formShown.contains(key) else { return }
+        session.formShown.insert(key)
+        tab = .swipe
+        session.sheet = .answer(deckID, me)
     }
 }
 

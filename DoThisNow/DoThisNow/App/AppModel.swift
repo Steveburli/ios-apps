@@ -7,6 +7,10 @@ import DoThisNowKit
 @Observable
 @MainActor
 final class AppModel {
+    /// One model for the whole app, so widget and Lock Screen buttons can
+    /// reach it even when iOS runs them with no window open.
+    static let shared = AppModel()
+
     enum Tab: String { case now, tasks, day, track, wake }
     enum NowStep { case ask, pick }
     enum PickPanel { case done, later }
@@ -38,6 +42,8 @@ final class AppModel {
         case replan
         /// Picking a day, with no time, for a task (by source key).
         case sendToDay(String)
+        /// Places and the rules that start and stop Track timers by them.
+        case places
 
         var id: String {
             switch self {
@@ -60,6 +66,7 @@ final class AppModel {
             case .alarm: return "alarm"
             case .replan: return "replan"
             case .sendToDay(let key): return "send-to-day-" + key
+            case .places: return "places"
             }
         }
     }
@@ -85,6 +92,8 @@ final class AppModel {
         let movable: [TimeBlock]
         let start: Int
         let obstacles: [TimeSpan]
+        /// Locked meetings: the dragged block can't land on them.
+        let locked: [TimeSpan]
         let earliest: Int
         var target: Int
         let push: Double
@@ -129,6 +138,10 @@ final class AppModel {
 
     /// Your lists in Reminders, for the task source filters.
     var reminderLists: [SourceList] = []
+    /// Your calendars, for picking which ones bring in locked meetings.
+    var meetingCalendars: [SourceList] = []
+    /// Why meetings couldn't be read, for Settings.
+    var meetingsProblem: String?
     /// Counts changes sent to Reminders, so a read that overlapped one starts over.
     @ObservationIgnored var reminderWrites = 0
     /// Why a source couldn't be read, for the Inbox settings.
@@ -146,6 +159,8 @@ final class AppModel {
     /// The Inbox task being dragged onto the timeline.
     var draggingKey: String?
     var draggingBlockID: String?
+    /// The suggestion being dragged on the timeline (`chunk id#part`), drawn on top.
+    var draggingSuggestion: String?
     @ObservationIgnored var blockDrag: BlockDrag?
     /// On iPad, a block dragged over the left column goes back to the Inbox when let go.
     var blockOverSideList = false
@@ -190,10 +205,12 @@ final class AppModel {
             state = PlannerState()
         }
         takeDroppedTasks()
+        takeTimerCommands()
+        syncTimers()
     }
 
     /// Goes to the screen named by `-screenshots`: now, pick, doing, tasks, day,
-    /// dayfull, week, inbox, inboxpage, replan, trip, tripcatchup, track or wake.
+    /// dayfull, week, inbox, inboxpage, replan, trip, tripcatchup, track, places or wake.
     private func openScreenshotScreen() {
         switch Screenshots.screen {
         case "pick":
@@ -243,6 +260,12 @@ final class AppModel {
             tab = .track
             state.running = RunningTimer(activityID: state.activities.first?.id, title: state.activities.first?.name ?? "Shower",
                                          startedAt: now.addingTimeInterval(-7 * 60 - 12))
+            state.breaks.day = today
+            state.breaks.seconds = 18 * 60
+        case "places":
+            tab = .track
+            loadPlaceExample()
+            sheet = .places
         case "wake":
             tab = .wake
             state.wake.alarm.on = true
@@ -255,6 +278,20 @@ final class AppModel {
     var calendar: Calendar { formats.calendar }
 
     var today: CalendarDay { CalendarDay(now, calendar: calendar) }
+
+    /// How hot a task is, or nil when Task heat colors is off.
+    func heat(_ task: TaskItem) -> TaskHeat? {
+        guard state.settings.taskHeat else { return nil }
+        return task.heat(today: today, calendar: calendar)
+    }
+
+    /// Heat for an Inbox row or a block: its app task's heat when it has
+    /// one (so snoozes count), else the source's own due date and priority.
+    func heat(for ref: SourceRef, source: SourceTask? = nil) -> TaskHeat? {
+        guard state.settings.taskHeat else { return nil }
+        if let task = state.task(for: ref) { return task.heat(today: today, calendar: calendar) }
+        return source?.heat(today: today, calendar: calendar)
+    }
 
     var engine: Engine {
         Engine(state: state, now: now, formats: formats, preferredEventID: lastMovedEventID)
@@ -282,6 +319,7 @@ final class AppModel {
         }
         Notifier.sync(state, now: Date())
         syncAlarms()
+        syncTimers()
     }
 
     func show(_ message: String) {
@@ -306,7 +344,9 @@ final class AppModel {
             if state.settings.sound { Sounds.chime() }
             commit()
         }
+        checkBreak(date)
         checkAlarm()
+        takeTimerCommands()
     }
 
     func refreshNow() {
@@ -424,6 +464,7 @@ final class AppModel {
     }
 
     func endSession(finished: Bool) {
+        earnBreakForSession(at: Date())
         let message = state.endSession(finished: finished, at: Date())
         nowStep = .ask
         commit()
@@ -507,7 +548,11 @@ final class AppModel {
         if isNew {
             state.tasks.append(task)
         } else {
-            state.updateTask(task.id) { $0 = task }
+            let before = state.task(task.id)?.deadline
+            state.updateTask(task.id) { saved in
+                saved = task
+                saved.coolIfDeadlineMovedLater(from: before)
+            }
         }
         if let reminderID = task.reminderID {
             reminderWrites += 1

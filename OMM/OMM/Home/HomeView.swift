@@ -4,7 +4,6 @@ import OMMKit
 struct HomeView: View {
     @Environment(AppModel.self) private var model
     @State private var confirmingReset = false
-    @State private var pickingStretches = false
 
     var body: some View {
         @Bindable var model = model
@@ -12,6 +11,7 @@ struct HomeView: View {
             VStack(spacing: 14) {
                 header
                 StatsCard(program: model.program)
+                SunlightCard()
                 QuickLogCard()
                 Card(padding: 6) {
                     MuscleGrid()
@@ -30,11 +30,6 @@ struct HomeView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This clears all progress, saved weights and reps, the start date, and daily set history.")
-        }
-        .sheet(isPresented: $pickingStretches) {
-            StretchPickerView()
-                .environment(model)
-                .presentationDetents([.large])
         }
         .sheet(item: $model.presetSheet) { sheet in
             PresetEditorView(sheet: sheet)
@@ -91,9 +86,6 @@ struct HomeView: View {
                 Button("Start Workout") { model.startWorkout() }
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(!model.canStart)
-                Button("Just Stretch") { pickingStretches = true }
-                    .buttonStyle(SecondaryButtonStyle())
-                    .padding(.top, 10)
                 Button("Reset Program") { confirmingReset = true }
                     .buttonStyle(SecondaryButtonStyle())
                     .padding(.top, 10)

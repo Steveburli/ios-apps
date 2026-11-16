@@ -1,7 +1,25 @@
 import SwiftUI
 import EventKit
 import EventKitUI
+import UniformTypeIdentifiers
 import MutualKit
+
+/// A card as a calendar invite (.ics) to send to family, who tap it to add
+/// the event to their own calendar, Google included.
+struct EventInvite: Transferable {
+    let card: Card
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(exportedContentType: .calendarEvent) { invite in
+            let folder = FileManager.default.temporaryDirectory.appendingPathComponent(invite.card.id, isDirectory: true)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let url = folder.appendingPathComponent(CalendarPlan.fileName(for: invite.card))
+            let text = CalendarPlan.ics(for: invite.card, start: CalendarPlan.start(for: invite.card))
+            try text.write(to: url, atomically: true, encoding: .utf8)
+            return SentTransferredFile(url)
+        }
+    }
+}
 
 /// The iPhone's own New Event screen, filled in from a card. The person picks
 /// the date and calendar and saves it themselves, so Mutual never needs
@@ -14,16 +32,14 @@ struct EventEditor: UIViewControllerRepresentable {
         let eventStore = EKEventStore()
         let event = EKEvent(eventStore: eventStore)
         event.title = card.title
-        event.notes = [card.subtitle, card.details].filter { !$0.isEmpty }.joined(separator: "\n\n")
+        event.notes = CalendarPlan.notes(for: card)
         if !card.link.isEmpty, let url = URL(string: card.link) {
             event.url = url
         }
-        // Next Friday at 7 PM, two hours. They'll change it.
-        let calendar = Calendar.current
-        let friday = calendar.nextDate(after: Date(), matching: DateComponents(hour: 19, minute: 0, weekday: 6),
-                                       matchingPolicy: .nextTime) ?? Date().addingTimeInterval(86_400)
-        event.startDate = friday
-        event.endDate = friday.addingTimeInterval(2 * 3600)
+        // The card's own time, or next Friday at 7 PM for them to change. Two hours.
+        let start = CalendarPlan.start(for: card)
+        event.startDate = start
+        event.endDate = start.addingTimeInterval(CalendarPlan.length)
 
         let controller = EKEventEditViewController()
         controller.eventStore = eventStore

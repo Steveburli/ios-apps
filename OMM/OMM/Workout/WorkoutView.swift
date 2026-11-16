@@ -95,6 +95,7 @@ struct ExerciseSection: View {
     let tint: Color
     var group: MuscleGroup?
     let exercises: [String]
+    @State private var howTo: HowToItem?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -117,6 +118,16 @@ struct ExerciseSection: View {
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .shadow(color: Theme.shadow.opacity(0.18), radius: 12, y: 8)
+        .sheet(item: $howTo) { item in
+            HowToSheet(move: item.move)
+        }
+        .onAppear {
+            // `-screenshots howto` opens the first drawing in the list.
+            if Screenshots.screen == "howto", howTo == nil, let group, let first = exercises.first,
+               group.noEquipment.first == first, let move = HowTo.move(groupKey: group.key, exercise: first) {
+                howTo = HowToItem(move: move)
+            }
+        }
     }
 
     private func row(number: Int, exercise: String) -> some View {
@@ -148,6 +159,22 @@ struct ExerciseSection: View {
                     }
                 }
                 .accessibilityElement(children: .combine)
+                if let group, let move = HowTo.move(groupKey: group.key, exercise: exercise) {
+                    Button {
+                        howTo = HowToItem(move: move)
+                    } label: {
+                        Label("How to", systemImage: "play.circle.fill")
+                            .font(.footnote.weight(.bold))
+                            .foregroundStyle(tint)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(tint.opacity(0.12), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 6)
+                    .accessibilityLabel("How to do \(text.title)")
+                    .accessibilityHint("Shows a looping drawing of the move and form tips")
+                }
                 if let group, let lift, let advice = WeightAdvice(log: lift) {
                     AdviceChip(advice: advice, key: ProgramState.weightKey(group: group, exercise: exercise))
                         .padding(.top, 6)

@@ -27,6 +27,29 @@ final class AppModel {
         }
     }
 
+    /// The stretch routine editor sheet: a new routine (maybe filled in from
+    /// "For you today"), or a saved one to change.
+    enum RoutineSheet: Identifiable {
+        case new(StretchRoutine)
+        case edit(StretchRoutine)
+
+        var id: String {
+            switch self {
+            case .new: return "new"
+            case .edit(let routine): return routine.id.uuidString
+            }
+        }
+    }
+
+    /// The Stretch tab's automatic routine and why it picked what it did.
+    struct TodayStretch {
+        /// Trained today or yesterday.
+        let sore: [MuscleGroup]
+        /// Likely next in the program; included when the switch is on or nothing is sore.
+        let upcoming: [MuscleGroup]
+        let steps: [StretchStep]
+    }
+
     /// The bar on the home screen after a one-tap log, with Undo.
     struct QuickLogNote: Equatable {
         let presetName: String
@@ -42,6 +65,10 @@ final class AppModel {
     private(set) var presets: [Preset]
     var presetSheet: PresetSheet?
     private(set) var quickLog: QuickLogNote?
+    /// Saved stretch routines, apart from the program so Reset Program keeps them.
+    private(set) var stretchRoutines: [StretchRoutine]
+    var routineSheet: RoutineSheet?
+    var tab: AppTab = .workout
     private(set) var selection = GroupSelection()
     private(set) var screen: Screen = .home
     private(set) var session: WorkoutSession?
@@ -61,6 +88,14 @@ final class AppModel {
     var stretchAfter: Bool {
         didSet { defaults.set(stretchAfter, forKey: Keys.stretchAfter) }
     }
+    /// Length of the Stretch tab's automatic routine, in minutes.
+    var stretchMinutes: Int {
+        didSet { defaults.set(stretchMinutes, forKey: Keys.stretchMinutes) }
+    }
+    /// Adds the groups coming up next to the automatic routine.
+    var stretchUpcoming: Bool {
+        didSet { defaults.set(stretchUpcoming, forKey: Keys.stretchUpcoming) }
+    }
 
     @ObservationIgnored private let defaults: UserDefaults
 
@@ -71,6 +106,9 @@ final class AppModel {
         static let cardioMinutes = "cardioMinutes"
         static let stretchAfter = "stretchAfter"
         static let presets = "presets.v1"
+        static let stretchRoutines = "stretchRoutines.v1"
+        static let stretchMinutes = "stretchMinutes"
+        static let stretchUpcoming = "stretchUpcoming"
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -85,6 +123,9 @@ final class AppModel {
             cardioOn = false
             cardioMinutes = Cardio.defaultMinutes
             stretchAfter = true
+            stretchRoutines = Screenshots.sampleRoutines()
+            stretchMinutes = StretchPlanner.defaultMinutes
+            stretchUpcoming = false
             openScreenshotScreen()
             return
         }
@@ -108,6 +149,16 @@ final class AppModel {
         cardioMinutes = Cardio.minutesRange.contains(storedCardio) ? storedCardio : Cardio.defaultMinutes
         // Stretching is on until it's turned off.
         stretchAfter = defaults.object(forKey: Keys.stretchAfter) as? Bool ?? true
+        if let data = defaults.data(forKey: Keys.stretchRoutines),
+           let saved = try? JSONDecoder().decode([StretchRoutine].self, from: data) {
+            stretchRoutines = saved
+        } else {
+            stretchRoutines = []
+        }
+        let storedLength = defaults.integer(forKey: Keys.stretchMinutes)
+        stretchMinutes = StretchPlanner.lengthChoices.contains(storedLength) ? storedLength : StretchPlanner.defaultMinutes
+        stretchUpcoming = defaults.bool(forKey: Keys.stretchUpcoming)
+        selection.fillSuggested(from: program)
     }
 
     /// Picks three groups and goes to the screen named by `-screenshots`.
@@ -120,6 +171,13 @@ final class AppModel {
             startWorkout()
             session?.advance(startingRest: true)
             session?.adjustRest(by: WorkoutSession.restStep)
+        case "howto":
+            // Mid chest has the how-to drawings; the workout row opens the first one.
+            // The sample program has Mid crossed out, so reopen it and train only Mid.
+            program.progress["Mid"] = 0
+            selection.clear()
+            if let mid = Catalog.group("Mid") { toggle(mid) }
+            startWorkout()
         case "weights":
             startWorkout()
             session?.toggleWeight("100", forKey: "Hams|Romanian Deadlift (Barbell/Dumbbell)")
@@ -138,6 +196,13 @@ final class AppModel {
         case "stretch":
             startStretch(areas: ["Shoulders", "Thighs", "Core"], afterWorkout: true)
             stretch?.startHold()
+        case "stretchtab":
+            selection.clear()
+            tab = .stretch
+        case "routine":
+            selection.clear()
+            tab = .stretch
+            if let routine = stretchRoutines.first { routineSheet = .edit(routine) }
         case "quicklog":
             if let preset = presets.first { logPreset(preset) }
         case "preset":
@@ -181,6 +246,7 @@ final class AppModel {
     func resetProgram() {
         program = ProgramState()
         selection.clear()
+        selection.fillSuggested(from: program)
         quickLog = nil
         save()
     }
@@ -211,6 +277,7 @@ final class AppModel {
         quickLog = QuickLogNote(presetName: preset.name, sets: preset.totalSets,
                                 finished: finished.map { "\($0.area) · \($0.name)" }, previous: before)
         selection.removeCompleted(in: program)
+        selection.fillSuggested(from: program)
         if program.isComplete {
             screen = .complete(days: DayKey.daysInclusive(from: program.startDate ?? Date(), to: Date()))
         }
@@ -219,6 +286,7 @@ final class AppModel {
     func undoQuickLog() {
         guard let quickLog else { return }
         program = quickLog.previous
+        selection.fillSuggested(from: program)
         self.quickLog = nil
         save()
         screen = .home
@@ -230,6 +298,7 @@ final class AppModel {
 
     func goHome() {
         selection.clear()
+        selection.fillSuggested(from: program)
         screen = .home
     }
 
@@ -260,6 +329,7 @@ final class AppModel {
         session?.stop()
         session = nil
         selection.removeCompleted(in: program)
+        selection.fillSuggested(from: program)
         screen = .home
     }
 
@@ -297,6 +367,7 @@ final class AppModel {
         let areas = session?.plan.areas ?? []
         session = nil
         selection.clear()
+        selection.fillSuggested(from: program)
         if stretchAfter && !areas.isEmpty {
             startStretch(areas: areas, afterWorkout: true)
         } else {
@@ -307,10 +378,55 @@ final class AppModel {
     // MARK: Stretching
 
     func startStretch(areas: [String], afterWorkout: Bool = false) {
-        let steps = Stretches.routine(areas: areas)
+        startStretch(steps: Stretches.routine(areas: areas), title: nil, afterWorkout: afterWorkout)
+    }
+
+    func startStretch(steps: [StretchStep], title: String?, afterWorkout: Bool = false) {
         guard !steps.isEmpty else { return }
-        stretch = StretchSession(steps: steps, afterWorkout: afterWorkout)
+        stretch = StretchSession(steps: steps, title: title, afterWorkout: afterWorkout)
         screen = .stretch
+    }
+
+    func startRoutine(_ routine: StretchRoutine) {
+        startStretch(steps: routine.steps, title: routine.name)
+    }
+
+    /// "For you today": stretches for what was trained today and yesterday,
+    /// plus what's coming up next when the switch is on (or when nothing was
+    /// trained lately, so there's always something to start).
+    func todayStretch(now: Date = Date()) -> TodayStretch {
+        let sore = StretchPlanner.soreGroups(in: program, now: now)
+        var upcoming: [MuscleGroup] = []
+        if stretchUpcoming || sore.isEmpty {
+            upcoming = StretchPlanner.upcomingGroups(in: program, picked: selection.orderedKeys, excluding: sore)
+        }
+        var targets = sore + upcoming
+        if targets.isEmpty {
+            // Program finished and nothing trained lately: a little of everything.
+            targets = Catalog.rows.compactMap { $0.groups.first }
+        }
+        return TodayStretch(sore: sore, upcoming: upcoming,
+                            steps: StretchPlanner.routine(for: targets, minutes: stretchMinutes))
+    }
+
+    /// What the switch would add, shown under it even while it's off.
+    func upcomingStretchGroups(now: Date = Date()) -> [MuscleGroup] {
+        StretchPlanner.upcomingGroups(in: program, picked: selection.orderedKeys,
+                                      excluding: StretchPlanner.soreGroups(in: program, now: now))
+    }
+
+    func saveRoutine(_ routine: StretchRoutine) {
+        if let index = stretchRoutines.firstIndex(where: { $0.id == routine.id }) {
+            stretchRoutines[index] = routine
+        } else {
+            stretchRoutines.append(routine)
+        }
+        saveStretchRoutines()
+    }
+
+    func deleteRoutine(_ routine: StretchRoutine) {
+        stretchRoutines.removeAll { $0.id == routine.id }
+        saveStretchRoutines()
     }
 
     func endStretch() {
@@ -341,6 +457,12 @@ final class AppModel {
     private func save() {
         if let data = try? JSONEncoder().encode(program) {
             defaults.set(data, forKey: Keys.program)
+        }
+    }
+
+    private func saveStretchRoutines() {
+        if let data = try? JSONEncoder().encode(stretchRoutines) {
+            defaults.set(data, forKey: Keys.stretchRoutines)
         }
     }
 

@@ -3,11 +3,13 @@ import SwiftUI
 @main
 struct OMMApp: App {
     @State private var model = AppModel()
+    @State private var sunlight = SunlightModel()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(model)
+                .environment(sunlight)
         }
     }
 }
@@ -22,7 +24,7 @@ struct RootView: View {
             Theme.background.ignoresSafeArea()
             switch model.screen {
             case .home:
-                HomeView()
+                MainTabs()
             case .workout:
                 if let session = model.session {
                     if session.phase == .cardio {

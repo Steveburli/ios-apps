@@ -77,6 +77,20 @@ struct ActivitySheet: View {
             }
 
             Section {
+                let rules = model.state.placeTimers.rules.filter { $0.activityID == activity.id }
+                ForEach(rules) { rule in
+                    let place = model.state.placeTimers.place(rule.placeID)?.name ?? "a deleted place"
+                    Text("\(rule.action == .start ? "Starts" : "Stops") when you \(rule.crossing.verb) \(place)\(rule.on ? "" : " (off)")")
+                        .foregroundStyle(Theme.ink)
+                }
+                NavigationLink(rules.isEmpty ? "Start or stop it by place" : "Change place rules") {
+                    PlacesView(activityID: activity.id, embedded: true)
+                }
+            } header: {
+                Text("By place")
+            }
+
+            Section {
                 Button("Delete \(activity.name)", role: .destructive) { confirmingDelete = true }
             }
         }

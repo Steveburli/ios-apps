@@ -2,12 +2,20 @@ import SwiftUI
 import UIKit
 import EventKit
 import CloudKit
+import UserNotifications
 import DoThisNowKit
 
 @main
 struct DoThisNowApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @State private var model = AppModel()
+    @State private var model = AppModel.shared
+
+    init() {
+        // Widget and Lock Screen buttons run here when iOS launches the app for them.
+        TimerControl.handler = { command in
+            AppModel.shared.handleTimerCommand(command)
+        }
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -23,6 +31,11 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         // Silent pushes tell the trip sync engines when someone else changes a shared trip.
         // CKSyncEngine handles them itself; the app only has to register.
         application.registerForRemoteNotifications()
+        // Place rules: notification buttons, and the place watcher, which iOS may
+        // have launched the app in the background for.
+        UNUserNotificationCenter.current().delegate = NotificationActions.shared
+        PlaceNotices.registerCategories()
+        PlaceWatcher.shared.attach(AppModel.shared)
         return true
     }
 
@@ -222,6 +235,8 @@ private struct SheetContent: View {
             ReplanSheet()
         case .sendToDay(let key):
             SendToDaySheet(key: key)
+        case .places:
+            PlacesView()
         }
     }
 }

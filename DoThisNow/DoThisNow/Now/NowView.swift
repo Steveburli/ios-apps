@@ -131,6 +131,8 @@ struct AskView: View {
                 .foregroundStyle(Theme.ink)
                 .accessibilityAddTraits(.isHeader)
 
+            BreakBalanceBar()
+
             if model.offersReminders {
                 RemindersOfferCard()
             }
@@ -139,6 +141,10 @@ struct AskView: View {
             }
             ForEach(engine.dueReminders()) { task in
                 ReminderCard(task: task)
+            }
+            let suggestions = model.state.pendingSuggestions
+            if !suggestions.isEmpty {
+                SuggestionsCard(suggestions: suggestions)
             }
 
             Question(title: "How much time do you have?") {

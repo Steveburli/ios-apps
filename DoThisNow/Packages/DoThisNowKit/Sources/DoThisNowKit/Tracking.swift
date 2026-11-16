@@ -269,6 +269,7 @@ extension PlannerState {
         activities.removeAll { $0.id == id }
         timings.removeAll { $0.activityID == id }
         if running?.activityID == id { running = nil }
+        placeTimers.rules.removeAll { $0.activityID == id }
         for index in wake.routine.indices where wake.routine[index].activityID == id {
             wake.routine[index].activityID = nil
         }

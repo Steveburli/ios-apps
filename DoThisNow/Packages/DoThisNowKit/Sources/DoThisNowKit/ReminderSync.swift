@@ -51,7 +51,11 @@ extension PlannerState {
             if let task = tasks.first(where: { $0.reminderID == reminder.ref.id }) {
                 // Let go, or finished here and not yet ticked off there.
                 guard !task.archived, !task.done || task.reminderClosed else { continue }
+                if let label = listLabel(forList: reminder.listID) {
+                    noteSharedChange(task: task, reminder: reminder, label: label, now: now)
+                }
                 updateTask(task.id) { t in
+                    t.reminderPriority = reminder.priority
                     if t.done {
                         // Open again over there: unticked, or a repeating reminder's next round.
                         t.done = false
@@ -61,7 +65,9 @@ extension PlannerState {
                     t.reminderListID = reminder.listID
                     t.title = reminder.title
                     t.notes = reminder.notes
+                    let before = t.deadline
                     t.deadline = reminder.due.map { CalendarDay($0, calendar: calendar) }
+                    t.coolIfDeadlineMovedLater(from: before)
                 }
             } else {
                 var task = TaskItem(title: reminder.title, created: now)
@@ -69,12 +75,14 @@ extension PlannerState {
                 task.reminderListID = reminder.listID
                 task.notes = reminder.notes
                 task.tier = Tier.forReminder(priority: reminder.priority)
+                task.reminderPriority = reminder.priority
                 task.places = [.anywhere]
                 task.deadline = reminder.due.map { CalendarDay($0, calendar: calendar) }
                 task.estimate = estimate(title: reminder.title).minutes
                 tasks.append(task)
             }
         }
+        pruneSuggestions()
     }
 
     /// Finished here and still open in Reminders.

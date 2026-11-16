@@ -99,6 +99,7 @@ private struct PickRow: View {
             Image(systemName: picked ? "checkmark.circle.fill" : "circle")
                 .font(.title2)
                 .foregroundStyle(picked ? Theme.block : Theme.ink3)
+            HeatBar(heat: model.heat(for: entry.task.ref, source: entry.task))
             SourceBadge(source: entry.task.ref.source)
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.task.title)

@@ -150,6 +150,8 @@ public struct TaskItem: Codable, Identifiable, Equatable, Sendable {
     public var doneAt: Date?
     public var archived: Bool = false
     public var snoozeUntil: Date?
+    /// Times you pressed Not now on it. Each one warms it up a little.
+    public var snoozes: Int = 0
     public var remindSeen: Bool = false
     public var nudgeUntil: Date?
     /// The Apple Reminder this task mirrors.
@@ -158,6 +160,9 @@ public struct TaskItem: Codable, Identifiable, Equatable, Sendable {
     public var reminderClosed: Bool = false
     /// The Reminders list it came from, for that list's label.
     public var reminderListID: String?
+    /// The reminder's priority (0 to 3) at the last sync, so a change made in a
+    /// shared list shows up as a suggestion.
+    public var reminderPriority: Int?
 
     public init(id: String = newID(), title: String, created: Date) {
         self.id = id
@@ -172,7 +177,8 @@ public struct TaskItem: Codable, Identifiable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case id, title, kind, tier, places, estimate, weekly, minBlock, place, deadline, stakes, binge,
              maxSession, focus, posture, outside, tv, notes, isExample, created, spent, lastDone, done,
-             doneAt, archived, snoozeUntil, remindSeen, nudgeUntil, reminderID, reminderClosed, reminderListID
+             doneAt, archived, snoozeUntil, snoozes, remindSeen, nudgeUntil, reminderID, reminderClosed, reminderListID,
+             reminderPriority
     }
 
     public init(from decoder: Decoder) throws {
@@ -203,11 +209,13 @@ public struct TaskItem: Codable, Identifiable, Equatable, Sendable {
         doneAt = try c.decodeIfPresent(Date.self, forKey: .doneAt)
         archived = try c.decodeIfPresent(Bool.self, forKey: .archived) ?? archived
         snoozeUntil = try c.decodeIfPresent(Date.self, forKey: .snoozeUntil)
+        snoozes = try c.decodeIfPresent(Int.self, forKey: .snoozes) ?? snoozes
         remindSeen = try c.decodeIfPresent(Bool.self, forKey: .remindSeen) ?? remindSeen
         nudgeUntil = try c.decodeIfPresent(Date.self, forKey: .nudgeUntil)
         reminderID = try c.decodeIfPresent(String.self, forKey: .reminderID)
         reminderClosed = try c.decodeIfPresent(Bool.self, forKey: .reminderClosed) ?? reminderClosed
         reminderListID = try c.decodeIfPresent(String.self, forKey: .reminderListID)
+        reminderPriority = try c.decodeIfPresent(Int.self, forKey: .reminderPriority)
     }
 }
 
@@ -311,10 +319,14 @@ public struct PlannerSettings: Codable, Equatable, Sendable {
     public var sound = true
     /// Suggest tasks for the gaps between the blocks you placed yourself.
     public var autoFill = true
+    /// Color tasks from cold (blue) to hot (red), and let late ones grow.
+    public var taskHeat = true
+    /// Minutes of focused work that earn one minute of break.
+    public var workPerBreak = 5
 
     public init() {}
 
-    private enum CodingKeys: String, CodingKey { case wake, bed, dinnerAt, dinner, work, cafeMinutes, sound, autoFill }
+    private enum CodingKeys: String, CodingKey { case wake, bed, dinnerAt, dinner, work, cafeMinutes, sound, autoFill, taskHeat, workPerBreak }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -326,6 +338,8 @@ public struct PlannerSettings: Codable, Equatable, Sendable {
         cafeMinutes = try c.decodeIfPresent(Int.self, forKey: .cafeMinutes) ?? cafeMinutes
         sound = try c.decodeIfPresent(Bool.self, forKey: .sound) ?? sound
         autoFill = try c.decodeIfPresent(Bool.self, forKey: .autoFill) ?? autoFill
+        taskHeat = try c.decodeIfPresent(Bool.self, forKey: .taskHeat) ?? taskHeat
+        workPerBreak = try max(1, c.decodeIfPresent(Int.self, forKey: .workPerBreak) ?? workPerBreak)
     }
 }
 
@@ -444,13 +458,22 @@ public struct PlannerState: Codable, Equatable, Sendable {
     public var timings: [Timing] = []
     public var running: RunningTimer?
     public var wake = WakeSettings()
+    /// Changes made in a shared Reminders list, waiting for your answer.
+    public var suggestions: [Suggestion] = []
+    /// Break time earned by focused work.
+    public var breaks = BreakBank()
+    /// Meetings from locked calendars (Alignops to start), refreshed from Calendar.
+    public var meetings: [Meeting] = []
+    public var meetingSettings = MeetingSettings()
+    /// Track timers that start and stop by place.
+    public var placeTimers = PlaceTimers()
     public var updatedAt = Date(timeIntervalSince1970: 0)
 
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
         case tasks, events, log, days, settings, context, cafeDismissed, active, blocks, inboxItems, inbox,
-             activities, timings, running, wake, updatedAt
+             activities, timings, running, wake, suggestions, breaks, meetings, meetingSettings, placeTimers, updatedAt
     }
 
     public init(from decoder: Decoder) throws {
@@ -470,6 +493,11 @@ public struct PlannerState: Codable, Equatable, Sendable {
         timings = try c.decodeIfPresent([Timing].self, forKey: .timings) ?? []
         running = try c.decodeIfPresent(RunningTimer.self, forKey: .running)
         wake = try c.decodeIfPresent(WakeSettings.self, forKey: .wake) ?? WakeSettings()
+        suggestions = try c.decodeIfPresent([Suggestion].self, forKey: .suggestions) ?? []
+        breaks = try c.decodeIfPresent(BreakBank.self, forKey: .breaks) ?? BreakBank()
+        meetings = try c.decodeIfPresent([Meeting].self, forKey: .meetings) ?? []
+        meetingSettings = try c.decodeIfPresent(MeetingSettings.self, forKey: .meetingSettings) ?? MeetingSettings()
+        placeTimers = try c.decodeIfPresent(PlaceTimers.self, forKey: .placeTimers) ?? PlaceTimers()
         updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date(timeIntervalSince1970: 0)
     }
 
@@ -527,5 +555,6 @@ public struct PlannerState: Codable, Equatable, Sendable {
         let eventCutoff = today.adding(days: -14, calendar: calendar)
         events.removeAll { $0.day < eventCutoff }
         blocks.removeAll { $0.day < eventCutoff }
+        meetings.removeAll { $0.day < eventCutoff }
     }
 }

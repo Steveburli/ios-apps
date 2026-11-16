@@ -23,11 +23,20 @@ struct DayTimeline: View {
             let early = min(p.wake, blockStarts.min() ?? p.wake)
             start = max((early / 60).rounded(.down) * 60, ((p.now - 60) / 60).rounded(.down) * 60)
         } else {
-            let earliest = ([p.wake] + p.rocks.map(\.start) + p.events.map(\.coreStart) + blockStarts).min() ?? p.wake
+            var firsts: [Double] = [p.wake]
+            firsts += p.rocks.map(\.start)
+            firsts += p.locked.map(\.start)
+            firsts += p.events.map(\.coreStart)
+            firsts += blockStarts
+            let earliest = firsts.min() ?? p.wake
             start = max(0, (earliest / 60).rounded(.down) * 60)
         }
-        let latest = ([p.sleepStart + 75, start + 240] + p.events.map { $0.winEnd + $0.travel } + p.rocks.map(\.end)
-                      + p.blocks.map { Double($0.end) }).max() ?? start + 240
+        var lasts: [Double] = [p.sleepStart + 75, start + 240]
+        lasts += p.events.map { $0.winEnd + $0.travel }
+        lasts += p.rocks.map(\.end)
+        lasts += p.locked.map(\.end)
+        lasts += p.blocks.map { Double($0.end) }
+        let latest = lasts.max() ?? start + 240
         return (start, (latest / 60).rounded(.up) * 60)
     }
 
@@ -93,6 +102,29 @@ struct DayTimeline: View {
                 }
             }
 
+            ForEach(plan.meetings) { meeting in
+                if let s = slot(Double(meeting.start), Double(meeting.end), r0) {
+                    BlockLabel(title: meeting.title,
+                               detail: "\(f.range(day, Double(meeting.start), Double(meeting.end))) · \(meeting.calendar.isEmpty ? "meeting" : meeting.calendar) · locked",
+                               trailingPadding: 30)
+                        .foregroundStyle(Theme.rockInk)
+                        .background(Theme.rock, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(Theme.ink.opacity(0.55), lineWidth: 1.5))
+                        .overlay(alignment: .topTrailing) {
+                            Image(systemName: "lock.fill")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(Theme.rockInk.opacity(0.9))
+                                .padding(.top, 5)
+                                .padding(.trailing, 10)
+                        }
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("\(meeting.title), locked meeting")
+                        .accessibilityValue(f.range(day, Double(meeting.start), Double(meeting.end)))
+                        .placed(width: blockWidth, slot: s, x: gutter)
+                        .zIndex(3)
+                }
+            }
+
             ForEach(Array(plan.doing.enumerated()), id: \.offset) { _, doing in
                 if let s = slot(doing.start, doing.end, r0) {
                     BlockLabel(title: doing.title, detail: "Doing it now")
@@ -109,9 +141,9 @@ struct DayTimeline: View {
 
             ForEach(Array(plan.items.enumerated()), id: \.offset) { _, item in
                 if let s = slot(item.start, item.end, r0) {
-                    itemBlock(item)
+                    SuggestionBlock(item: item, day: plan.day, movable: model.canMoveSuggestion(item.chunk))
                         .placed(width: blockWidth, slot: s, x: gutter)
-                        .zIndex(3)
+                        .zIndex(model.draggingSuggestion == suggestionKey(item) ? 9 : 3)
                 }
             }
 
@@ -285,6 +317,9 @@ struct DayTimeline: View {
             .foregroundStyle(Theme.blockInk)
             .strikethrough(block.done)
             .background(Theme.block.opacity(block.done ? 0.45 : 1), in: shape)
+            .overlay(alignment: .leading) {
+                heatStripe(block.done ? nil : model.heat(for: block.ref), shape: shape)
+            }
             .overlay(alignment: .trailing) {
                 Group {
                     if block.done {
@@ -330,37 +365,8 @@ struct DayTimeline: View {
             .accessibilityAction(named: "Options") { model.sheet = .block(block.id) }
     }
 
-    private func itemBlock(_ item: PlanItem) -> some View {
-        let f = model.formats
-        let chunk = item.chunk
-        var note = [f.range(plan.day, item.start, item.end)]
-        if item.parts > 1 { note.append("part \(item.part) of \(item.parts)") }
-        if item.squished { note.append("squeezed") }
-        if item.filler { note.append("if you have room") } else if chunk.must { note.append("must do") }
-        let radius: CGFloat = item.squished ? 5 : 14
-        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
-
-        return Button { model.sheet = .dayItem(chunk.id) } label: {
-            BlockLabel(title: chunk.title, detail: note.joined(separator: " · "))
-                .foregroundStyle(Theme.softInk)
-                .background {
-                    if item.filler {
-                        shape.fill(Theme.surface).overlay(Stripes(color: Theme.soft, spacing: 13, lineWidth: 7).clipShape(shape))
-                    } else {
-                        shape.fill(Theme.soft)
-                    }
-                }
-                .overlay {
-                    if item.squished {
-                        shape.strokeBorder(Theme.bad, lineWidth: 2)
-                    } else if item.filler {
-                        shape.strokeBorder(Theme.softLine, lineWidth: 1.5)
-                    } else {
-                        shape.strokeBorder(Theme.softLine.opacity(0.6), lineWidth: 1)
-                    }
-                }
-        }
-        .buttonStyle(.plain)
+    private func suggestionKey(_ item: PlanItem) -> String {
+        "\(item.chunk.id)#\(item.part)"
     }
 
     @ViewBuilder
@@ -380,6 +386,127 @@ struct DayTimeline: View {
             }
             .offset(x: gutter, y: top)
             .zIndex(3)
+    }
+}
+
+/// The hottest of a chunk's tasks (an errand run can hold several).
+@MainActor
+private func hottest(_ tasks: [TaskItem], in model: AppModel) -> TaskHeat? {
+    tasks.compactMap { model.heat($0) }.max { a, b in
+        (a.daysLate, a.value) < (b.daysLate, b.value)
+    }
+}
+
+/// A heat-colored stripe down a block's left edge, blue (cold) to red (hot).
+@ViewBuilder
+private func heatStripe(_ heat: TaskHeat?, shape: RoundedRectangle) -> some View {
+    if let heat {
+        HStack(spacing: 0) {
+            Rectangle()
+                .fill(Theme.heat(heat))
+                .frame(width: heat.isAngry ? 7 : 5)
+            Spacer(minLength: 0)
+        }
+        .clipShape(shape)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// A task the planner suggested for a gap. Tap for options; touch and hold,
+/// then drag, to move it. Once dropped it becomes a block you placed, so it
+/// stays where you put it.
+private struct SuggestionBlock: View {
+    @Environment(AppModel.self) private var model
+    let item: PlanItem
+    let day: CalendarDay
+    let movable: Bool
+    @State private var offset: CGFloat = 0
+    @State private var lifted = false
+
+    private var key: String { "\(item.chunk.id)#\(item.part)" }
+
+    var body: some View {
+        let f = model.formats
+        let chunk = item.chunk
+        let px = DayTimeline.px
+        var note = [lifted ? f.time(day, Double(Reflow.snap(item.start + Double(offset / px)))) : f.range(day, item.start, item.end)]
+        if item.parts > 1 { note.append("part \(item.part) of \(item.parts)") }
+        if item.squished { note.append("squeezed") }
+        if item.filler { note.append("if you have room") } else if chunk.must { note.append("must do") }
+        let radius: CGFloat = item.squished ? 5 : 14
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+
+        return BlockLabel(title: chunk.title, detail: note.joined(separator: " · "))
+            .foregroundStyle(Theme.softInk)
+            .background {
+                if item.filler {
+                    shape.fill(Theme.surface).overlay(Stripes(color: Theme.soft, spacing: 13, lineWidth: 7).clipShape(shape))
+                } else {
+                    shape.fill(Theme.soft)
+                }
+            }
+            .overlay {
+                if lifted {
+                    shape.strokeBorder(Theme.ink, lineWidth: 2)
+                } else if item.squished {
+                    shape.strokeBorder(Theme.bad, lineWidth: 2)
+                } else if item.filler {
+                    shape.strokeBorder(Theme.softLine, lineWidth: 1.5)
+                } else {
+                    shape.strokeBorder(Theme.softLine.opacity(0.6), lineWidth: 1)
+                }
+            }
+            .overlay(alignment: .leading) {
+                heatStripe(hottest(chunk.tasks, in: model), shape: shape)
+            }
+            .scaleEffect(lifted ? 1.02 : 1)
+            .shadow(color: .black.opacity(lifted ? 0.25 : 0), radius: 10, y: 6)
+            .offset(y: offset)
+            .contentShape(shape)
+            .onTapGesture { model.sheet = .dayItem(chunk.id) }
+            .gesture(
+                LongPressGesture(minimumDuration: 0.3)
+                    .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .global))
+                    .onChanged { value in
+                        guard movable, case .second(true, let drag) = value else { return }
+                        if !lifted {
+                            lifted = true
+                            model.draggingSuggestion = key
+                        }
+                        if let drag {
+                            // Snap to five minutes so the time shown matches where it lands.
+                            let minutes = Double(Reflow.snap(Double(drag.translation.height / px)))
+                            offset = CGFloat(minutes) * px
+                            model.trackBlockDrag(at: drag.location)
+                        }
+                    }
+                    .onEnded { _ in
+                        guard lifted else { return }
+                        let moved = offset
+                        lifted = false
+                        offset = 0
+                        model.draggingSuggestion = nil
+                        model.dropSuggestion(chunk.id, from: item.start, by: moved, pointsPerMinute: px)
+                    },
+                including: movable ? .all : .subviews
+            )
+            .sensoryFeedback(.impact(weight: .medium), trigger: lifted) { _, now in now }
+            .sensoryFeedback(.selection, trigger: offset)
+            .accessibilityElement(children: .ignore)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel("Suggested: \(chunk.title)")
+            .accessibilityValue(f.range(day, item.start, item.end))
+            .accessibilityHint(movable ? "Swipe up or down to move it five minutes. It then stays where you put it." : "")
+            .accessibilityAdjustableAction { direction in
+                guard movable else { return }
+                switch direction {
+                case .increment: model.nudgeSuggestion(chunk.id, from: item.start, by: 5)
+                case .decrement: model.nudgeSuggestion(chunk.id, from: item.start, by: -5)
+                @unknown default: break
+                }
+            }
+            .accessibilityAction { model.sheet = .dayItem(chunk.id) }
     }
 }
 

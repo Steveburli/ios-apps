@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import DoThisNowKit
 
 /// The web app's palette, light and dark. Each block on the Day view is a
 /// material: rock (work), soft clay (tasks), jelly with a hard core (events),
@@ -34,6 +35,17 @@ enum Theme {
     static let good = Color(light: 0x23804F, dark: 0x5BC98C)
     static let warn = Color(light: 0xA86F00, dark: 0xE0A83A)
     static let bad = Color(light: 0xC8352E, dark: 0xFF6B61)
+
+    /// Task heat, cold blue (0) through purple to hot red (1). Angry tasks
+    /// go a little deeper red the longer they're late.
+    static func heat(_ heat: TaskHeat) -> Color {
+        let t = heat.value
+        // Hue runs from blue (0.6) round through violet to red (1.0).
+        let hue = 0.6 + 0.4 * t
+        let saturation = 0.55 + 0.3 * t + 0.15 * heat.anger
+        let brightness = 0.88 - 0.18 * heat.anger
+        return Color(hue: hue.truncatingRemainder(dividingBy: 1), saturation: min(1, saturation), brightness: brightness)
+    }
 
     static func display(_ size: CGFloat) -> Font {
         .system(size: size, weight: .heavy, design: .rounded)

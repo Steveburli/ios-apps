@@ -7,6 +7,9 @@ struct SettingsView: View {
     @State private var draft = PlannerSettings()
     @State private var loaded = false
     @State private var confirmingErase = false
+    /// The activities with start buttons on widgets; set when you change them here.
+    @State private var widgetIDs: [String] = []
+    @State private var widgetIDsChanged = false
 
     private let weekdays: [(index: Int, label: String)] = [
         (1, "Mon"), (2, "Tue"), (3, "Wed"), (4, "Thu"), (5, "Fri"), (6, "Sat"), (0, "Sun"),
@@ -53,8 +56,75 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Toggle("Lock my work meetings", isOn: Binding(
+                        get: { model.state.meetingSettings.on },
+                        set: { on in Task { await model.setMeetingsOn(on) } }))
+                    if model.state.meetingSettings.on {
+                        if let problem = model.meetingsProblem {
+                            Text(problem)
+                                .font(.footnote)
+                                .foregroundStyle(Theme.ink2)
+                        }
+                        ForEach(model.meetingCalendars) { list in
+                            Toggle(list.name, isOn: Binding(
+                                get: { model.state.meetingSettings.locks(calendarID: list.id, name: list.name) },
+                                set: { model.setCalendarLocked(list, $0) }))
+                        }
+                    }
+                } header: {
+                    Text("Work meetings")
+                } footer: {
+                    Text("Meetings from the calendars switched on here (Alignops to start) keep their exact times and show a lock. You can still put tasks in work hours: anything dropped on a meeting moves to the next open gap.")
+                }
+
+                Section {
                     MinuteStepper(title: "Suggest a coffee shop or library when computer work piles up past",
                                   minutes: $draft.cafeMinutes, range: 15...960, step: 15)
+                }
+
+                Section {
+                    Toggle("Task heat colors", isOn: $draft.taskHeat)
+                    if draft.taskHeat {
+                        HStack(spacing: 8) {
+                            Text("Cold").font(.caption).foregroundStyle(Theme.ink3)
+                            LinearGradient(colors: stride(from: 0.0, through: 1.0, by: 0.25).map { Theme.heat(TaskHeat(value: $0)) },
+                                           startPoint: .leading, endPoint: .trailing)
+                                .frame(height: 8)
+                                .clipShape(Capsule())
+                            Text("Hot").font(.caption).foregroundStyle(Theme.ink3)
+                        }
+                        .accessibilityHidden(true)
+                    }
+                } footer: {
+                    Text("Blue is cold, red is hot, from priority and how close the deadline is. Each Not now warms a task up. Once a deadline passes, the task turns red and grows a little each day late, for up to 5 days. A later deadline is a fresh start.")
+                }
+
+                Section {
+                    Stepper(value: $draft.workPerBreak, in: 1...30) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Minutes of focus for 1 minute of break")
+                            Text("\(draft.workPerBreak) min")
+                                .font(.subheadline.monospacedDigit().weight(.semibold))
+                                .foregroundStyle(Theme.accent)
+                        }
+                    }
+                    .accessibilityValue("\(draft.workPerBreak) minutes")
+                } header: {
+                    Text("Break bank")
+                } footer: {
+                    Text("Focus time and timed sessions earn break time. Leftover break time is gone the next morning, but time you owe carries over.")
+                }
+
+                Section {
+                    NavigationLink {
+                        WidgetButtonsPicker(ids: $widgetIDs, changed: $widgetIDsChanged)
+                    } label: {
+                        LabeledContent("Start buttons", value: widgetSummary)
+                    }
+                } header: {
+                    Text("Widgets and Lock Screen")
+                } footer: {
+                    Text("Pick what the Home Screen and Lock Screen widgets can start. Running timers also show on the Lock Screen and in the Dynamic Island, with a Stop button.")
                 }
 
                 Section {
@@ -83,7 +153,10 @@ struct SettingsView: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { model.saveSettings(draft) }
+                    Button("Save") {
+                        if widgetIDsChanged { model.setWidgetActivities(widgetIDs) }
+                        model.saveSettings(draft)
+                    }
                         .fontWeight(.bold)
                 }
             }
@@ -93,12 +166,20 @@ struct SettingsView: View {
                 Text("This can’t be undone.")
             }
             .onAppear {
+                model.refreshMeetings()
                 if !loaded {
                     draft = model.state.settings
+                    widgetIDs = model.widgetActivities.map(\.id)
                     loaded = true
                 }
             }
         }
+    }
+
+    private var widgetSummary: String {
+        if model.state.activities.isEmpty { return "Add activities on Track" }
+        let names = model.state.activities.filter { widgetIDs.contains($0.id) }.map(\.name)
+        return names.isEmpty ? "None" : names.joined(separator: ", ")
     }
 
     private func toggle(_ weekday: Int) {

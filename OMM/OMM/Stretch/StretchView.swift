@@ -2,7 +2,8 @@ import SwiftUI
 import UIKit
 import OMMKit
 
-/// One stretch at a time: what to do, then a countdown for the hold.
+/// One stretch at a time: a picture and what to do, then a big countdown for
+/// the hold, with a chime and a buzz at the end and the next move shown below.
 struct StretchView: View {
     @Environment(AppModel.self) private var model
     let session: StretchSession
@@ -13,7 +14,7 @@ struct StretchView: View {
                 Button {
                     model.endStretch()
                 } label: {
-                    Label(session.afterWorkout ? "Done Stretching" : "Back to Home", systemImage: "chevron.left")
+                    Label(session.afterWorkout ? "Done Stretching" : "Back to Stretch", systemImage: "chevron.left")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Color.white)
                         .padding(.vertical, 6)
@@ -21,10 +22,13 @@ struct StretchView: View {
                 header
                 Card {
                     VStack(alignment: .leading, spacing: 12) {
+                        StretchFigureView(stretchID: session.step.stretch.id)
+                            .frame(maxWidth: 220)
+                            .frame(maxWidth: .infinity)
                         Text(session.step.stretch.how)
                             .font(.body)
                             .foregroundStyle(Theme.text)
-                        Label("Hold \(session.step.stretch.holdSeconds) seconds", systemImage: "timer")
+                        Label("Hold \(session.step.holdSeconds) seconds", systemImage: "timer")
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(Theme.primary)
                         Divider().overlay(Theme.border)
@@ -49,7 +53,7 @@ struct StretchView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("STRETCH · \(session.step.stretch.area.uppercased())")
+            Text(kicker)
                 .font(.caption.weight(.heavy))
                 .tracking(1)
                 .opacity(0.85)
@@ -75,10 +79,17 @@ struct StretchView: View {
                 .padding(.vertical, 4)
                 .background(Color.white.opacity(0.2), in: Capsule())
                 .padding(14)
-                .accessibilityLabel("Stretch \(session.index + 1) of \(session.steps.count)")
+                .accessibilityLabel("Move \(session.index + 1) of \(session.steps.count)")
         }
         .shadow(color: Theme.shadow.opacity(0.3), radius: 14, y: 10)
         .accessibilityElement(children: .combine)
+    }
+
+    /// "YOGA · THIGHS", or the routine's name first when it has one.
+    private var kicker: String {
+        let stretch = session.step.stretch
+        let parts = [session.title, stretch.kind.title, stretch.area].compactMap { $0 }
+        return parts.joined(separator: " · ").uppercased()
     }
 
     private var bar: some View {
@@ -87,10 +98,14 @@ struct StretchView: View {
             BottomPanel {
                 ProgressBar(fraction: timer.fraction(now: context.date))
                 Text(clock(now: context.date))
-                    .font(.system(size: 46, weight: .heavy).monospacedDigit())
+                    .font(.system(size: 76, weight: .heavy).monospacedDigit())
                     .foregroundStyle(timer.state == .done ? Theme.success : (timer.isRunning ? Theme.primary : Theme.text))
-                    .padding(.top, 8)
-                    .padding(.bottom, 12)
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                    .padding(.top, 6)
+                    .accessibilityLabel(accessibleClock(now: context.date))
+                nextUp
+                    .padding(.bottom, 10)
                 HStack(spacing: 10) {
                     switch timer.state {
                     case .idle:
@@ -108,6 +123,26 @@ struct StretchView: View {
         }
     }
 
+    @ViewBuilder
+    private var nextUp: some View {
+        if let next = session.nextStep {
+            HStack(spacing: 8) {
+                StretchFigureView(stretchID: next.stretch.id, color: Theme.muted)
+                    .frame(width: 30, height: 30)
+                Text("Next up: \(next.title)")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Theme.muted)
+                    .lineLimit(1)
+            }
+            .accessibilityElement(children: .combine)
+        } else {
+            Text("Last one")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(Theme.muted)
+                .frame(height: 30)
+        }
+    }
+
     private var skipButton: some View {
         Button(session.isLast ? "Finish" : "Skip") { nextOrFinish() }
             .buttonStyle(SecondaryButtonStyle())
@@ -121,80 +156,19 @@ struct StretchView: View {
         }
     }
 
-    private func clock(now: Date) -> String {
+    private func seconds(now: Date) -> Int {
         switch session.timer.state {
-        case .idle: return Clock.string(session.step.stretch.holdSeconds)
-        case .done: return "0:00"
-        case .running: return Clock.string(session.timer.secondsLeft(now: now) ?? 0)
-        }
-    }
-}
-
-/// "Just Stretch" from the home screen: pick body areas, then start.
-struct StretchPickerView: View {
-    @Environment(AppModel.self) private var model
-    @Environment(\.dismiss) private var dismiss
-    @State private var chosen = Set(Catalog.areas)
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("Pick the areas to stretch. Each stretch is a \(Stretches.holdSeconds)-second hold, both sides where it applies.")
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.muted)
-                    VStack(spacing: 0) {
-                        ForEach(Array(Catalog.areas.enumerated()), id: \.element) { index, area in
-                            if index > 0 { Divider().overlay(Theme.border) }
-                            areaRow(area)
-                        }
-                    }
-                    .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    Button(startTitle) {
-                        let areas = Catalog.areas.filter(chosen.contains)
-                        dismiss()
-                        model.startStretch(areas: areas)
-                    }
-                    .buttonStyle(PrimaryButtonStyle())
-                    .disabled(chosen.isEmpty)
-                }
-                .padding(16)
-            }
-            .background(Theme.sheet.ignoresSafeArea())
-            .navigationTitle("Just Stretch")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-            }
+        case .idle: return session.step.holdSeconds
+        case .done: return 0
+        case .running: return session.timer.secondsLeft(now: now) ?? 0
         }
     }
 
-    private var startTitle: String {
-        let minutes = Stretches.minutes(for: Stretches.routine(areas: Array(chosen)))
-        return chosen.isEmpty ? "Start Stretching" : "Start Stretching (about \(minutes.counted("minute")))"
+    private func clock(now: Date) -> String {
+        Clock.string(seconds(now: now))
     }
 
-    private func areaRow(_ area: String) -> some View {
-        let on = chosen.contains(area)
-        return Button {
-            if on { chosen.remove(area) } else { chosen.insert(area) }
-        } label: {
-            HStack {
-                Text(area)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Theme.text)
-                Spacer()
-                Image(systemName: on ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
-                    .foregroundStyle(on ? Theme.primary : Theme.border)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(on ? .isSelected : [])
+    private func accessibleClock(now: Date) -> String {
+        "\(seconds(now: now).counted("second")) left"
     }
 }

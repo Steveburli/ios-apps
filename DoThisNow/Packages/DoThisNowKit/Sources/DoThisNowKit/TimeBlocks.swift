@@ -86,10 +86,16 @@ public enum Reflow {
     /// goes below. Everything else slides down. The push carries on from
     /// block to block, and a pushed block hops over `obstacles` (event cores,
     /// blocks already under way). Blocks that aren't in the way stay put.
+    ///
+    /// `locked` holds meetings from a locked calendar. Nothing sits on them:
+    /// a block dropped on one goes to the next open gap after it, and pushed
+    /// blocks hop over them like any obstacle.
     public static func move(_ id: String, to start: Int, in blocks: [TimeBlock], obstacles: [TimeSpan] = [],
-                            earliest: Int = 0) -> [TimeBlock] {
+                            locked: [TimeSpan] = [], earliest: Int = 0) -> [TimeBlock] {
         guard var moved = blocks.first(where: { $0.id == id }) else { return blocks }
         moved.start = max(0, start)
+        moved.start = hopDown(moved, locked)
+        let obstacles = obstacles + locked
         let middle = Double(moved.start) + Double(moved.minutes) / 2
         let others = blocks.filter { $0.id != id }
         let above = others.filter { Double($0.start) + Double($0.minutes) / 2 < middle }

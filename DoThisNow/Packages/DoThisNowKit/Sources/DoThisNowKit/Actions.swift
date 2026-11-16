@@ -179,6 +179,7 @@ extension PlannerState {
         for id in taskIDs {
             updateTask(id) { task in
                 task.snoozeUntil = date
+                task.snoozes += 1
                 task.remindSeen = false
             }
         }
@@ -219,6 +220,7 @@ extension PlannerState {
             task.done = false
             task.archived = false
             task.doneAt = nil
+            task.snoozes = 0
             task.nudgeUntil = now.addingTimeInterval(14 * 86_400)
         }
     }

@@ -11,8 +11,12 @@ A native SwiftUI (iOS 18+, iPhone, portrait, light and dark) version of the user
   - `Card` (`deck` reference, `.deleteSelf`)
   - `Player`
   - `Pick` (`card` reference, `.deleteSelf`)
+  - `Answer` (`deck` reference, `.deleteSelf`)
+  - `Photo` (`card` reference, `.deleteSelf`; the image is an Asset)
+- A **Photo** is one picture on a card, named `photo_<id>`. Anyone in the group can add up to 6 per card (`CardPhotos.limit`) from their photo library or camera, or remove one. Photos are shrunk to 1280 px and kept as files in Application Support/card-photos (`Sync/PhotoFiles`). A card shows its added photos first, else its ready-made deck photo; on the swipe card, tapping the left or right of the photo flips between them. The card sheet has "Find photos in Google Maps", which opens a search for the place so you can browse its Vibe and Food & Drink photos.
 - A **Pick** is one person's vote on one card, stored as its own record named `pick_<card>_<player>`. Two people swiping at once never overwrite each other.
 - **Vetting and rounds.** A deck's first pass is its vetting: plain picks with no `roundID`. A **round** (`Deck.roundID`) is a quick pick for right now. Its votes are separate picks named `pick_<card>_<player>_r<round>`, the down swipe reads "Not tonight", and starting a new round saves the winner to `roundHistory`, then deletes the old round's picks. `Rounds.plan` picks the round's cards: a vetted deck uses the cards everyone liked. A chain (`roundChain`) goes on to other decks, narrowed by each winner's title (`roundFilter`). "Never, for good" sets `Card.retiredAt`, which hides the card everywhere until someone brings it back.
+- **Deck questions.** `Deck.questions` (a String List of small JSON strings, `FormQuestion`) is a short form people answer before they swipe: text, pick one, yes/no, date, or "Your ideas". `MutualKit/Forms.swift` has the logic and the ready-made Trip, Dinner out and Night out sets. Each person's answers are one `Answer` record named `answer_<deck>_<player>`. Anyone can fill in anyone's answers (`filledBy`); they count as confirmed only when the person saves their own (`confirmedAt`). Confirming turns each "Your ideas" line into a card with a Love from that person (an idea matching an existing card's title just gets the Love), and `ideasMade` remembers them so a deleted idea card isn't made again. Everyone in the group sees all answers. A deck with questions opens the form once per launch until the person confirms.
 - Deleting a deck cascades through the references on the server. Picks reference their card, not the deck, which keeps them under CloudKit's limit of 750 `.deleteSelf` references per target.
 - **Players** are names inside a group, not iCloud identities. That keeps the artifact's pass-the-phone mode working. Each phone remembers "who's swiping" per group in UserDefaults (`Session`).
 - `Sync/CloudStore` is local-first. A JSON cache lives in Application Support, and two `CKSyncEngine`s do the syncing: one for the private database (groups you own) and one for the shared database (groups shared with you). Conflicts resolve as last writer wins: on `serverRecordChanged` it takes the server's change tag and saves again.
@@ -26,7 +30,7 @@ A native SwiftUI (iOS 18+, iPhone, portrait, light and dark) version of the user
   - the models
   - `DeckState` (the artifact's `classify` and `deckState`, ported exactly)
   - `CardText` (cleaning, link safety, the initial letter, the color hash, "Paste a list" parsing)
-- `MutualSwipe/` holds the app: `App/` (entry point, `AppDelegate`/`SceneDelegate`, `Session`), `Sync/`, `Home/`, `Deck/` (the Swipe, Results and Cards tabs), `Sheets/`, and `Support/Theme`.
+- `MutualSwipe/` holds the app: `App/` (entry point, `AppDelegate`/`SceneDelegate`, `Session`), `Sync/`, `Home/`, `Deck/` (the Swipe, Results, Overlap and Cards tabs), `Sheets/`, and `Support/Theme`.
 - `Config/MutualSwipe.entitlements` holds iCloud (CloudKit), the container `iCloud.com.steveburlison.mutualswipe`, and `aps-environment`. `Config/Info.plist` sets `CKSharingSupported` and the `remote-notification` background mode.
 
 ## Commands
@@ -47,10 +51,12 @@ TestFlight and App Store builds use CloudKit's **Production** environment. That 
    | Record type | Fields (type) |
    |---|---|
    | `Group` | `name` (String), `createdAt` (Date/Time) |
-   | `Deck` | `title` (String), `kind` (String), `blurb` (String), `createdAt` (Date/Time); version 2 adds `decided` (String List), `decidedAt` (Date/Time), `decidedBy` (String), `spinCardID` (String), `spinAt` (Date/Time); version 2 build B adds `roundID` (String), `roundQuestion` (String), `roundStartedAt` (Date/Time), `roundCards` (String List), `roundFilter` (String List), `roundChain` (String List), `roundHistory` (String List) |
-   | `Card` | `deck` (Reference), `deckID` (String), `title` (String), `subtitle` (String), `details` (String), `tags` (String List), `link` (String), `order` (Double), `createdAt` (Date/Time); build B adds `retiredAt` (Date/Time), `retiredBy` (String) |
+   | `Deck` | `title` (String), `kind` (String), `blurb` (String), `createdAt` (Date/Time); version 2 adds `decided` (String List), `decidedAt` (Date/Time), `decidedBy` (String), `spinCardID` (String), `spinAt` (Date/Time); version 2 build B adds `roundID` (String), `roundQuestion` (String), `roundStartedAt` (Date/Time), `roundCards` (String List), `roundFilter` (String List), `roundChain` (String List), `roundHistory` (String List); deck questions add `questions` (String List) |
+   | `Card` | `deck` (Reference), `deckID` (String), `title` (String), `subtitle` (String), `details` (String), `tags` (String List), `link` (String), `order` (Double), `createdAt` (Date/Time); build B adds `retiredAt` (Date/Time), `retiredBy` (String); the calendar build adds `startsAt` (Date/Time) |
    | `Player` | `name` (String), `color` (Int(64)), `createdAt` (Date/Time) |
    | `Pick` | `card` (Reference), `deckID` (String), `cardID` (String), `playerID` (String), `vote` (String), `updatedAt` (Date/Time); build B adds `roundID` (String) |
+   | `Answer` | `deck` (Reference), `deckID` (String), `playerID` (String), `values` (String), `filledBy` (String), `confirmedAt` (Date/Time), `updatedAt` (Date/Time), `ideasMade` (String List) |
+   | `Photo` (card photos, Nov 2026) | `card` (Reference), `deckID` (String), `cardID` (String), `order` (Double), `addedBy` (String), `createdAt` (Date/Time), `image` (Asset) |
 
 4. **Deploy.** In the console, press **Deploy Schema Changes** to copy them to **Production**.
 

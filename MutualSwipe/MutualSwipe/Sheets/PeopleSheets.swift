@@ -139,7 +139,7 @@ struct GroupsSheet: View {
                 } header: {
                     Text("Your groups")
                 } footer: {
-                    Text("Everyone in a group sees all of its decks. Make separate groups for, say, family and friends.")
+                    Text("Invite people so they can swipe your decks on their own iPhones. They need to be signed in to iCloud. Everyone in a group sees all of its decks, so make separate groups for, say, family and friends.\n\nSharing one phone? Tap your name at the top of the home screen to switch who’s swiping.")
                 }
 
                 Section("New group") {
@@ -152,7 +152,7 @@ struct GroupsSheet: View {
                     }
                 }
             }
-            .navigationTitle("Groups")
+            .navigationTitle("People and groups")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {

@@ -340,6 +340,9 @@ public struct Engine {
         for event in plan.live where event.coreStart > n {
             points.append((event.coreStart, event.travel > 0 ? "leave for \(event.title)" : event.title))
         }
+        for meeting in plan.meetings where Double(meeting.start) > n {
+            points.append((Double(meeting.start), meeting.title))
+        }
         for block in plan.blocks where !block.done && Double(block.start) > n {
             points.append((Double(block.start), block.title))
         }

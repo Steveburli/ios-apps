@@ -2,7 +2,7 @@ import CloudKit
 import MutualKit
 
 /// How each model maps to a CloudKit record. Every group is a zone holding a
-/// "Group" record plus its decks, cards, players and picks.
+/// "Group" record plus its decks, cards, players, picks and card photos.
 ///
 /// Field names are part of the production schema once it's deployed, so
 /// never rename one. Add new fields instead.
@@ -15,6 +15,8 @@ enum Records {
         static let card = "Card"
         static let player = "Player"
         static let pick = "Pick"
+        static let answer = "Answer"
+        static let photo = "Photo"
     }
 
     /// Starts from the last record the server sent, so the save carries its
@@ -64,6 +66,24 @@ enum Records {
         if let history = deck.roundHistory, !history.isEmpty {
             record["roundHistory"] = history.compactMap(encode)
         }
+        // Only written once a deck has had questions, so other decks save as before.
+        if let questions = deck.questions {
+            record["questions"] = questions.isEmpty ? nil : questions.compactMap(\.encoded)
+        }
+        return record
+    }
+
+    static func record(_ answers: FormAnswers, zoneID: CKRecordZone.ID) -> CKRecord {
+        let record = base(Kind.answer, name: answers.id, zoneID: zoneID, systemFields: answers.systemFields)
+        // Deleting a deck deletes everyone's answers to it on the server.
+        record["deck"] = CKRecord.Reference(recordID: CKRecord.ID(recordName: answers.deckID, zoneID: zoneID), action: .deleteSelf)
+        record["deckID"] = answers.deckID
+        record["playerID"] = answers.playerID
+        record["values"] = (try? JSONEncoder().encode(answers.values)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+        record["filledBy"] = answers.filledBy
+        record["confirmedAt"] = answers.confirmedAt
+        record["updatedAt"] = answers.updatedAt
+        record["ideasMade"] = answers.ideasMade.isEmpty ? nil : answers.ideasMade
         return record
     }
 
@@ -83,6 +103,10 @@ enum Records {
         if card.retiredAt != nil || card.retiredBy != nil {
             record["retiredAt"] = card.retiredAt
             record["retiredBy"] = card.retiredBy
+        }
+        // Only written once a card has had a time, so other cards save as before.
+        if card.writesTime {
+            record["startsAt"] = card.startsAt
         }
         return record
     }
@@ -106,6 +130,21 @@ enum Records {
         record["vote"] = pick.vote.rawValue
         record["updatedAt"] = pick.updatedAt
         if let round = pick.roundID { record["roundID"] = round }
+        return record
+    }
+
+    static func record(_ photo: CardPhoto, zoneID: CKRecordZone.ID) -> CKRecord {
+        let record = base(Kind.photo, name: photo.id, zoneID: zoneID, systemFields: photo.systemFields)
+        // Like picks, photos hang off their card, so deleting the card (or its deck) deletes them.
+        record["card"] = CKRecord.Reference(recordID: CKRecord.ID(recordName: photo.cardID, zoneID: zoneID), action: .deleteSelf)
+        record["deckID"] = photo.deckID
+        record["cardID"] = photo.cardID
+        record["order"] = photo.order
+        record["addedBy"] = photo.addedBy
+        record["createdAt"] = photo.createdAt
+        if PhotoFiles.exists(photo.id) {
+            record["image"] = CKAsset(fileURL: PhotoFiles.url(for: photo.id))
+        }
         return record
     }
 
@@ -154,6 +193,7 @@ enum Records {
         deck.roundFilter = record["roundFilter"] as? [String]
         deck.roundChain = record["roundChain"] as? [String]
         deck.roundHistory = (record["roundHistory"] as? [String])?.compactMap(decode)
+        deck.questions = (record["questions"] as? [String])?.compactMap(FormQuestion.decode)
         deck.systemFields = record.archivedSystemFields
         return deck
     }
@@ -166,6 +206,7 @@ enum Records {
                         order: record["order"] as? Double ?? 0, createdAt: date(record, "createdAt"))
         card.retiredAt = record["retiredAt"] as? Date
         card.retiredBy = record["retiredBy"] as? String
+        card.startsAt = record["startsAt"] as? Date
         card.systemFields = record.archivedSystemFields
         return card
     }
@@ -178,6 +219,18 @@ enum Records {
         return player
     }
 
+    /// Copies the downloaded image into the phone's photo folder.
+    static func photo(from record: CKRecord, groupID: String) -> CardPhoto {
+        var photo = CardPhoto(id: record.recordID.recordName, groupID: groupID, deckID: string(record, "deckID"),
+                              cardID: string(record, "cardID"), order: record["order"] as? Double ?? 0,
+                              addedBy: string(record, "addedBy"), createdAt: date(record, "createdAt"))
+        if let asset = record["image"] as? CKAsset, let file = asset.fileURL {
+            PhotoFiles.copy(from: file, as: photo.id)
+        }
+        photo.systemFields = record.archivedSystemFields
+        return photo
+    }
+
     static func pick(from record: CKRecord, groupID: String) -> Pick? {
         guard let vote = Vote(rawValue: string(record, "vote")) else { return nil }
         var pick = Pick(groupID: groupID, deckID: string(record, "deckID"), cardID: string(record, "cardID"),
@@ -186,6 +239,18 @@ enum Records {
         pick.roundID = record["roundID"] as? String
         pick.systemFields = record.archivedSystemFields
         return pick
+    }
+
+    static func answers(from record: CKRecord, groupID: String) -> FormAnswers? {
+        let deckID = string(record, "deckID"), playerID = string(record, "playerID")
+        guard !deckID.isEmpty, !playerID.isEmpty else { return nil }
+        let values = (try? JSONDecoder().decode([String: String].self, from: Data(string(record, "values").utf8))) ?? [:]
+        var answers = FormAnswers(groupID: groupID, deckID: deckID, playerID: playerID, values: values,
+                                  filledBy: string(record, "filledBy"), confirmedAt: record["confirmedAt"] as? Date,
+                                  updatedAt: date(record, "updatedAt"), ideasMade: record["ideasMade"] as? [String] ?? [])
+        answers.id = record.recordID.recordName
+        answers.systemFields = record.archivedSystemFields
+        return answers
     }
 }
 

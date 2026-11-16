@@ -260,7 +260,7 @@ private struct ListLabelsView: View {
                     LabelField(list: list, saved: model.state.inbox.listLabels[list.id] ?? "")
                 }
             } footer: {
-                Text("Tasks from a list with a label show it on Tasks, in the Inbox and on the Day. Leave it empty for no label. To share a list, open it in Reminders and tap Share.")
+                Text("Tasks from a list with a label show it on Tasks, in the Inbox and on the Day. Leave it empty for no label. To share a list, open it in Reminders and tap Share.\n\nWhen someone changes a task’s priority or adds to its notes in a labeled list, it shows up under Suggestions on Now and Tasks. A new priority takes effect right away, and you can keep it, put it back, or pick another.")
             }
         }
         .navigationTitle("Labels")
