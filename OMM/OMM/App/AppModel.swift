@@ -173,6 +173,9 @@ final class AppModel {
             session?.adjustRest(by: WorkoutSession.restStep)
         case "howto":
             // Mid chest has the how-to drawings; the workout row opens the first one.
+            // The sample program has Mid crossed out, so reopen it and train only Mid.
+            program.progress["Mid"] = 0
+            selection.clear()
             if let mid = Catalog.group("Mid") { toggle(mid) }
             startWorkout()
         case "weights":
