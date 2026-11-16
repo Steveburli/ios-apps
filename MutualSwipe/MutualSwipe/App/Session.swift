@@ -19,6 +19,8 @@ final class Session {
         case startRound(String)
         /// Pick a ready-made deck, opened on one deck when given.
         case starter(String?)
+        /// "Plan something new": the guided journey.
+        case journey
 
         var id: String {
             switch self {
@@ -31,6 +33,7 @@ final class Session {
             case .qr(let group): return "qr-" + group
             case .startRound(let deck): return "round-" + deck
             case .starter(let deck): return "starter-" + (deck ?? "all")
+            case .journey: return "journey"
             }
         }
     }
@@ -54,6 +57,10 @@ final class Session {
     }
     /// Decks showing their vetting while a round is running. Rounds show by default.
     var vettingShown: Set<String> = []
+    /// A deck the journey just made, until its "Your plan is ready" banner is closed.
+    var journeyMade: JourneyMade?
+    /// A group just joined from a link: its newest planned deck opens once it arrives.
+    var openPlannedIn: String?
     /// The player picker opens by itself once per launch.
     var pickerShown = false
     /// A file opened in Mutual from another app, waiting for the import sheet.
@@ -133,6 +140,8 @@ final class Session {
             sheet = .starter("dinners")
         case "starterswipe":
             path = [Screenshots.starterDeckID]
+        case "journey":
+            sheet = .journey
         default:
             break
         }

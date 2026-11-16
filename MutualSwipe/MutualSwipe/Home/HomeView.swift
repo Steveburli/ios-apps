@@ -25,8 +25,11 @@ struct HomeView: View {
                         .background(Theme.sunk, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
 
-                SectionTitle("Ready-made decks", detail: "Places around Indianapolis. Tap one to look through it.")
+                PlanHero(enabled: canWrite)
                     .padding(.top, 8)
+
+                SectionTitle("Ready-made decks", detail: "Places around Indianapolis. Tap one to look through it.")
+                    .padding(.top, 12)
                 ReadyMadeStrip()
 
                 SectionTitle("Your decks", detail: group.map { "In “\($0.name)”" })
@@ -36,10 +39,12 @@ struct HomeView: View {
                 Button {
                     session.sheet = .newDeck
                 } label: {
-                    Label("New deck", systemImage: "plus")
+                    Label("Make your own deck", systemImage: "plus")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.muted)
                         .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
                 }
-                .buttonStyle(DashedButtonStyle())
                 .disabled(!canWrite)
 
                 HowItWorks()
@@ -94,8 +99,8 @@ struct HomeView: View {
             .padding(.vertical, 22)
             .padding(.horizontal, 20)
             .frame(maxWidth: .infinity)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.line, style: StrokeStyle(lineWidth: 1.5, dash: [6, 4])))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.radius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous).strokeBorder(Theme.line, style: StrokeStyle(lineWidth: 1.5, dash: [6, 4])))
         } else {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 12)], spacing: 12) {
                 ForEach(decks) { deck in
@@ -264,10 +269,48 @@ private struct DeckTile: View {
                 .accessibilityHidden(true)
         }
         .padding(16)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.line))
-        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.radius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous).strokeBorder(Theme.line))
+        .contentShape(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous))
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// The one big choice on the home screen: start the guided journey.
+private struct PlanHero: View {
+    @Environment(Session.self) private var session
+    let enabled: Bool
+
+    var body: some View {
+        Button {
+            session.sheet = .journey
+        } label: {
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Plan something new")
+                        .font(Theme.display(26))
+                        .foregroundStyle(.white)
+                    Text("Answer a few questions, swipe on ideas, then swipe on real places together.")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.white.opacity(0.92))
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "arrow.right")
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(Theme.accent)
+                    .frame(width: 48, height: 48)
+                    .background(.white, in: Circle())
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.heroGradient, in: RoundedRectangle(cornerRadius: Theme.radius, style: .continuous))
+            .shadow(color: Theme.accent.opacity(0.28), radius: 16, y: 8)
+        }
+        .buttonStyle(PressableStyle())
+        .disabled(!enabled)
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Starts a few quick questions that build a deck for your group")
     }
 }
 
@@ -358,9 +401,9 @@ private struct ReadyMadeTile: View {
         }
         .frame(width: 210, alignment: .leading)
         .background(Theme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.line))
-        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous).strokeBorder(Theme.line))
+        .contentShape(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityHint("Look through this deck and make your own copy")
     }

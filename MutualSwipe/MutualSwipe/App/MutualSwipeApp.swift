@@ -123,11 +123,20 @@ struct RootView: View {
                 case .qr(let groupID): QRSheet(groupID: groupID)
                 case .startRound(let deckID): StartRoundSheet(deckID: deckID)
                 case .starter(let deckID): StarterSheet(initialDeckID: deckID)
+                case .journey: JourneyView()
                 }
             }
             .environment(store)
             .environment(session)
         }
+        .overlay(alignment: .top) {
+            if let made = session.journeyMade, session.path.last == made.deckID, session.sheet == nil {
+                JourneyMadeBanner(made: made)
+                    .padding(.top, 54)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: session.journeyMade)
         .overlay(alignment: .bottom) {
             if let toast = session.toast {
                 ToastView(toast: toast)
@@ -161,7 +170,10 @@ struct RootView: View {
             session.sheet = nil
             session.show("You joined “\(store.groups[id]?.name ?? "the group")”")
             store.joinedGroupID = nil
+            session.openPlannedIn = id
+            openPlannedDeck()
         }
+        .onChange(of: store.decks.count) { _, _ in openPlannedDeck() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 Task { await store.refresh() }
@@ -172,6 +184,17 @@ struct RootView: View {
         .onReceive(poll) { _ in
             if scenePhase == .active { Task { await store.refresh() } }
         }
+    }
+}
+
+extension RootView {
+    /// Someone who opens a link to a group with a planned deck goes straight into it.
+    fileprivate func openPlannedDeck() {
+        guard let groupID = session.openPlannedIn else { return }
+        guard let deck = store.decks(in: groupID).first(where: { Journey.isPlanned(blurb: $0.blurb) }) else { return }
+        session.openPlannedIn = nil
+        session.openingTab[deck.id] = .swipe
+        session.path = [deck.id]
     }
 }
 

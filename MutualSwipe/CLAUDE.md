@@ -26,6 +26,7 @@ A native SwiftUI (iOS 18+, iPhone, portrait, light and dark) version of the user
   - the models
   - `DeckState` (the artifact's `classify` and `deckState`, ported exactly)
   - `CardText` (cleaning, link safety, the initial letter, the color hash, "Paste a list" parsing)
+- `Journey` (in MutualKit) is "Plan something new": the questions, the categories to swipe, and which ready-made Indianapolis places fit the answers. `MutualSwipe/Journey/` holds its screens and `NearbyPlaces` (Apple Maps search with when-in-use location, filling gaps up to 8 places per category; far from Indianapolis it uses Maps only). A journey ends as a normal deck whose blurb starts "Planned in Mutual", so it adds no iCloud fields. Joining a group from a link opens its newest planned deck.
 - `MutualSwipe/` holds the app: `App/` (entry point, `AppDelegate`/`SceneDelegate`, `Session`), `Sync/`, `Home/`, `Deck/` (the Swipe, Results and Cards tabs), `Sheets/`, and `Support/Theme`.
 - `Config/MutualSwipe.entitlements` holds iCloud (CloudKit), the container `iCloud.com.steveburlison.mutualswipe`, and `aps-environment`. `Config/Info.plist` sets `CKSharingSupported` and the `remote-notification` background mode.
 
