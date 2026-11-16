@@ -219,6 +219,20 @@ final class CloudStore: CKSyncEngineDelegate {
         return added
     }
 
+    /// Saves an edited card, like a plan after its stops or photos change.
+    func updateCard(_ id: String, draft: CardDraft) {
+        guard var card = cards[id], let group = groups[card.groupID], let clean = CardText.clean(draft) else { return }
+        card.title = clean.title
+        card.subtitle = clean.subtitle
+        card.details = clean.details
+        card.link = clean.link
+        card.tags = clean.tags
+        card.plan = clean.plan
+        cards[id] = card
+        enqueueSave(id, in: group)
+        scheduleSave()
+    }
+
     func deleteCard(_ id: String) {
         guard let card = cards[id], let group = groups[card.groupID] else { return }
         enqueueDelete(id, in: group)
@@ -852,6 +866,20 @@ final class CloudStore: CKSyncEngineDelegate {
             decks[deck.id] = deck
             for (index, starter) in Starter.dates.cards.filter({ $0.hasPhoto }).prefix(6).enumerated() {
                 let card = Card(id: "indy-" + starter.id, groupID: group.id, deckID: deck.id, draft: starter.draft,
+                                order: Double(index), createdAt: now)
+                cards[card.id] = card
+            }
+        }
+
+        if Screenshots.screen?.hasPrefix("plan") == true {
+            // Planned nights, with places already located so the map shows without a network.
+            let deck = Deck(id: Screenshots.planDeckID, groupID: group.id, title: "Planned nights", kind: .dates,
+                            blurb: "Whole evenings out in Indy", createdAt: now)
+            decks[deck.id] = deck
+            for (index, starter) in Starter.plannedNights.enumerated() {
+                var draft = starter.draft
+                draft.plan = draft.plan.map(Screenshots.locate)
+                let card = Card(id: "plan-" + starter.id, groupID: group.id, deckID: deck.id, draft: draft,
                                 order: Double(index), createdAt: now)
                 cards[card.id] = card
             }

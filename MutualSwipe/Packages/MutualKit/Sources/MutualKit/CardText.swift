@@ -7,8 +7,12 @@ public struct CardDraft: Equatable, Sendable {
     public var details: String
     public var link: String
     public var tags: [String]
+    /// Set for an itinerary card: stops, times and photos.
+    public var plan: Itinerary?
 
-    public init(title: String, subtitle: String = "", details: String = "", link: String = "", tags: [String] = []) {
+    public init(title: String, subtitle: String = "", details: String = "", link: String = "", tags: [String] = [],
+                plan: Itinerary? = nil) {
+        self.plan = plan
         self.title = title
         self.subtitle = subtitle
         self.details = details
@@ -34,7 +38,7 @@ public enum CardText {
             .prefix(6)
             .map { String($0.prefix(30)) }
         return CardDraft(title: title, subtitle: limit(draft.subtitle, 160), details: limit(draft.details, 1500),
-                         link: safeURL(draft.link), tags: Array(tags))
+                         link: safeURL(draft.link), tags: Array(tags), plan: draft.plan?.cleaned())
     }
 
     public static func splitTags(_ text: String) -> [String] {

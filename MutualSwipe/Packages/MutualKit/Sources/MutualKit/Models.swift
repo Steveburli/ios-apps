@@ -207,6 +207,8 @@ public struct Card: Identifiable, Codable, Equatable, Sendable {
     /// round and every stack, for everyone, until someone brings it back.
     public var retiredAt: Date?
     public var retiredBy: String?
+    /// Set for an itinerary card: a few stops with times, a map and photos.
+    public var plan: Itinerary?
     public var systemFields: Data?
 
     public var isRetired: Bool { retiredAt != nil }
@@ -220,6 +222,7 @@ public struct Card: Identifiable, Codable, Equatable, Sendable {
         self.details = draft.details
         self.tags = draft.tags
         self.link = draft.link
+        self.plan = draft.plan
         self.order = order
         self.createdAt = createdAt
     }

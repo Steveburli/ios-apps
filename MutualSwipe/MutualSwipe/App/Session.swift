@@ -19,6 +19,8 @@ final class Session {
         case startRound(String)
         /// Pick a ready-made deck, opened on one deck when given.
         case starter(String?)
+        /// Build a new plan (itinerary card) in a deck, or edit one when a card is given.
+        case plan(deck: String, card: String?)
 
         var id: String {
             switch self {
@@ -31,6 +33,7 @@ final class Session {
             case .qr(let group): return "qr-" + group
             case .startRound(let deck): return "round-" + deck
             case .starter(let deck): return "starter-" + (deck ?? "all")
+            case .plan(let deck, let card): return "plan-" + deck + "-" + (card ?? "new")
             }
         }
     }
@@ -131,6 +134,15 @@ final class Session {
             sheet = .starter(nil)
         case "starterpreview":
             sheet = .starter("dinners")
+        case "plan":
+            path = [Screenshots.planDeckID]
+        case "plancard":
+            path = [Screenshots.planDeckID]
+            sheet = .card(Screenshots.planCardID)
+        case "planedit":
+            openingTab[Screenshots.planDeckID] = .cards
+            path = [Screenshots.planDeckID]
+            sheet = .plan(deck: Screenshots.planDeckID, card: Screenshots.planCardID)
         case "starterswipe":
             path = [Screenshots.starterDeckID]
         default:

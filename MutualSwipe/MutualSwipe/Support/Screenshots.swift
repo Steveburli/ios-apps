@@ -25,6 +25,21 @@ enum Screenshots {
     static let roundID = "round-sample"
     /// A deck copied from the ready-made Indy date nights, so its cards show photos.
     static let starterDeckID = "deck-indy"
+    /// Planned nights (itinerary cards) for the "plan", "plancard" and "planedit" screens.
+    static let planDeckID = "deck-plans"
+    static let planCardID = "plan-p-fountainsquare"
+
+    /// Made-up spots near downtown Indy so the screenshot map shows pins
+    /// without a network. Sample data only.
+    static func locate(_ plan: Itinerary) -> Itinerary {
+        var plan = plan
+        for index in plan.stops.indices {
+            plan.stops[index].latitude = 39.7497 + Double(index) * 0.0021
+            plan.stops[index].longitude = -86.1415 - Double(index % 2) * 0.0035 + Double(index) * 0.0012
+        }
+        return plan
+    }
+
     /// Round votes for the "round" and "roundresults" screens.
     static let alexRound: [(String, Vote)] = [("card-curry", .like), ("card-fajitas", .nope), ("card-salmon", .love), ("card-pizza", .never)]
     static let samRound: [(String, Vote)] = [("card-curry", .love), ("card-fajitas", .like), ("card-salmon", .like), ("card-pizza", .like)]

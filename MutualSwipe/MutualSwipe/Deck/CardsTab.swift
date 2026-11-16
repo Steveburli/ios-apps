@@ -44,6 +44,7 @@ struct CardsTab: View {
                         .background(Theme.sunk, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 } else {
                     addMany
+                    addPlan
                     addCard
                 }
                 cardList
@@ -127,6 +128,21 @@ struct CardsTab: View {
                 Label("Add many cards", systemImage: "square.stack.3d.up.fill")
             }
             .buttonStyle(.mutual(wide: true))
+        }
+    }
+
+    private var addPlan: some View {
+        Panel {
+            Text("Plan a night out").font(Theme.display(18, weight: .bold))
+            Text("One card with a few stops, their times, a map and photos to swipe through. Paste a link or type the plan, and Mutual builds it for you to check.")
+                .font(.footnote)
+                .foregroundStyle(Theme.muted)
+            Button {
+                session.sheet = .plan(deck: deck.id, card: nil)
+            } label: {
+                Label("New plan", systemImage: "map")
+            }
+            .buttonStyle(.mutual(.quiet, wide: true))
         }
     }
 

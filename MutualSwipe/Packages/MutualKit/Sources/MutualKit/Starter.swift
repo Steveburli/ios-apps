@@ -18,9 +18,12 @@ public struct StarterCard: Identifiable, Equatable, Sendable {
     /// A photo from the place's website is bundled as `starter-<id>.jpg`.
     /// Sources are listed in MutualSwipe/PHOTO-SOURCES.md.
     public let hasPhoto: Bool
+    /// Set for a planned night out: an itinerary card with stops and photos.
+    public let plan: Itinerary?
 
     init(_ id: String, _ title: String, _ facts: String, _ about: String, good: String = "", todo: String = "",
-         site: String = "", section: String, tags: [String] = [], photo: Bool = false) {
+         site: String = "", section: String, tags: [String] = [], photo: Bool = false, plan: Itinerary? = nil) {
+        self.plan = plan
         self.id = id
         self.title = title
         self.facts = facts
@@ -42,7 +45,7 @@ public struct StarterCard: Identifiable, Equatable, Sendable {
         var details = about
         if !goodFor.isEmpty { details += "\n\nGood for: " + goodFor }
         if !todo.isEmpty { details += "\nWhat to do: " + todo }
-        return CardDraft(title: title, subtitle: facts, details: details, link: website, tags: tags)
+        return CardDraft(title: title, subtitle: facts, details: details, link: website, tags: tags, plan: plan)
     }
 }
 
@@ -231,7 +234,9 @@ public enum Starter {
     ])
 
     public static let dates = StarterDeck(id: "dates", title: "Indy date nights", kind: .dates,
-                                   blurb: "Things to do in and around Indianapolis", cards: [
+                                   blurb: "Things to do in and around Indianapolis", cards: plannedNights + datePlaces)
+
+    static let datePlaces: [StarterCard] = [
         StarterCard("n-newfields", "Newfields", "Art museum and gardens · $$",
                     "The art museum, gardens and Winter Lights from November to January.",
                     good: "Any season, art lovers", todo: "Walk the gardens, then the galleries",
@@ -316,7 +321,61 @@ public enum Starter {
                     "Local beer and food trucks.",
                     good: "A low-key evening", todo: "Try a flight",
                     site: "https://www.sunkingbrewing.com/", section: "Drinks", photo: true),
-    ])
+    ]
+
+    // MARK: Planned nights
+
+    /// Whole evenings as itinerary cards: stops with times, a map and photos.
+    /// Written for Mutual. The photos are the places' own, already bundled
+    /// with the cards above.
+    public static let plannedNights: [StarterCard] = [
+        StarterCard("p-fountainsquare", "Thai, duckpins and a show in Fountain Square", "Fountain Square · $$ · 3 stops",
+                    "Three stops a short walk apart: curry, a few frames on vintage lanes, then live music.",
+                    good: "A full night without driving between stops", todo: "Check who's playing at HI-FI first",
+                    section: "Planned nights", plan: Itinerary(stops: [
+                        .init(id: "p-fs-1", time: "6:00 PM", what: "Dinner", place: "Siam Square",
+                              note: "Order a curry each and share", website: "https://siamsquareindy.com/"),
+                        .init(id: "p-fs-2", time: "7:30 PM", what: "Duckpin bowling", place: "Fountain Square Theatre Building",
+                              note: "Small balls, short lanes, no shame", website: "https://fountainsquareindy.com/"),
+                        .init(id: "p-fs-3", time: "9:00 PM", what: "Live music", place: "HI-FI Indy",
+                              website: "https://hifiindy.com/"),
+                    ], photos: ["starter:d-siam", "starter:n-duckpin", "starter:n-hifi"],
+                    area: "Fountain Square, Indianapolis, IN")),
+        StarterCard("p-bottleworks", "Food hall, pinball and a movie at Bottleworks", "Bottleworks District · $$ · 21+",
+                    "Everyone picks their own dinner, then games, then recliners for a late movie.",
+                    good: "Groups who can't agree on food", todo: "Book the movie before you go",
+                    section: "Planned nights", plan: Itinerary(stops: [
+                        .init(id: "p-bw-1", time: "5:30 PM", what: "Dinner", place: "Garage Food Hall",
+                              note: "Walk every counter before choosing", website: "https://www.garageindy.com/"),
+                        .init(id: "p-bw-2", time: "7:00 PM", what: "Duckpin and pinball", place: "Pins Mechanical Co.",
+                              note: "21 and over", website: "https://www.pinsbar.com/"),
+                        .init(id: "p-bw-3", time: "9:00 PM", what: "Movie", place: "Living Room Theaters",
+                              website: "https://livingroomtheaters.com/"),
+                    ], photos: ["starter:d-garage", "starter:n-pins"],
+                    area: "Bottleworks District, Indianapolis, IN")),
+        StarterCard("p-broadripple", "Make something, then pizza in Broad Ripple", "Broad Ripple · $$ · 2 stops",
+                    "A one-night class together, then build-your-own pizza down the street.",
+                    good: "Trying something new", todo: "Book the class a week ahead",
+                    section: "Planned nights", plan: Itinerary(stops: [
+                        .init(id: "p-br-1", time: "5:00 PM", what: "Class", place: "Indianapolis Art Center",
+                              note: "Pottery, glass or painting", website: "https://indyartcenter.org/"),
+                        .init(id: "p-br-2", time: "7:30 PM", what: "Dinner", place: "Bazbeaux Pizza Broad Ripple",
+                              note: "Split one with too many toppings", website: "https://bazbeaux.com/"),
+                    ], photos: ["starter:n-artcenter", "starter:d-bazbeaux"],
+                    area: "Broad Ripple, Indianapolis, IN")),
+        StarterCard("p-massave", "Tacos, jazz and milkshakes on Mass Ave", "Mass Ave · $$ · 3 stops",
+                    "Dinner at the bar, a set at the jazz club, and something sweet on the way home.",
+                    good: "Late nights", todo: "Bring cash for the jazz club",
+                    section: "Planned nights", plan: Itinerary(stops: [
+                        .init(id: "p-ma-1", time: "6:30 PM", what: "Tacos", place: "Bakersfield Mass Ave",
+                              website: "https://www.bakersfieldtacos.com/"),
+                        .init(id: "p-ma-2", time: "8:30 PM", what: "Jazz", place: "Chatterbox Jazz Club",
+                              note: "Tiny room, so get there early", website: "https://www.chatterboxjazz.com/"),
+                        .init(id: "p-ma-3", time: "10:30 PM", what: "Spiked milkshake", place: "Bru Burger Bar",
+                              website: "https://www.bruburgerbar.com/"),
+                    ], photos: ["starter:d-bakersfield", "starter:d-bru"],
+                    area: "Mass Ave, Indianapolis, IN")),
+    ]
 
     public static let movies = StarterDeck(id: "movies", title: "Indy movie nights", kind: .movies,
                                     blurb: "Places to see a movie", cards: [

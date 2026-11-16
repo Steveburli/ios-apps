@@ -27,6 +27,7 @@ A native SwiftUI (iOS 18+, iPhone, portrait, light and dark) version of the user
   - `DeckState` (the artifact's `classify` and `deckState`, ported exactly)
   - `CardText` (cleaning, link safety, the initial letter, the color hash, "Paste a list" parsing)
 - `MutualSwipe/` holds the app: `App/` (entry point, `AppDelegate`/`SceneDelegate`, `Session`), `Sync/`, `Home/`, `Deck/` (the Swipe, Results and Cards tabs), `Sheets/`, and `Support/Theme`.
+- **Plans** (itinerary cards): `Card.plan` is an `Itinerary` (stops with times and places, photo references, an area), saved as JSON in the Card's `itinerary` field. Photos added from a phone are JPEGs in Application Support/PlanPhotos, synced as the `photos` asset list in the same order as the plan's `photo:` entries. `ItineraryText` (MutualKit) turns pasted text into stops; `Plan/` in the app holds the card face (photos page sideways only in the photo area), the map, the editor and `PlanBuilder`, which reads a pasted link, keeps only the outline, finds each place with MapKit and takes photos from each place's own website.
 - `Config/MutualSwipe.entitlements` holds iCloud (CloudKit), the container `iCloud.com.steveburlison.mutualswipe`, and `aps-environment`. `Config/Info.plist` sets `CKSharingSupported` and the `remote-notification` background mode.
 
 ## Commands
@@ -48,7 +49,7 @@ TestFlight and App Store builds use CloudKit's **Production** environment. That 
    |---|---|
    | `Group` | `name` (String), `createdAt` (Date/Time) |
    | `Deck` | `title` (String), `kind` (String), `blurb` (String), `createdAt` (Date/Time); version 2 adds `decided` (String List), `decidedAt` (Date/Time), `decidedBy` (String), `spinCardID` (String), `spinAt` (Date/Time); version 2 build B adds `roundID` (String), `roundQuestion` (String), `roundStartedAt` (Date/Time), `roundCards` (String List), `roundFilter` (String List), `roundChain` (String List), `roundHistory` (String List) |
-   | `Card` | `deck` (Reference), `deckID` (String), `title` (String), `subtitle` (String), `details` (String), `tags` (String List), `link` (String), `order` (Double), `createdAt` (Date/Time); build B adds `retiredAt` (Date/Time), `retiredBy` (String) |
+   | `Card` | `deck` (Reference), `deckID` (String), `title` (String), `subtitle` (String), `details` (String), `tags` (String List), `link` (String), `order` (Double), `createdAt` (Date/Time); build B adds `retiredAt` (Date/Time), `retiredBy` (String); plans add `itinerary` (String) and `photos` (Asset List) |
    | `Player` | `name` (String), `color` (Int(64)), `createdAt` (Date/Time) |
    | `Pick` | `card` (Reference), `deckID` (String), `cardID` (String), `playerID` (String), `vote` (String), `updatedAt` (Date/Time); build B adds `roundID` (String) |
 
