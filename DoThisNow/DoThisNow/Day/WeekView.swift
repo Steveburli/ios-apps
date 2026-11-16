@@ -349,16 +349,24 @@ struct WeekView: View {
     /// One time range for the whole week, so the columns line up: from an
     /// hour before the earliest wake-up (or alarm) to an hour after the latest bedtime.
     static func range(of columns: [DayColumn]) -> (start: Double, end: Double) {
-        let firsts = columns.map { column in
-            ([column.wake, column.alarm ?? column.wake] + column.bars.filter { $0.start > 0 }.map(\.start)
-             + column.dots.map(\.minute)).min() ?? column.wake
+        // Split into small typed steps: one long expression here is too slow for the compiler.
+        let firsts: [Double] = columns.map { column -> Double in
+            var times: [Double] = [column.wake, column.alarm ?? column.wake]
+            times += column.bars.filter { $0.start > 0 }.map(\.start)
+            times += column.dots.map(\.minute)
+            return times.min() ?? column.wake
         }
-        let lasts = columns.map { column in
-            ([column.bars.first(where: \.isEvening)?.start ?? 22 * 60]
-             + column.bars.filter { !$0.isEvening }.map(\.end) + column.dots.map(\.minute)).max() ?? 22 * 60
+        let lasts: [Double] = columns.map { column -> Double in
+            let evening: Double = column.bars.first(where: \.isEvening)?.start ?? 22 * 60
+            var times: [Double] = [evening]
+            times += column.bars.filter { !$0.isEvening }.map(\.end)
+            times += column.dots.map(\.minute)
+            return times.max() ?? 22 * 60
         }
-        let start = max(0, (((firsts.min() ?? 6 * 60) - 60) / 60).rounded(.down) * 60)
-        let end = min(30 * 60, (((lasts.max() ?? 22 * 60) + 60) / 60).rounded(.up) * 60)
+        let earliest: Double = (firsts.min() ?? 6 * 60) - 60
+        let latest: Double = (lasts.max() ?? 22 * 60) + 60
+        let start: Double = max(0, (earliest / 60).rounded(.down) * 60)
+        let end: Double = min(30 * 60, (latest / 60).rounded(.up) * 60)
         return (start, max(end, start + 8 * 60))
     }
 
