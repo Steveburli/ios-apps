@@ -14,7 +14,7 @@ struct PlanDetails: View {
                 if plan.photos.isEmpty {
                     Theme.cardColor(card.id)
                 } else {
-                    PhotoPager(photos: plan.photos, barsInset: 14)
+                    PlanPhotoPager(photos: plan.photos, barsInset: 14)
                 }
                 LinearGradient(colors: [.clear, .black.opacity(0.75)], startPoint: .center, endPoint: .bottom)
                     .allowsHitTesting(false)

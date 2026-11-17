@@ -161,7 +161,7 @@ struct PlanPhoto: View {
 /// photo along the top. Sideways drags here page the photos instead of
 /// voting on the card. With one photo there's nothing to page, so drags
 /// pass through to the card.
-struct PhotoPager: View {
+struct PlanPhotoPager: View {
     let photos: [String]
     var barsInset: CGFloat = 10
     @State private var page = 0

@@ -22,7 +22,7 @@ struct PlanCardContent: View {
             VStack(spacing: 0) {
                 ZStack(alignment: .bottomLeading) {
                     if photos {
-                        PhotoPager(photos: plan.photos, barsInset: 16)
+                        PlanPhotoPager(photos: plan.photos, barsInset: 16)
                     } else if showsMap {
                         PlanMap(plan: plan)
                     } else {
