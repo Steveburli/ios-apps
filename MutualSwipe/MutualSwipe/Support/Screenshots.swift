@@ -4,7 +4,7 @@ import MutualKit
 /// The cloud build launches the app with `-screenshots <screen>` to photograph
 /// each screen with sample decks: home, swipe, results, overlap, card, import, spin,
 /// round, roundresults, startround, starter, starterpreview, starterswipe,
-/// questions, answer, allanswers or cardphotos. Nothing here
+/// questions, answer, allanswers, cardphotos, plan, plancard or planedit. Nothing here
 /// runs in normal use, and it never touches iCloud.
 enum Screenshots {
     static let screen: String? = {
@@ -51,6 +51,21 @@ enum Screenshots {
     }
     /// The card in that deck that gets sample photos on the "cardphotos" screen.
     static let photoCardID = "indy-" + (Starter.dates.cards.first { $0.hasPhoto }?.id ?? "")
+    /// Planned nights (itinerary cards) for the "plan", "plancard" and "planedit" screens.
+    static let planDeckID = "deck-plans"
+    static let planCardID = "plan-p-fountainsquare"
+
+    /// Made-up spots near downtown Indy so the screenshot map shows pins
+    /// without a network. Sample data only.
+    static func locate(_ plan: Itinerary) -> Itinerary {
+        var plan = plan
+        for index in plan.stops.indices {
+            plan.stops[index].latitude = 39.7497 + Double(index) * 0.0021
+            plan.stops[index].longitude = -86.1415 - Double(index % 2) * 0.0035 + Double(index) * 0.0012
+        }
+        return plan
+    }
+
     /// Round votes for the "round" and "roundresults" screens.
     static let alexRound: [(String, Vote)] = [("card-curry", .like), ("card-fajitas", .nope), ("card-salmon", .love), ("card-pizza", .never)]
     static let samRound: [(String, Vote)] = [("card-curry", .love), ("card-fajitas", .like), ("card-salmon", .like), ("card-pizza", .like)]

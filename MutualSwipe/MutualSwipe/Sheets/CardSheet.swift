@@ -180,6 +180,9 @@ struct CardSheet: View {
 
         return ScrollView {
             VStack(alignment: .leading, spacing: 12) {
+                if let plan = card.plan {
+                    PlanDetails(card: card, plan: plan, kind: deck.kind)
+                } else {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(deck.kind.label.uppercased())
                         .font(.caption.weight(.bold))
@@ -215,6 +218,7 @@ struct CardSheet: View {
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityAddTraits(.isHeader)
+                }
 
                 if mine != nil && state.participants.count > 1 && verdict != .pending {
                     Pill(text: verdict.label, tint: verdict.isMatch ? Theme.accent : Theme.ink,
@@ -237,6 +241,14 @@ struct CardSheet: View {
                     .buttonStyle(.mutual(.quiet))
                 }
                 when(card, canWrite: store.canWrite(deck.groupID))
+                if card.plan != nil && store.canWrite(deck.groupID) {
+                    Button {
+                        session.sheet = .plan(deck: deck.id, card: card.id)
+                    } label: {
+                        Label("Edit plan", systemImage: "pencil")
+                    }
+                    .buttonStyle(.mutual(.quiet))
+                }
                 if starter?.website.isEmpty == false {
                     Text("From Mutual’s ready-made decks. Last checked \(Starter.lastChecked), so check hours before you go.")
                         .font(.footnote)

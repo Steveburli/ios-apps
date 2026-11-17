@@ -107,7 +107,7 @@ private struct StarterPreview: View {
                         if isKept { dropped.insert(card.id) } else { dropped.remove(card.id) }
                     } label: {
                         HStack(alignment: .top, spacing: 12) {
-                            CardThumb(title: card.title, colorID: card.id, photo: StarterPhoto.image(named: card.photoName), size: 48)
+                            CardThumb(title: card.title, colorID: card.id, photo: StarterPhoto.image(named: card.photoName) ?? PlanPhotos.cover(of: card.plan), size: 48)
                                 .opacity(isKept ? 1 : 0.4)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(card.title).font(.body.weight(.semibold)).foregroundStyle(isKept ? Theme.ink : Theme.muted)

@@ -27,6 +27,8 @@ final class Session {
         case allAnswers(String)
         /// Put a deck's matches on a calendar in one go.
         case calendar(String)
+        /// Build a new plan (itinerary card) in a deck, or edit one when a card is given.
+        case plan(deck: String, card: String?)
 
         var id: String {
             switch self {
@@ -43,6 +45,7 @@ final class Session {
             case .answer(let deck, let player): return "answer-" + deck + "-" + player
             case .allAnswers(let deck): return "answers-" + deck
             case .calendar(let deck): return "calendar-" + deck
+            case .plan(let deck, let card): return "plan-" + deck + "-" + (card ?? "new")
             }
         }
     }
@@ -148,6 +151,15 @@ final class Session {
             sheet = .starter(nil)
         case "starterpreview":
             sheet = .starter("dinners")
+        case "plan":
+            path = [Screenshots.planDeckID]
+        case "plancard":
+            path = [Screenshots.planDeckID]
+            sheet = .card(Screenshots.planCardID)
+        case "planedit":
+            openingTab[Screenshots.planDeckID] = .cards
+            path = [Screenshots.planDeckID]
+            sheet = .plan(deck: Screenshots.planDeckID, card: Screenshots.planCardID)
         case "starterswipe":
             path = [Screenshots.starterDeckID]
         case "questions":

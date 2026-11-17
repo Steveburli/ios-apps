@@ -16,8 +16,11 @@ enum StarterPhoto {
         return image
     }
 
+    /// A plan card uses its first photo that's already on the phone.
+    @MainActor
     static func image(for card: Card) -> UIImage? {
-        image(named: Starter.match(card)?.photoName)
+        if let plan = card.plan { return PlanPhotos.cover(of: plan) }
+        return image(named: Starter.match(card)?.photoName)
     }
 }
 

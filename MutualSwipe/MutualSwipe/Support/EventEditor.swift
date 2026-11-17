@@ -41,6 +41,22 @@ struct EventEditor: UIViewControllerRepresentable {
         event.startDate = start
         event.endDate = start.addingTimeInterval(CalendarPlan.length)
 
+        // A plan is one event for the whole night: from the first stop's time
+        // to two hours after the last, with every stop in the notes.
+        if let plan = card.plan, !plan.stops.isEmpty {
+            let times = plan.stops.compactMap(\.minutes)
+            if let first = times.first, let day = calendar.date(bySettingHour: 0, minute: 0, second: 0, of: friday) {
+                let last = max(times.last ?? first, first)
+                event.startDate = day.addingTimeInterval(TimeInterval(first * 60))
+                event.endDate = day.addingTimeInterval(TimeInterval((last + 120) * 60))
+            } else {
+                event.endDate = friday.addingTimeInterval(3 * 3600)
+            }
+            let stop = plan.stops[0]
+            event.location = [stop.place, stop.address].filter { !$0.isEmpty }.joined(separator: ", ")
+            event.notes = [card.subtitle, plan.summary, card.details].filter { !$0.isEmpty }.joined(separator: "\n\n")
+        }
+
         let controller = EKEventEditViewController()
         controller.eventStore = eventStore
         controller.event = event

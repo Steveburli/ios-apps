@@ -108,6 +108,15 @@ enum Records {
         if card.writesTime {
             record["startsAt"] = card.startsAt
         }
+        // Itinerary cards only, so other cards save as before. Phone photos go up
+        // as assets in the same order as the plan's `photo:` entries.
+        if let plan = card.plan {
+            record["itinerary"] = plan.encoded()
+            let files = PlanPhotoStore.names(in: plan).map(PlanPhotoStore.url(for:))
+            if files.allSatisfy({ FileManager.default.fileExists(atPath: $0.path) }) {
+                record["photos"] = files.isEmpty ? nil : files.map { CKAsset(fileURL: $0) }
+            }
+        }
         return record
     }
 
@@ -207,6 +216,12 @@ enum Records {
         card.retiredAt = record["retiredAt"] as? Date
         card.retiredBy = record["retiredBy"] as? String
         card.startsAt = record["startsAt"] as? Date
+        card.plan = Itinerary.decode(record["itinerary"] as? String)
+        if let plan = card.plan, let assets = record["photos"] as? [CKAsset] {
+            for (name, asset) in zip(PlanPhotoStore.names(in: plan), assets) {
+                if let file = asset.fileURL { PlanPhotoStore.adopt(file, as: name) }
+            }
+        }
         card.systemFields = record.archivedSystemFields
         return card
     }

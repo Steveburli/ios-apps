@@ -216,6 +216,8 @@ public struct Card: Identifiable, Codable, Equatable, Sendable {
     /// True once someone took a card's time off, so the empty value still
     /// reaches the server.
     public var timeCleared: Bool?
+    /// Set for an itinerary card: a few stops with times, a map and photos.
+    public var plan: Itinerary?
     public var systemFields: Data?
 
     public var isRetired: Bool { retiredAt != nil }
@@ -233,6 +235,7 @@ public struct Card: Identifiable, Codable, Equatable, Sendable {
         self.tags = draft.tags
         self.link = draft.link
         self.startsAt = draft.startsAt
+        self.plan = draft.plan
         self.order = order
         self.createdAt = createdAt
     }

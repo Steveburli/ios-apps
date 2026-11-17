@@ -321,8 +321,31 @@ struct CardFace: View {
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
+        Group {
+            if let plan = card.plan {
+                PlanCardContent(card: card, plan: plan, kind: kind)
+            } else {
+                classic
+            }
+        }
+        .clipShape(shape)
+        .overlay { stampView }
+        .shadow(color: .black.opacity(0.2), radius: 20, y: 18)
+        .contentShape(shape)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityText)
+    }
+
+    private var accessibilityText: String {
+        var parts = [card.title, card.subtitle]
+        if let plan = card.plan { parts.append(plan.summary.replacingOccurrences(of: "\n", with: ". ")) } else { parts.append(card.details) }
+        if card.plan == nil && photos.count > 1 { parts.append("\(photos.count) photos") }
+        return parts.filter { !$0.isEmpty }.joined(separator: ". ")
+    }
+
+    private var classic: some View {
         let shown = photos.isEmpty ? nil : photos[min(photoIndex, photos.count - 1)]
-        ZStack(alignment: .topLeading) {
+        return ZStack(alignment: .topLeading) {
             Theme.cardColor(card.id)
             if let photo = shown {
                 GeometryReader { box in
@@ -402,13 +425,6 @@ struct CardFace: View {
             .padding(.top, 20)
             .padding(.bottom, 22)
         }
-        .clipShape(shape)
-        .overlay { stampView }
-        .shadow(color: .black.opacity(0.2), radius: 20, y: 18)
-        .contentShape(shape)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(([card.title, card.subtitle, card.details] + (photos.count > 1 ? ["\(photos.count) photos"] : []))
-            .filter { !$0.isEmpty }.joined(separator: ". "))
     }
 
     /// Two invisible halves over the top of the photo: left goes back, right goes on.
