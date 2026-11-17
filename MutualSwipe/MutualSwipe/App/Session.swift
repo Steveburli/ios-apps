@@ -29,6 +29,8 @@ final class Session {
         case calendar(String)
         /// Build a new plan (itinerary card) in a deck, or edit one when a card is given.
         case plan(deck: String, card: String?)
+        /// "Plan something new": the guided journey.
+        case journey
 
         var id: String {
             switch self {
@@ -46,6 +48,7 @@ final class Session {
             case .allAnswers(let deck): return "answers-" + deck
             case .calendar(let deck): return "calendar-" + deck
             case .plan(let deck, let card): return "plan-" + deck + "-" + (card ?? "new")
+            case .journey: return "journey"
             }
         }
     }
@@ -69,6 +72,10 @@ final class Session {
     }
     /// Decks showing their vetting while a round is running. Rounds show by default.
     var vettingShown: Set<String> = []
+    /// A deck the journey just made, until its "Your plan is ready" banner is closed.
+    var journeyMade: JourneyMade?
+    /// A group just joined from a link: its newest planned deck opens once it arrives.
+    var openPlannedIn: String?
     /// The player picker opens by itself once per launch.
     var pickerShown = false
     /// Deck~person pairs whose questions already opened by themselves this launch.
@@ -175,6 +182,8 @@ final class Session {
         case "cardphotos":
             path = [Screenshots.starterDeckID]
             sheet = .card(Screenshots.photoCardID)
+        case "journey":
+            sheet = .journey
         default:
             break
         }

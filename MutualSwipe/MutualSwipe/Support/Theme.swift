@@ -2,17 +2,26 @@ import SwiftUI
 import UIKit
 import MutualKit
 
-/// The artifact's palette, light and dark.
+/// Mutual's palette, light and dark: warm cream and a pink-to-orange accent.
 enum Theme {
-    static let bg = Color(light: 0xF1F2F7, dark: 0x0D0E15)
-    static let surface = Color(light: 0xFFFFFF, dark: 0x171925)
-    static let sunk = Color(light: 0xE6E8F0, dark: 0x202331)
-    static let ink = Color(light: 0x161726, dark: 0xECEEF6)
-    static let muted = Color(light: 0x5B6075, dark: 0x9A9FB5)
-    static let line = Color(light: 0xD9DCE6, dark: 0x2A2D3C)
-    static let accent = Color(light: 0xD01C5B, dark: 0xFF5A8E)
-    static let accentInk = Color(light: 0xFFFFFF, dark: 0x22040F)
-    static let accentSoft = Color(light: 0xFBE1EA, dark: 0x3B1224)
+    static let bg = Color(light: 0xFFF7F2, dark: 0x120E14)
+    static let surface = Color(light: 0xFFFFFF, dark: 0x1D1820)
+    static let sunk = Color(light: 0xF6EAE3, dark: 0x2A2330)
+    static let ink = Color(light: 0x1F1622, dark: 0xF6EEF3)
+    static let muted = Color(light: 0x6B5D6F, dark: 0xB0A3B4)
+    static let line = Color(light: 0xEEDDD4, dark: 0x352C3A)
+    static let accent = Color(light: 0xD4145A, dark: 0xFF6B93)
+    static let accentInk = Color(light: 0xFFFFFF, dark: 0x2A0712)
+    static let accentSoft = Color(light: 0xFFE3EA, dark: 0x3F1526)
+    /// The second gradient color. White text stays readable on both ends.
+    static let accentWarm = Color(hex: 0xC2410C)
+
+    /// Big cards and tiles.
+    static let radius: CGFloat = 22
+
+    /// The hero gradient: the "Plan something new" card, the journey's progress bar.
+    static let heroGradient = LinearGradient(colors: [Color(hex: 0xD4145A), accentWarm],
+                                             startPoint: .topLeading, endPoint: .bottomTrailing)
 
     /// Card and player colors.
     static let palette: [Color] = [0xC2410C, 0x0F766E, 0x1D4ED8, 0x9D174D, 0x6D28D9, 0x166534, 0xA16207, 0x334155]
@@ -187,11 +196,11 @@ struct MutualButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.subheadline.weight(.semibold))
+            .font(.body.weight(.bold))
             .foregroundStyle(kind == .primary ? Theme.accentInk : kind == .danger ? Vote.never.color : Theme.ink)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 11)
-            .frame(minHeight: 44)
+            .padding(.horizontal, 22)
+            .padding(.vertical, 13)
+            .frame(minHeight: 50)
             .frame(maxWidth: wide ? .infinity : nil)
             .background(kind == .primary ? Theme.accent : kind == .danger ? Vote.never.soft : Theme.sunk, in: Capsule())
             .opacity(isEnabled ? (configuration.isPressed ? 0.8 : 1) : 0.5)
@@ -214,8 +223,8 @@ struct Panel<Content: View>: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.line))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.radius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous).strokeBorder(Theme.line))
     }
 }
 

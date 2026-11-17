@@ -4,7 +4,7 @@ import MutualKit
 /// The cloud build launches the app with `-screenshots <screen>` to photograph
 /// each screen with sample decks: home, swipe, results, overlap, card, import, spin,
 /// round, roundresults, startround, starter, starterpreview, starterswipe,
-/// questions, answer, allanswers, cardphotos, plan, plancard or planedit. Nothing here
+/// questions, answer, allanswers, cardphotos, plan, plancard, planedit or journey. Nothing here
 /// runs in normal use, and it never touches iCloud.
 enum Screenshots {
     static let screen: String? = {
