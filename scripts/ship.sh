@@ -6,6 +6,7 @@
 #   ./scripts/ship.sh OMM
 #   ./scripts/ship.sh DoThisNow
 #   ./scripts/ship.sh MutualSwipe
+#   ./scripts/ship.sh MapMyArgument
 #
 # The Team ID comes from the project settings. To use another one, run with
 # TEAM_ID=XXXXXXXXXX, or put it in scripts/team-id.
@@ -13,8 +14,8 @@ set -euo pipefail
 
 app="${1:-}"
 case "$app" in
-  OMM|DoThisNow|MutualSwipe) ;;
-  *) echo "Usage: ./scripts/ship.sh OMM | DoThisNow | MutualSwipe"; exit 1 ;;
+  OMM|DoThisNow|MutualSwipe|MapMyArgument) ;;
+  *) echo "Usage: ./scripts/ship.sh OMM | DoThisNow | MutualSwipe | MapMyArgument"; exit 1 ;;
 esac
 
 root="$(cd "$(dirname "$0")/.." && pwd)"

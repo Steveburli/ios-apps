@@ -37,6 +37,8 @@ jobs:
             kit: DoThisNowKit
           - app: MutualSwipe
             kit: MutualKit
+          - app: MapMyArgument
+            kit: ArgumentKit
     steps:
       - uses: actions/checkout@v7
 
@@ -85,3 +87,17 @@ jobs:
       - name: Fail the job if tests or the build failed
         if: steps.tests.outcome == 'failure' || steps.build.outcome == 'failure'
         run: exit 1
+
+  # Map My Argument's website: the scoring engine's tests, which also check the shared
+  # cases in MapMyArgument/Packages/ArgumentKit/Tests/ArgumentKitTests/Fixtures.
+  web:
+    name: MapMyArgument website
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Engine tests
+        run: node --test MapMyArgument/web/tests/*.test.mjs

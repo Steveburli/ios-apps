@@ -2,7 +2,7 @@
 # TestFlight 10-30 minutes later. No Mac needed. Start it by pushing a tag named
 # testflight-<App>-<number>:
 #
-#   testflight-OMM-1   testflight-DoThisNow-1   testflight-MutualSwipe-1
+#   testflight-OMM-1   testflight-DoThisNow-1   testflight-MutualSwipe-1   testflight-MapMyArgument-1
 #
 # or from the Actions tab with "Run workflow". scripts/ship.sh on a Mac is the fallback.
 #
@@ -28,7 +28,7 @@ on:
       app:
         description: Which app to send to TestFlight
         type: choice
-        options: [OMM, DoThisNow, MutualSwipe]
+        options: [OMM, DoThisNow, MutualSwipe, MapMyArgument]
         required: true
 
 concurrency:
@@ -72,8 +72,9 @@ jobs:
               # The Lock Screen and Home Screen widgets, with their own App ID and profile.
               echo "WIDGETS_BUNDLE_ID=com.steveburlison.dothisnow.widgets" >> "$GITHUB_ENV" ;;
             MutualSwipe) bundle=com.steveburlison.mutualswipe ;;
+            MapMyArgument) bundle=com.steveburlison.mapmyargument ;;
             *)
-              echo "::error::Unknown app \"$app\". Name the tag testflight-OMM-1, testflight-DoThisNow-1 or testflight-MutualSwipe-1."
+              echo "::error::Unknown app \"$app\". Name the tag testflight-OMM-1, testflight-DoThisNow-1, testflight-MutualSwipe-1 or testflight-MapMyArgument-1."
               exit 1 ;;
           esac
           echo "APP=$app" >> "$GITHUB_ENV"

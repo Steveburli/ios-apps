@@ -1,12 +1,13 @@
 # iOS apps
 
-Three native iPhone apps (SwiftUI, iOS 18+), each an Xcode project plus a small Swift package of tested logic:
+Four native iPhone apps (SwiftUI, iOS 18+), each an Xcode project plus a small Swift package of tested logic:
 
 | Folder | App | Bundle ID |
 |---|---|---|
 | `OMM/` | OMM: Old Man Maintenance, a superset workout program | `com.steveburlison.omm` |
 | `DoThisNow/` | Do This Now, which picks the one thing to do now and includes a day planner | `com.steveburlison.dothisnow` |
 | `MutualSwipe/` | Mutual, for swiping on shared decks with iCloud sharing | `com.steveburlison.mutualswipe` |
+| `MapMyArgument/` | Map My Argument, which turns an argument into a building and stress-tests it (plus its website in `MapMyArgument/web/`) | `com.steveburlison.mapmyargument` |
 
 ## How it's built
 
@@ -28,7 +29,7 @@ Three native iPhone apps (SwiftUI, iOS 18+), each an Xcode project plus a small 
 
 ```bash
 cd ~/Developer/ios-apps
-./scripts/ship.sh OMM          # or DoThisNow, or MutualSwipe
+./scripts/ship.sh OMM          # or DoThisNow, MutualSwipe, or MapMyArgument
 ```
 
 It pulls the latest code, archives and signs the app with your Xcode account, and uploads it to App Store Connect. The build appears under TestFlight about 10–30 minutes later.

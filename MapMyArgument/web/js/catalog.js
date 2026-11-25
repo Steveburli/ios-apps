@@ -1,0 +1,165 @@
+/*
+ * Map My Argument: ready-made topics and the example maps.
+ *
+ * This file is the single source for both apps: `node tools/gen-swift-catalog.mjs`
+ * writes Packages/ArgumentKit/Sources/ArgumentKit/Catalog.swift from it. Edit
+ * here, then run that.
+ */
+(function (root) {
+  "use strict";
+
+  // Grouped like a debate club's motion list. Each is a statement someone could
+  // be for or against. Drawn from the kinds of questions people argue about on
+  // debate forums and in formal debates.
+  const TOPICS = [
+    { category: "Society", items: [
+      "The voting age should be lowered to 16",
+      "Elections should be held on a weekend",
+      "The Electoral College should be replaced by the national popular vote",
+      "Too many kids go to college",
+      "Smart technology is making us dumb",
+      "Privacy is overrated",
+    ] },
+    { category: "Economy", items: [
+      "A universal basic income would work better than today's welfare programs",
+      "The minimum wage should be abolished",
+      "Insider trading shouldn't be a crime",
+      "Big banks should be broken up",
+      "Self-driving cars will destroy more jobs than they create",
+    ] },
+    { category: "Science and energy", items: [
+      "We should build more nuclear power plants",
+      "Organic food is mostly marketing hype",
+      "Genetically modified food is safe to eat",
+      "Major cuts to carbon emissions are worth the cost",
+      "Artificial intelligence will do more harm than good",
+    ] },
+    { category: "Health", items: [
+      "People should be allowed to sell their organs",
+      "College students should be allowed to take smart drugs",
+      "Obesity is the government's business",
+      "Lifespans are long enough",
+    ] },
+    { category: "Sports", items: [
+      "Performance-enhancing drugs should be allowed in sports",
+      "College football should be banned",
+      "NFL overtime should give both teams the ball",
+      "Instant replay makes sports fairer",
+    ] },
+    { category: "Just for fun", items: [
+      "The spork is an inferior utensil",
+      "Ice cream is better in a cone than a cup",
+      "A proper quesadilla uses two tortillas",
+      "A hot dog is a sandwich",
+      "Movies should be judged without comparing them to the book",
+      "The five-star review system is broken",
+    ] },
+  ];
+
+  // The example on the home screen: a real-looking map with the usual soft
+  // spots, so every part of the tower has something to show (an IXI pillar, a
+  // belief cloud, termites, an unanswered counter-argument, a sub-claim).
+  const EXAMPLE = {
+    version: 1,
+    id: "example-nuclear",
+    topic: "We should build more nuclear power plants",
+    thesis: "We should build more nuclear power plants",
+    stance: "for",
+    author: "Example",
+    basedOn: "",
+    trust: {
+      study: "trust", government: "trust", news: "unfamiliar", expert: "trust",
+      reference: "trust", advocacy: "distrust", social: "distrust", personal: "unfamiliar",
+    },
+    created: "2026-11-25T12:00:00.000Z",
+    updated: "2026-11-25T12:00:00.000Z",
+    claims: [
+      {
+        id: "ex-carbon", parent: null, importance: 5, confidence: 90, familiarity: 4, cloud: false, votes: 3,
+        text: "Nuclear power produces very little carbon over its whole life cycle",
+        sources: [
+          { id: "ex-s1", title: "IPCC AR5 Working Group III, Annex III", url: "https://www.ipcc.ch/report/ar5/wg3/", kind: "study", lean: "neutral" },
+          { id: "ex-s2", title: "UNECE life cycle assessment of electricity sources (2021)", url: "https://unece.org/sed/documents/2021/10/reports/life-cycle-assessment-electricity-generation-options", kind: "government", lean: "neutral" },
+          { id: "ex-s3", title: "Our World in Data: carbon intensity of electricity", url: "https://ourworldindata.org/safest-sources-of-energy", kind: "reference", lean: "neutral" },
+        ],
+        counters: [{ id: "ex-x1", text: "Mining and enriching uranium has its own emissions", strength: 2, answered: true }],
+        disputedBy: [],
+      },
+      {
+        id: "ex-safe", parent: null, importance: 4, confidence: 80, familiarity: 3, cloud: false, votes: 1,
+        text: "Nuclear is one of the safest energy sources per unit of electricity",
+        sources: [
+          { id: "ex-s4", title: "Our World in Data: deaths per terawatt-hour", url: "https://ourworldindata.org/safest-sources-of-energy", kind: "reference", lean: "neutral" },
+          { id: "ex-s5", title: "Newspaper explainer on nuclear safety", url: "", kind: "news", lean: "left" },
+        ],
+        counters: [{ id: "ex-x2", text: "Chernobyl and Fukushima show how bad the worst case can be", strength: 4, answered: true }],
+        disputedBy: [],
+      },
+      {
+        id: "ex-cost", parent: null, importance: 3, confidence: 75, familiarity: 1, cloud: false, votes: 0,
+        text: "New reactors can be built on time and on budget",
+        sources: [
+          { id: "ex-s6", title: "A viral thread about small modular reactors", url: "", kind: "social", lean: "right" },
+        ],
+        counters: [{ id: "ex-x3", text: "Vogtle units 3 and 4 in Georgia opened years late and billions over budget", strength: 5, answered: false }],
+        disputedBy: ["progressive", "libertarian"],
+      },
+      {
+        id: "ex-waste", parent: null, importance: 3, confidence: 70, familiarity: 2, cloud: true, votes: 0,
+        text: "Nuclear waste can be stored safely for the long term",
+        sources: [],
+        counters: [],
+        disputedBy: ["progressive"],
+      },
+      {
+        id: "ex-onkalo", parent: "ex-waste", importance: 3, confidence: 70, familiarity: 3, cloud: false, votes: 0,
+        text: "Finland's deep underground repository shows permanent storage can work",
+        sources: [
+          { id: "ex-s7", title: "News report on Finland's Onkalo repository", url: "", kind: "news", lean: "neutral" },
+        ],
+        counters: [],
+        disputedBy: [],
+      },
+    ],
+  };
+
+  // A friend's response to the example: same claims (same ids), their own
+  // confidence and their own source trust, plus one claim of their own.
+  const EXAMPLE_FRIEND = {
+    version: 1,
+    id: "example-nuclear-sam",
+    topic: EXAMPLE.topic,
+    thesis: "We shouldn't build more nuclear power plants",
+    stance: "against",
+    author: "Sam (example)",
+    basedOn: "example-nuclear",
+    trust: {
+      study: "trust", government: "unfamiliar", news: "trust", expert: "trust",
+      reference: "unfamiliar", advocacy: "trust", social: "distrust", personal: "trust",
+    },
+    created: "2026-11-25T12:00:00.000Z",
+    updated: "2026-11-25T12:00:00.000Z",
+    claims: [
+      { id: "ex-carbon", parent: null, importance: 4, confidence: 85, familiarity: 3, cloud: false, votes: 0,
+        text: EXAMPLE.claims[0].text, sources: [], counters: [], disputedBy: [] },
+      { id: "ex-safe", parent: null, importance: 4, confidence: 40, familiarity: 2, cloud: false, votes: 0,
+        text: EXAMPLE.claims[1].text, sources: [], counters: [], disputedBy: [] },
+      { id: "ex-cost", parent: null, importance: 5, confidence: 10, familiarity: 4, cloud: false, votes: 0,
+        text: EXAMPLE.claims[2].text,
+        sources: [{ id: "sam-s1", title: "Utility filings on the Vogtle expansion", url: "", kind: "government", lean: "neutral" }],
+        counters: [], disputedBy: [] },
+      { id: "ex-waste", parent: null, importance: 3, confidence: 30, familiarity: 2, cloud: false, votes: 0,
+        text: EXAMPLE.claims[3].text, sources: [], counters: [], disputedBy: [] },
+      { id: "ex-onkalo", parent: "ex-waste", importance: 3, confidence: 75, familiarity: 3, cloud: false, votes: 0,
+        text: EXAMPLE.claims[4].text, sources: [], counters: [], disputedBy: [] },
+      { id: "sam-renew", parent: null, importance: 4, confidence: 80, familiarity: 3, cloud: false, votes: 0,
+        text: "Solar and wind plus batteries are now cheaper to build than new nuclear",
+        sources: [{ id: "sam-s2", title: "Lazard levelized cost of energy analysis", url: "https://www.lazard.com/research-insights/levelized-cost-of-energyplus/", kind: "expert", lean: "neutral" }],
+        counters: [], disputedBy: [] },
+    ],
+  };
+
+  const CATALOG = { TOPICS, EXAMPLE, EXAMPLE_FRIEND };
+  if (typeof module !== "undefined" && module.exports) module.exports = CATALOG;
+  root.MMA_CATALOG = CATALOG;
+})(typeof globalThis !== "undefined" ? globalThis : this);
