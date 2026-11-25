@@ -34,7 +34,7 @@ xcodebuild -project MapMyArgument/MapMyArgument.xcodeproj -scheme MapMyArgument 
 
 ## Status (2026-11-25)
 
-First version of both. The website was clicked through end to end in a headless browser (build, stress tests, opponent, share, rate on a second "phone", compare). The Swift code has not been compiled yet: there's no Swift toolchain in the cloud session, so the first cloud Mac build will show any errors in `report-MapMyArgument/errors.txt`.
+First version of both. The website was clicked through end to end in a headless browser (build, stress tests, opponent, share, rate on a second "phone", compare). The first cloud Mac build (run 64, on the branch) passed: `swift test` including the shared engine cases, the Simulator build, and 10 screenshots. Nobody has looked at those screenshots yet, and the app hasn't run on a real iPhone.
 
 ## Ideas not built yet
 
