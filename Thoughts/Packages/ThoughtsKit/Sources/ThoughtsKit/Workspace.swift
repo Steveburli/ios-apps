@@ -167,7 +167,8 @@ public struct Workspace: Codable, Equatable, Sendable {
 
     public mutating func toggleFavorite(_ id: UUID, now: Date = Date()) {
         guard pages[id] != nil else { return }
-        pages[id]?.favorited = pages[id]?.favorited == nil ? now : nil
+        let wasFavorite = pages[id]?.favorited != nil
+        pages[id]?.favorited = wasFavorite ? nil : now
     }
 
     // MARK: - Moving
@@ -226,8 +227,9 @@ public struct Workspace: Codable, Equatable, Sendable {
         guard pages[id] != nil else { return }
         pages[id]?.trashed = nil
         if let parent = pages[id]?.parentID, pages[parent] == nil || isInTrash(parent) {
+            let order = nextOrder(under: nil)
             pages[id]?.parentID = nil
-            pages[id]?.order = nextOrder(under: nil)
+            pages[id]?.order = order
         }
     }
 
