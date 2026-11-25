@@ -383,12 +383,12 @@ struct DayTotalsCard: View {
 
     private func stats(_ s: DaySummary) -> [Stat] {
         var items: [Stat] = []
-        if s.bottles > 0 { items.append(Stat(label: "\(s.bottles) bottle\(s.bottles == 1 ? "" : "s")", value: Measure.oz(s.bottleOz)) }
-        if s.nursing > 0 { items.append(Stat(label: "nursing ×\(s.nursing)", value: "\(s.nursingMinutes)m") }
-        if s.diapers > 0 { items.append(Stat(label: "diapers · \(s.dirty) dirty", value: "\(s.diapers)") }
-        if s.sleepMinutes > 0 { items.append(Stat(label: "sleep · \(s.naps) nap\(s.naps == 1 ? "" : "s")", value: Dates.duration(Double(s.sleepMinutes) * 60)) }
-        if s.meals > 0 { items.append(Stat(label: "meals · \(s.foods) foods", value: "\(s.meals)") }
-        if s.pottySuccesses + s.accidents > 0 { items.append(Stat(label: "potty · \(s.accidents) accident\(s.accidents == 1 ? "" : "s")", value: "\(s.pottySuccesses)") }
+        if s.bottles > 0 { items.append(Stat(label: "\(s.bottles) bottle\(s.bottles == 1 ? "" : "s")", value: Measure.oz(s.bottleOz))) }
+        if s.nursing > 0 { items.append(Stat(label: "nursing ×\(s.nursing)", value: "\(s.nursingMinutes)m")) }
+        if s.diapers > 0 { items.append(Stat(label: "diapers · \(s.dirty) dirty", value: "\(s.diapers)")) }
+        if s.sleepMinutes > 0 { items.append(Stat(label: "sleep · \(s.naps) nap\(s.naps == 1 ? "" : "s")", value: Dates.duration(Double(s.sleepMinutes) * 60))) }
+        if s.meals > 0 { items.append(Stat(label: "meals · \(s.foods) foods", value: "\(s.meals)")) }
+        if s.pottySuccesses + s.accidents > 0 { items.append(Stat(label: "potty · \(s.accidents) accident\(s.accidents == 1 ? "" : "s")", value: "\(s.pottySuccesses)")) }
         return items
     }
 }
