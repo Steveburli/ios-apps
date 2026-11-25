@@ -14,9 +14,10 @@ final class GeoTests: XCTestCase {
     func testBearingCardinals() {
         let north = Geo.destination(from: cityHall, bearing: 0, meters: 1000)
         let east = Geo.destination(from: cityHall, bearing: 90, meters: 1000)
-        XCTAssertEqual(Geo.bearing(from: cityHall, to: north), 0, accuracy: 0.5)
-        XCTAssertEqual(Geo.bearing(from: cityHall, to: east), 90, accuracy: 0.5)
-        XCTAssertEqual(Geo.bearing(from: north, to: cityHall), 180, accuracy: 0.5)
+        // Compare as angles: due north can come back as 359.9999…
+        XCTAssertEqual(Geo.angleBetween(Geo.bearing(from: cityHall, to: north), 0), 0, accuracy: 0.5)
+        XCTAssertEqual(Geo.angleBetween(Geo.bearing(from: cityHall, to: east), 90), 0, accuracy: 0.5)
+        XCTAssertEqual(Geo.angleBetween(Geo.bearing(from: north, to: cityHall), 180), 0, accuracy: 0.5)
     }
 
     func testDestinationRoundTrip() {
