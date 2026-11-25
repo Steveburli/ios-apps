@@ -14,6 +14,7 @@ case "$app" in
   OMM)         bundle="com.steveburlison.omm";         screens="home quicklog preset workout howto weights cardio stretch stretchtab routine complete sunlight sunlightsettings" ;;
   MutualSwipe) bundle="com.steveburlison.mutualswipe"; screens="home swipe results overlap card import spin round roundresults startround starter starterpreview starterswipe journey cardphotos questions answer allanswers plan plancard planedit" ;;
   DoThisNow)   bundle="com.steveburlison.dothisnow";   screens="now pick doing tasks day dayfull week inbox inboxpage replan trip tripcatchup track places wake" ;;
+  Thoughts)    bundle="com.steveburlison.thoughts";    screens="home page slash table board row search settings" ;;
   *) echo "Unknown app: $app"; exit 1 ;;
 esac
 

@@ -37,6 +37,8 @@ jobs:
             kit: DoThisNowKit
           - app: MutualSwipe
             kit: MutualKit
+          - app: Thoughts
+            kit: ThoughtsKit
     steps:
       - uses: actions/checkout@v7
 
