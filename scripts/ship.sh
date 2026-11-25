@@ -13,8 +13,8 @@ set -euo pipefail
 
 app="${1:-}"
 case "$app" in
-  OMM|DoThisNow|MutualSwipe) ;;
-  *) echo "Usage: ./scripts/ship.sh OMM | DoThisNow | MutualSwipe"; exit 1 ;;
+  OMM|DoThisNow|MutualSwipe|FishersGuide) ;;
+  *) echo "Usage: ./scripts/ship.sh OMM | DoThisNow | MutualSwipe | FishersGuide"; exit 1 ;;
 esac
 
 root="$(cd "$(dirname "$0")/.." && pwd)"

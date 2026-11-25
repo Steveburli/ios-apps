@@ -1,0 +1,251 @@
+{
+  "id": "fishers",
+  "title": "Fishers & Hamilton County",
+  "summary": "A drive-along guide to Fishers, Noblesville, Carmel and the White River valley.",
+  "center": {
+    "lat": 39.99,
+    "lon": -86.0
+  },
+  "span": 0.3,
+  "stops": [
+    {
+      "id": "fishers-welcome",
+      "kind": "area",
+      "category": "area",
+      "title": "Welcome to Fishers",
+      "subtitle": "From railroad switch to city",
+      "location": {
+        "lat": 39.95611,
+        "lon": -86.01278
+      },
+      "radius": 6000,
+      "priority": 0,
+      "narration": "Welcome to Fishers. This city began as a stop on the railroad. In June of 1872, a local landowner named Salathiel Fisher divided twelve acres into town lots beside the tracks, and the little settlement was platted as Fishers Switch. Fisher died the next year, and his son Henry carried on building the town. It was later called Fishers Station, and in 1908 the post office shortened the name to just Fishers. The town incorporated in 1891, and after more than a century of growth it officially became a city on January first, 2015. Keep listening as you drive: this guide will tell you about the places you pass."
+    },
+    {
+      "id": "noblesville-welcome",
+      "kind": "area",
+      "category": "area",
+      "title": "Welcome to Noblesville",
+      "subtitle": "The Hamilton County seat",
+      "location": {
+        "lat": 40.0456,
+        "lon": -86.0086
+      },
+      "radius": 4500,
+      "priority": 0,
+      "narration": "You're entering Noblesville, the county seat of Hamilton County. The town was platted in January of 1823 by fur trader William Conner and Josiah Polk, and it became the county seat the following year. It was most likely named for James Noble, one of Indiana's first United States senators, though a local legend says Polk named it for a sweetheart, Lavina Noble. Conner donated the land for the courthouse square, on the condition that it be used for the seat of county government."
+    },
+    {
+      "id": "carmel-welcome",
+      "kind": "area",
+      "category": "area",
+      "title": "Welcome to Carmel",
+      "subtitle": "Bethlehem, renamed",
+      "location": {
+        "lat": 39.9784,
+        "lon": -86.118
+      },
+      "radius": 5000,
+      "priority": 0,
+      "narration": "Welcome to Carmel. The first settlers here were mostly Quakers, and the village was originally called Bethlehem. Because another Indiana post office already used that name, the local post office took the name Carmel in 1846, and the town made it official when it incorporated in 1874. Today Carmel is famous for something you're probably about to drive through: roundabouts. The city has built well over a hundred and fifty of them since the late 1990s, more than almost any city in the country."
+    },
+    {
+      "id": "fishers-municipal",
+      "category": "landmark",
+      "title": "Fishers City Hall & Nickel Plate District",
+      "subtitle": "Downtown Fishers",
+      "location": {
+        "lat": 39.95865,
+        "lon": -86.01704
+      },
+      "radius": 250,
+      "priority": 2,
+      "address": "1 Municipal Drive, Fishers, IN 46038",
+      "teaser": "the heart of downtown Fishers, the Nickel Plate District.",
+      "narration": "This is the Nickel Plate District, the downtown that Fishers built around its city hall. The district takes its name from the Nickel Plate railroad line, the same tracks that gave Fishers Switch its start in 1872. The old rail corridor has since become the Nickel Plate Trail, a walking and biking path that runs north and south through the city. Next to city hall is the Nickel Plate District Amphitheater, which hosts concerts, movies and community events through the warmer months."
+    },
+    {
+      "id": "ritchey-woods",
+      "category": "nature",
+      "title": "Ritchey Woods Nature Preserve",
+      "subtitle": "127 acres of woods, prairie and wetland",
+      "location": {
+        "lat": 39.93917,
+        "lon": -86.03778
+      },
+      "radius": 300,
+      "priority": 1,
+      "address": "10410 Hague Road, Fishers, IN 46038",
+      "teaser": "a quiet nature preserve tucked between the neighborhoods.",
+      "narration": "Off to the side here is Ritchey Woods Nature Preserve. Dr. James Oscar Ritchey left this land to The Nature Conservancy to be protected after his death, and the preserve opened in 1983. Later held by the Children's Museum of Indianapolis, it was handed over to Fishers in 2004. Its 127 acres include forest, prairie and wetland, with about two and a quarter miles of trails, and Hare Creek winding through on its way to the White River. It's free and open from dawn to dusk, and it's a favorite spot for bird watching."
+    },
+    {
+      "id": "conner-prairie",
+      "category": "history",
+      "title": "Conner Prairie",
+      "subtitle": "Living history museum",
+      "location": {
+        "lat": 39.98453,
+        "lon": -86.02886
+      },
+      "radius": 400,
+      "priority": 3,
+      "address": "13400 Allisonville Road, Fishers, IN 46038",
+      "website": "https://www.connerprairie.org",
+      "teaser": "Conner Prairie, where Indiana's frontier past comes back to life.",
+      "narration": "This is Conner Prairie. In the early 1800s, fur trader William Conner set up a cabin and trading post along the White River here. In 1823 he built a two-story brick house on the bluff above the river, believed to be one of the first brick buildings in central Indiana, and it still stands. In 1934, Indianapolis businessman and philanthropist Eli Lilly bought the property and restored the house. Thirty years later he placed it in a trust with Earlham College, and in 2005 Conner Prairie became an independent museum. Today it's a living history park, where costumed interpreters bring nineteenth-century Indiana to life.",
+      "directional": [
+        {
+          "heading": {
+            "from": 300,
+            "to": 60
+          },
+          "text": "This is Conner Prairie. As you head north toward Noblesville, you're following roughly the same White River valley that fur trader William Conner traveled in the early 1800s, when he set up a trading post here. In 1823 he built a two-story brick house on the bluff above the river, believed to be one of the first brick buildings in central Indiana, and it still stands. Eli Lilly bought and restored the property in 1934, and today it's a living history museum, where costumed interpreters bring nineteenth-century Indiana to life."
+        }
+      ]
+    },
+    {
+      "id": "courthouse-square",
+      "category": "history",
+      "title": "Hamilton County Courthouse Square",
+      "subtitle": "Noblesville, 1879",
+      "location": {
+        "lat": 40.04583,
+        "lon": -86.01417
+      },
+      "radius": 250,
+      "priority": 3,
+      "teaser": "the historic Hamilton County Courthouse on the Noblesville square.",
+      "narration": "This is the Hamilton County Courthouse Square. The three-story brick courthouse was built between 1877 and 1879 in the Second Empire style, and it's listed on the National Register of Historic Places. Beside it stand the sheriff's residence and jail, finished in 1876. This courthouse saw one of the most important trials in Indiana history. In 1925, D. C. Stephenson, the leader of the Ku Klux Klan in Indiana, was tried here after the case was moved from Indianapolis, and a Hamilton County jury convicted him of murder in the death of Madge Oberholtzer. Historians credit the verdict with breaking the Klan's power in Indiana."
+    },
+    {
+      "id": "potters-bridge",
+      "category": "landmark",
+      "title": "Potter's Covered Bridge",
+      "subtitle": "The last covered bridge in the county",
+      "location": {
+        "lat": 40.0725,
+        "lon": -86.00056
+      },
+      "radius": 250,
+      "priority": 3,
+      "address": "19401 North Allisonville Road, Noblesville, IN",
+      "teaser": "a covered bridge that's been crossing the White River since 1871.",
+      "narration": "This is Potter's Covered Bridge, spanning the White River. It was built in 1871 by Josiah Durfee of Noblesville, using a wooden Howe truss design, and it's about two hundred and sixty feet long. Cars no longer cross it, but you can walk through it in the park beside the road. If you have a few minutes, it's worth stopping to hear the river under the old wooden floor."
+    },
+    {
+      "id": "strawtown-koteewi",
+      "category": "nature",
+      "title": "Strawtown Koteewi Park",
+      "subtitle": "Prairie, river and archaeology",
+      "location": {
+        "lat": 40.1233,
+        "lon": -85.9444
+      },
+      "radius": 800,
+      "priority": 2,
+      "address": "12308 Strawtown Avenue, Noblesville, IN",
+      "teaser": "a park where archaeologists have uncovered centuries of Native American life.",
+      "narration": "This is the Strawtown area, home to Strawtown Koteewi Park, around eight hundred acres along the White River. People lived on this land for centuries before European settlers arrived, and university-led archaeological digs in the park have uncovered the remains of Native American homes and daily life. The Delaware people lived in this area after moving from Ohio around 1795. The park's name honors those who called this land home long ago."
+    },
+    {
+      "id": "ruoff",
+      "category": "entertainment",
+      "title": "Ruoff Music Center",
+      "subtitle": "Locals still call it Deer Creek",
+      "location": {
+        "lat": 40.00516,
+        "lon": -85.931061
+      },
+      "radius": 450,
+      "priority": 2,
+      "address": "12880 East 146th Street, Noblesville, IN",
+      "teaser": "the outdoor amphitheater that's been central Indiana's summer stage since 1989.",
+      "narration": "This is Ruoff Music Center. It opened in 1989 as Deer Creek Music Center, built for about twelve million dollars beside Sand Creek, just north of Interstate 69. Since then it's carried several names, including Verizon Wireless Music Center and Klipsch Music Center, but plenty of Hoosiers still just call it Deer Creek. Its lawn and pavilion have made central Indiana a must-stop on summer concert tours."
+    },
+    {
+      "id": "geist",
+      "category": "nature",
+      "title": "Geist Reservoir",
+      "subtitle": "Fall Creek, dammed in the 1940s",
+      "location": {
+        "lat": 39.927,
+        "lon": -85.96
+      },
+      "radius": 1500,
+      "priority": 2,
+      "teaser": "Geist Reservoir, and the town that lies beneath it.",
+      "narration": "You're near Geist Reservoir. It's named for Clarence Geist, who controlled the Indianapolis Water Company and bought thousands of acres in the Fall Creek valley in the 1920s and 1930s. Work began in 1941, a dam was built across Fall Creek, and the rising water covered the little community of Germantown. The reservoir began supplying water to Indianapolis in 1943, five years after Geist's death. It opened to recreational boating in 1971, and today its shoreline is lined with homes, though it still serves as a drinking water supply for the city."
+    },
+    {
+      "id": "palladium",
+      "category": "arts",
+      "title": "The Palladium",
+      "subtitle": "Carmel's concert hall",
+      "location": {
+        "lat": 39.9699,
+        "lon": -86.1303
+      },
+      "radius": 300,
+      "priority": 2,
+      "address": "1 Carter Green, Carmel, IN 46032",
+      "teaser": "a domed concert hall that looks like it belongs in Renaissance Italy.",
+      "narration": "This domed building is the Palladium, the concert hall at the heart of the Center for the Performing Arts in Carmel. It opened on January 29, 2011, and seats about sixteen hundred people. Its design draws on the Renaissance villas of the Italian architect Andrea Palladio, which is where it gets its name. The lawn in front, Carter Green, hosts festivals and an ice rink in winter."
+    }
+  ],
+  "demoRoute": [
+    {
+      "lat": 39.95865,
+      "lon": -86.01704
+    },
+    {
+      "lat": 39.9586,
+      "lon": -86.03
+    },
+    {
+      "lat": 39.97,
+      "lon": -86.031
+    },
+    {
+      "lat": 39.98453,
+      "lon": -86.026
+    },
+    {
+      "lat": 40.01,
+      "lon": -86.023
+    },
+    {
+      "lat": 40.04,
+      "lon": -86.016
+    },
+    {
+      "lat": 40.04583,
+      "lon": -86.0125
+    },
+    {
+      "lat": 40.06,
+      "lon": -86.007
+    },
+    {
+      "lat": 40.0725,
+      "lon": -86.003
+    },
+    {
+      "lat": 40.05,
+      "lon": -85.97
+    },
+    {
+      "lat": 40.007,
+      "lon": -85.933
+    },
+    {
+      "lat": 39.96,
+      "lon": -85.948
+    },
+    {
+      "lat": 39.935,
+      "lon": -85.955
+    }
+  ]
+}

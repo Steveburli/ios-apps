@@ -37,6 +37,8 @@ jobs:
             kit: DoThisNowKit
           - app: MutualSwipe
             kit: MutualKit
+          - app: FishersGuide
+            kit: GuideKit
     steps:
       - uses: actions/checkout@v7
 
