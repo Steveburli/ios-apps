@@ -31,7 +31,7 @@ def run(query, path):
         return
     body = urllib.parse.urlencode({"data": query}).encode()
     last = None
-    for attempt in range(6):
+    for attempt in range(9):
         url = SERVERS[attempt % len(SERVERS)]
         try:
             print("fetch", os.path.basename(path), "from", url, flush=True)
@@ -47,7 +47,7 @@ def run(query, path):
         except Exception as e:  # noqa: BLE001
             last = e
             print("  failed:", e, flush=True)
-            time.sleep(10 + attempt * 10)
+            time.sleep(5 + attempt * 5)
     raise SystemExit(f"could not fetch {path}: {last}")
 
 
@@ -57,22 +57,6 @@ def main():
     b = bbox_str(BBOX)
     run(f'[out:json][timeout:300];way["highway"]({b});out body geom qt;',
         os.path.join(out, "roads.json"))
-    # Buildings in a 3x3 grid; a cell that has not been fetched yet is
-    # requested as four smaller pieces, which survive flaky connections better.
-    s, w, n, e = BBOX
-    k = 3
-    for i in range(k):
-        for j in range(k):
-            whole = os.path.join(out, f"buildings_{i}{j}.json")
-            if os.path.exists(whole):
-                print("have", whole)
-                continue
-            for a in range(2):
-                for c in range(2):
-                    sub = (s + (n - s) * (i + a / 2) / k, w + (e - w) * (j + c / 2) / k,
-                           s + (n - s) * (i + (a + 1) / 2) / k, w + (e - w) * (j + (c + 1) / 2) / k)
-                    run(f'[out:json][timeout:300];way["building"]({bbox_str(sub)});out tags geom qt;',
-                        os.path.join(out, f"buildings_{i}{j}_{a}{c}.json"))
     run(f'''[out:json][timeout:300];
 (
   way["natural"~"^(water|wood|scrub|wetland|grassland|beach|sand)$"]({b});
@@ -111,6 +95,22 @@ out tags geom qt;''', os.path.join(out, "lines.json"))
   relation["name"]["natural"="water"]({b});
 );
 out tags center qt;''', os.path.join(out, "pois.json"))
+    # Buildings in a 3x3 grid; a cell that has not been fetched yet is
+    # requested as four smaller pieces, which survive flaky connections better.
+    s, w, n, e = BBOX
+    k = 3
+    for i in range(k):
+        for j in range(k):
+            whole = os.path.join(out, f"buildings_{i}{j}.json")
+            if os.path.exists(whole):
+                print("have", whole)
+                continue
+            for a in range(2):
+                for c in range(2):
+                    sub = (s + (n - s) * (i + a / 2) / k, w + (e - w) * (j + c / 2) / k,
+                           s + (n - s) * (i + (a + 1) / 2) / k, w + (e - w) * (j + (c + 1) / 2) / k)
+                    run(f'[out:json][timeout:300];way["building"]({bbox_str(sub)});out tags geom qt;',
+                        os.path.join(out, f"buildings_{i}{j}_{a}{c}.json"))
 
 
 if __name__ == "__main__":
