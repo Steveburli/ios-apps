@@ -41,7 +41,7 @@ xcodebuild -project Littles.xcodeproj -scheme Littles -destination 'generic/plat
 
 ## Status (2026-11-25)
 
-Version 1 written: Today, Food, Play, Schedule and Grow tabs, local storage only. Not yet built on a device or shipped to TestFlight.
+Version 1 written: Today, Food, Play, Schedule and Grow tabs, local storage only. The cloud build is green on branch `claude/admiring-cori-elbx4l` (run 69): every Kit test passes, the app compiles, and all 14 screenshots were taken with no crash. The screenshots haven't been looked at yet. Not yet on a device or in TestFlight.
 
 ## Next tasks, in order
 
