@@ -49,6 +49,8 @@ xcodebuild -project Littles.xcodeproj -scheme Littles -destination 'generic/plat
 
 ## Status (2026-11-26)
 
+Shipped: TestFlight run 23 (2026-11-26, 14:52 UTC) signed and uploaded build 2026112614xx after the App Store Connect app record was created.
+
 Build run 74 is green (Kit tests, app and widgets compile, 20 screenshots with no crash). TestFlight run 22 (Run workflow, app Littles, on this branch) created the App IDs `com.steveburlison.littles` and `com.steveburlison.littles.widgets` and their App Store profiles, and the signed archive succeeded, but the upload stopped at "Error Downloading App Information": App Store Connect has no app record for the bundle ID yet. Create it once in App Store Connect (Apps > + > New App, bundle ID `com.steveburlison.littles`), then run the TestFlight workflow again. Tags can't be pushed from cloud sessions; use Run workflow instead.
 
 The second round (all of `FEATURE-IDEAS.md` except the Apple Watch app, live iCloud sync and Home Screen widgets) was added on 2026-11-26. Caregiver sharing works now by swapping sync files; live iCloud sync needs an iCloud container (`iCloud.com.steveburlison.littles`) and the CloudKit setup Mutual uses. Home Screen widgets need an App Group registered for both App IDs.
