@@ -14,9 +14,17 @@ A native SwiftUI app (iOS 18+, iPhone, portrait, light and dark) for tracking ev
   - `Schedule`: `RoutineItem` (weekly, with weekdays, times, place, reminder and an end date for the school year), `OneOffEvent` ("No school" crosses off school, drop-off and pickup; `bring` goes on the pack list), `PackItem`, and `Agenda` (a day's entries, the pack list, the next thing up)
   - `Milestones`: the CDC 2022 checklists (2 months to 5 years), paraphrased; `current`, `upcoming`, `progress` and `toMention` (earlier ones still "not yet")
   - `Tips`: 20 short "instead of / try / why" scripts by situation, and a tip of the day
+  - `Family`: `Units` (values are always saved as oz, lb, in and °F; `isMetric` only changes display and editing), `NightMode`, `PottyPlan`, `FamilySettings`, `RoutineChart` (picture checklists, done keys `day|chart|kid|step`, streaks), `Contact`, `ShoppingItem`
+  - `Growth` (WHO 0–5 percentiles from `WHOTables`, generated from the WHO anthro package every 15 days and interpolated) and `SleepGuide` (awake windows by age, the next sleep window)
+  - `Health`: `HealthSchedule` (the CDC/AAP vaccine doses and checkups as of 2025, dose states, the next checkup), `MedicineTimer` (acetaminophen and ibuprofen intervals and daily limits; never doses), `SickAdvice` (when to call), `Teeth`, `Streaks`, `PottyStats`, `TimeTotals`
+  - `MealPlanning`: `MealPlanner` (a week of meals by age, every started allergen twice, one new allergen three mornings in a row, new foods at dinner, a grocery list), `RecipeBook`, `FamilyDinners.adapt`, `PickyEater`
+  - `Imports`: `CalendarImport` (.ics files and links, and text read from a photo of a printed list, with the year guessed from today) and `DailyReport` (a pasted daycare report into entries)
+  - `Sync`: `FamilySync.merge` (log entries keep the newer `updated`; everything else is a union that keeps this phone's copy; `FamilyState.deleted` keeps deletions deleted), `PediatricianReport.html`, `Recap` (a month's highlights, memories) and `MilestoneActivities` (activities that practice the current milestones)
   - `Sample`: the screenshot family (a baby and a preschooler) and test data
-- `Littles/` holds the app: `App/` (`LittlesApp` with the five tabs, `AppModel`, `Notifier`), `Today/` (timers, "since last", quick log, totals, timeline, `LogSheet`, `FoodPicker`), `Food/`, `Play/`, `Schedule/` (week strip, agenda, pack list, editors), `Grow/` (milestones, growth charts with Swift Charts, tips), `Family/` (kids, export, the first-launch welcome) and `Support/` (`Theme`, `Screenshots`).
-- `AppModel` saves `family.json` in Application Support after every change (with complete file protection) and re-syncs the routine reminders: one weekly repeating local notification per routine weekday (`Notifier`, ids `routine-<id>-<weekday>`).
+- `Littles/` holds the app: `App/` (`LittlesApp` with the five tabs and night mode, `AppModel` (`AppModel.shared`, also used by Siri), `Notifier`, `LiveTimers`, `Shortcuts` (App Intents: log a bottle or diaper, start or end a nap, "when did … last …"), `Today/TodayCards` (countdown, medicine, sick, nap window, potty, picture charts), `Today/` (timers, "since last", quick log, totals, timeline, `LogSheet`, `FoodPicker`), `Food/`, `Play/`, `Schedule/` (week strip, agenda, pack list, editors), `Grow/` (milestones, growth charts with Swift Charts, tips), `Family/` (kids, export, the first-launch welcome) and `Support/` (`Theme`, `Screenshots`).
+- `AppModel` saves `family.json` in Application Support after every change (readable after first unlock, so Siri works while locked), stamps `updated` on saved entries, records deletions, and re-syncs reminders (`Notifier`, ids `littles-…`: routines weekly, leave-for-school 15 minutes ahead for 7 days, potty for 2 days, the next fever-medicine dose, checkups a week ahead; 64 at most) and the Live Activities.
+- `Widgets/` is the `LittlesWidgets` extension (`com.steveburlison.littles.widgets`): the Live Activity for running sleep and nursing timers. `Shared/TimerActivity.swift` (the `ActivityAttributes`) is compiled into both targets. Home Screen widgets need an App Group, which isn't set up yet.
+- Photos are JPEGs (1600 px) in Application Support/photos; a log entry keeps the file name. Sync files (`.littles`, type `com.steveburlison.littles.family`) carry the data but not the photos.
 
 ## Commands
 
@@ -39,6 +47,10 @@ xcodebuild -project Littles.xcodeproj -scheme Littles -destination 'generic/plat
 - Every push to `main` runs `.github/workflows/build.yml` on a GitHub cloud Mac: `swift test` for the Kit and an unsigned Simulator build. The report artifact is `report-Littles`, with `errors.txt` and `screens/` (the app launched with `-screenshots <screen>`, see `Littles/Support/Screenshots.swift`).
 - TestFlight: push a tag `testflight-Littles-<n>`. The App ID `com.steveburlison.littles` must exist in the developer account first (the workflow creates the provisioning profile). No iCloud, push or App Groups capabilities are needed yet.
 
+## Status (2026-11-26)
+
+The second round (all of `FEATURE-IDEAS.md` except the Apple Watch app, live iCloud sync and Home Screen widgets) was added on 2026-11-26. Caregiver sharing works now by swapping sync files; live iCloud sync needs an iCloud container (`iCloud.com.steveburlison.littles`) and the CloudKit setup Mutual uses. Home Screen widgets need an App Group registered for both App IDs.
+
 ## Status (2026-11-25)
 
 Version 1 written: Today, Food, Play, Schedule and Grow tabs, local storage only. The cloud build is green on branch `claude/admiring-cori-elbx4l` (run 69): every Kit test passes, the app compiles, and all 14 screenshots were taken with no crash. The screenshots haven't been looked at yet. Not yet on a device or in TestFlight.
@@ -47,6 +59,6 @@ Version 1 written: Today, Food, Play, Schedule and Grow tabs, local storage only
 
 1. Keep the GitHub build green after every change.
 2. Set Griffin's and Blake's real birthdays on first launch, then ship a TestFlight build (ask the user first).
-3. iCloud sharing so both parents (and a grandparent or sitter) log on their own phones: the Mutual / Trip pattern (`CKSyncEngine`, one zone shared with a zone-wide `CKShare`).
-4. Widgets and a Live Activity for the sleep and nursing timers, and Siri / Shortcuts for "Log a bottle for Griffin".
-5. The rest of `FEATURE-IDEAS.md`.
+3. Live iCloud sync so both parents log on their own phones without swapping files: the Mutual / Trip pattern (`CKSyncEngine`, one zone shared with a zone-wide `CKShare`). Needs the container first.
+4. Home Screen and Lock Screen widgets ("last bottle 2h ago"), once an App Group exists.
+5. An Apple Watch app for one-tap bottle, diaper and sleep.

@@ -27,6 +27,8 @@ Other apps worth knowing about:
 
 ## Feature ideas, by value
 
+**Status (2026-11-26):** everything below is built except live iCloud sync (#1 works by swapping sync files for now), Home Screen widgets (#2 has the Lock Screen Live Activity for timers) and the Apple Watch app (#26). Those three need setup in the Apple developer account first (an iCloud container, an App Group, a Watch target).
+
 **Next (big wins for two parents)**
 
 1. **Share with both parents and caregivers** through iCloud, so whoever does the bottle logs it, and a sitter or grandparent can be invited for a week.
