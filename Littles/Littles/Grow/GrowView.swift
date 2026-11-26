@@ -3,12 +3,14 @@ import Charts
 import LittlesKit
 
 enum GrowSection: String, CaseIterable, Identifiable {
-    case milestones, growth, tips
+    case milestones, growth, health, memories, tips
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .milestones: return "Milestones"
+        case .milestones: return "Skills"
         case .growth: return "Growth"
+        case .health: return "Health"
+        case .memories: return "Memories"
         case .tips: return "Tips"
         }
     }
@@ -18,7 +20,7 @@ enum GrowSection: String, CaseIterable, Identifiable {
 /// growth over time, and short scripts for hard parenting moments.
 struct GrowView: View {
     @EnvironmentObject var model: AppModel
-    @State private var section: GrowSection = Screenshots.shows("tips") ? .tips : (Screenshots.shows("growth") ? .growth : .milestones)
+    @State private var section: GrowSection = Screenshots.growSection
     @State private var months: Int?
 
     var body: some View {
@@ -35,6 +37,8 @@ struct GrowView: View {
                         switch section {
                         case .milestones: MilestonesSection(kid: kid, months: $months)
                         case .growth: GrowthSection(kid: kid)
+                        case .health: HealthSection(kid: kid)
+                        case .memories: MemoriesSection(kid: kid)
                         case .tips: TipsSection()
                         }
                     }
@@ -175,15 +179,20 @@ struct GrowthSection: View {
             if points.isEmpty {
                 EmptyNote(emoji: "📏", text: "Add weight and height from each checkup to see \(kid.name)'s growth.").card()
             } else {
-                chart(title: "Weight", unit: "lb", points: points.compactMap { entry in entry.weightLb.map { (entry.start, $0) } })
-                chart(title: "Height", unit: "in", points: points.compactMap { entry in entry.heightIn.map { (entry.start, $0) } })
+                chart(title: "Weight", kind: .weight, points: points.compactMap { entry in entry.weightLb.map { (entry.start, $0) } })
+                chart(title: "Height", kind: .height, points: points.compactMap { entry in entry.heightIn.map { (entry.start, $0) } })
+                if kid.sex.isEmpty {
+                    Text("Set \(kid.name)'s sex in Family to see WHO growth percentiles.")
+                        .font(.caption)
+                        .foregroundStyle(Theme.muted)
+                }
                 VStack(spacing: 0) {
                     ForEach(points.reversed()) { entry in
                         HStack {
                             Text(entry.start.formatted(.dateTime.month(.abbreviated).day().year()))
                                 .font(.subheadline.weight(.semibold))
                             Spacer()
-                            Text(entry.detail(now: Date())).font(.subheadline).foregroundStyle(Theme.muted)
+                            Text(entry.detail(now: Date(), units: model.units)).font(.subheadline).foregroundStyle(Theme.muted)
                         }
                         .padding(.vertical, 8)
                         .contentShape(Rectangle())
@@ -210,16 +219,24 @@ struct GrowthSection: View {
     }
 
     @ViewBuilder
-    private func chart(title: String, unit: String, points: [(Date, Double)]) -> some View {
+    private func chart(title: String, kind: Growth.Kind, points saved: [(Date, Double)]) -> some View {
+        let units = model.units
+        let points = saved.map { ($0.0, kind == .weight ? units.showWeight($0.1) : units.showLength($0.1)) }
         if points.count >= 1 {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text(title).font(.headline)
                     Spacer()
-                    if let last = points.last {
-                        Text(unit == "lb" ? Measure.pounds(last.1) : Measure.inches(last.1))
-                            .font(.subheadline.weight(.bold))
-                            .foregroundStyle(Theme.color(kid))
+                    if let last = saved.last {
+                        VStack(alignment: .trailing, spacing: 0) {
+                            Text(kind == .weight ? units.weight(last.1) : units.length(last.1))
+                                .font(.subheadline.weight(.bold))
+                                .foregroundStyle(Theme.color(kid))
+                            if let percentile = Growth.percentile(kind, value: last.1,
+                                                                  ageDays: Growth.ageDays(birthday: kid.birthday, at: last.0), sex: kid.sex) {
+                                Text(Growth.label(percentile)).font(.caption).foregroundStyle(Theme.muted)
+                            }
+                        }
                     }
                 }
                 Chart {

@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 import LittlesKit
 
 /// Adds or edits one log entry. The fields shown depend on its kind.
@@ -9,12 +10,15 @@ struct LogSheet: View {
     let isNew: Bool
     @State private var pickingFoods = false
     @State private var stillGoing = false
+    @State private var photoItem: PhotosPickerItem?
 
     init(entry: LogEntry, isNew: Bool) {
         _entry = State(initialValue: entry)
         self.isNew = isNew
         _stillGoing = State(initialValue: entry.kind.isTimed && entry.end == nil)
     }
+
+    private var units: Units { model.units }
 
     var body: some View {
         NavigationStack {
@@ -41,10 +45,11 @@ struct LogSheet: View {
                         }
                     }
                 }
-                Section("Note") {
-                    TextField("Anything to remember", text: $entry.note, axis: .vertical)
+                Section(noteTitle) {
+                    TextField(notePrompt, text: $entry.note, axis: .vertical)
                         .lineLimit(1...4)
                 }
+                photoSection
                 if !isNew {
                     Section {
                         Button("Delete", role: .destructive) {
@@ -72,7 +77,7 @@ struct LogSheet: View {
                         dismiss()
                     }
                     .fontWeight(.bold)
-                    .disabled(entry.kind == .solids && entry.bites.isEmpty && entry.note.isEmpty)
+                    .disabled(!canSave)
                 }
             }
             .sheet(isPresented: $pickingFoods) {
@@ -83,11 +88,63 @@ struct LogSheet: View {
                 }
                 .environmentObject(model)
             }
+            .onChange(of: photoItem) { _, item in
+                guard let item else { return }
+                Task {
+                    if let data = try? await item.loadTransferable(type: Data.self), let name = model.savePhoto(data) {
+                        if !entry.photo.isEmpty && isNew { model.deletePhoto(entry.photo) }
+                        entry.photo = name
+                    }
+                }
+            }
+        }
+    }
+
+    private var canSave: Bool {
+        switch entry.kind {
+        case .solids: return !entry.bites.isEmpty || !entry.note.isEmpty
+        case .first, .quote: return !entry.note.trimmingCharacters(in: .whitespaces).isEmpty
+        default: return true
+        }
+    }
+
+    private var noteTitle: String {
+        switch entry.kind {
+        case .first: return "What happened"
+        case .quote: return "What they said"
+        case .tooth: return "Which tooth"
+        default: return "Note"
+        }
+    }
+
+    private var notePrompt: String {
+        switch entry.kind {
+        case .first: return "First steps, first word, first haircut…"
+        case .quote: return "Word for word"
+        case .tooth: return "Like bottom front left"
+        default: return "Anything to remember"
         }
     }
 
     private var endBinding: Binding<Date> {
         Binding(get: { max(entry.end ?? Date(), entry.start) }, set: { entry.end = $0 })
+    }
+
+    @ViewBuilder
+    private var photoSection: some View {
+        Section {
+            if let image = model.photo(entry.photo) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxHeight: 220)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                Button("Remove photo", role: .destructive) { entry.photo = "" }
+            }
+            PhotosPicker(selection: $photoItem, matching: .images) {
+                Label(entry.photo.isEmpty ? "Add a photo" : "Change photo", systemImage: "photo.on.rectangle.angled")
+            }
+        }
     }
 
     @ViewBuilder
@@ -133,53 +190,102 @@ struct LogSheet: View {
         case .solids:
             mealSection
         case .meds:
-            Section("Medicine") {
+            Section {
                 TextField("Name, like Infant Tylenol", text: $entry.medicine)
                 TextField("Dose, like 2.5 mL", text: $entry.dose)
-            }
-            Section {
-                Text("Check the dose with your pediatrician or the package, by weight.")
-                    .font(.footnote)
-                    .foregroundStyle(Theme.muted)
+            } header: {
+                Text("Medicine")
+            } footer: {
+                Text(medicineFooter)
             }
         case .temperature:
-            Section("Temperature") {
-                Stepper(value: Binding(get: { entry.temperatureF ?? 98.6 }, set: { entry.temperatureF = $0 }),
-                        in: 94...106, step: 0.1) {
-                    Text(String(format: "%.1f°F", entry.temperatureF ?? 98.6))
-                        .font(Theme.display(22))
-                        .foregroundStyle((entry.temperatureF ?? 98.6) >= 100.4 ? Theme.warn : Theme.ink)
-                }
-                if (entry.temperatureF ?? 0) >= 100.4 {
-                    Text("100.4°F or higher counts as a fever. Under 3 months, call the doctor for any fever.")
-                        .font(.footnote)
-                        .foregroundStyle(Theme.warn)
-                }
-            }
+            temperatureSection
+        case .symptom:
+            symptomSection
+            temperatureSection
         case .growth:
             Section("Measurements") {
-                numberField("Weight (lb)", value: $entry.weightLb)
-                numberField("Height (in)", value: $entry.heightIn)
-                numberField("Head (in)", value: $entry.headIn)
+                numberField("Weight (\(units.weightUnit))", value: converted(\.weightLb, show: units.showWeight, save: units.saveWeight))
+                numberField("Height (\(units.lengthUnit))", value: converted(\.heightIn, show: units.showLength, save: units.saveLength))
+                numberField("Head (\(units.lengthUnit))", value: converted(\.headIn, show: units.showLength, save: units.saveLength))
             }
-        case .sleep, .bath, .note:
+        case .screen, .outside:
+            Section(entry.kind == .screen ? "Screen time" : "Time outside") {
+                Stepper(value: Binding(get: { entry.minutes ?? 30 }, set: { entry.minutes = $0 }), in: 5...600, step: 5) {
+                    Text(Dates.duration(Double(entry.minutes ?? 30) * 60)).font(Theme.display(22))
+                }
+            }
+        case .sleep, .bath, .note, .tooth, .brush, .first, .quote:
             EmptyView()
         }
     }
 
+    private var medicineFooter: String {
+        if let rule = MedicineTimer.rule(for: entry.medicine) {
+            return rule.note + " Give the dose for their weight from the package chart or your pediatrician."
+        }
+        return "Give the dose for their weight from the package chart or your pediatrician."
+    }
+
+    /// A binding that shows a saved US value in the chosen units.
+    private func converted(_ path: WritableKeyPath<LogEntry, Double?>, show: @escaping (Double) -> Double,
+                           save: @escaping (Double) -> Double) -> Binding<Double?> {
+        Binding(
+            get: { entry[keyPath: path].map { (show($0) * 100).rounded() / 100 } },
+            set: { entry[keyPath: path] = $0.map(save) }
+        )
+    }
+
     private var amountSection: some View {
-        Section("Amount") {
-            Stepper(value: Binding(get: { entry.amountOz ?? 0 }, set: { entry.amountOz = $0 }), in: 0...16, step: 0.5) {
-                Text(Measure.oz(entry.amountOz ?? 0))
+        let shown = units.showVolume(entry.amountOz ?? 0)
+        let step = units.isMetric ? 10.0 : 0.5
+        let presets: [Double] = units.isMetric ? [60, 90, 120, 150, 180, 210, 240] : [2, 3, 4, 5, 6, 7, 8]
+        return Section("Amount") {
+            Stepper(value: Binding(get: { shown }, set: { entry.amountOz = units.saveVolume(max(0, $0)) }),
+                    in: 0...(units.isMetric ? 480 : 16), step: step) {
+                Text(units.volume(entry.amountOz ?? 0))
                     .font(Theme.display(24))
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    ForEach([2.0, 3, 4, 5, 6, 7, 8], id: \.self) { ounces in
-                        Button(Measure.oz(ounces)) { entry.amountOz = ounces }
+                    ForEach(presets, id: \.self) { value in
+                        Button(units.isMetric ? "\(Int(value)) ml" : Measure.oz(value)) { entry.amountOz = units.saveVolume(value) }
                             .buttonStyle(.bordered)
-                            .tint(entry.amountOz == ounces ? Theme.accent : Theme.muted)
+                            .tint(abs(shown - value) < 0.01 ? Theme.accent : Theme.muted)
                     }
+                }
+            }
+        }
+    }
+
+    private var temperatureSection: some View {
+        let fahrenheit = entry.temperatureF ?? 98.6
+        return Section("Temperature") {
+            Stepper(value: Binding(get: { units.showTemperature(fahrenheit) },
+                                   set: { entry.temperatureF = units.saveTemperature($0) }),
+                    in: units.isMetric ? 34...42 : 94...107, step: units.isMetric ? 0.1 : 0.1) {
+                Text(units.temperature(fahrenheit))
+                    .font(Theme.display(22))
+                    .foregroundStyle(fahrenheit >= 100.4 ? Theme.warn : Theme.ink)
+            }
+            if entry.kind == .symptom && entry.temperatureF == nil {
+                Text("Tap + or − to add a temperature.").font(.footnote).foregroundStyle(Theme.muted)
+            }
+            if fahrenheit >= 100.4 {
+                Text("100.4°F (38°C) or higher counts as a fever. Under 3 months, call the doctor for any fever.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.warn)
+            }
+        }
+    }
+
+    private var symptomSection: some View {
+        Section("Symptoms") {
+            FlowChips(items: SickAdvice.symptoms, selected: Set(entry.symptoms)) { symptom in
+                if entry.symptoms.contains(symptom) {
+                    entry.symptoms.removeAll { $0 == symptom }
+                } else {
+                    entry.symptoms.append(symptom)
                 }
             }
         }
@@ -218,6 +324,70 @@ struct LogSheet: View {
                 .keyboardType(.decimalPad)
                 .multilineTextAlignment(.trailing)
                 .frame(maxWidth: 120)
+        }
+    }
+}
+
+/// Tappable chips that wrap onto as many lines as they need.
+struct FlowChips: View {
+    let items: [String]
+    let selected: Set<String>
+    let onTap: (String) -> Void
+
+    var body: some View {
+        FlowLayout(spacing: 8) {
+            ForEach(items, id: \.self) { item in
+                let on = selected.contains(item)
+                Button { onTap(item) } label: {
+                    Text(item)
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .foregroundStyle(on ? Color.white : Theme.ink)
+                        .background(on ? Theme.accent : Theme.sunk, in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+}
+
+/// Lays children out left to right, wrapping to new lines.
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? 320
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var row: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > 0 && x + size.width > width {
+                x = 0
+                y += row + spacing
+                row = 0
+            }
+            x += size.width + spacing
+            row = max(row, size.height)
+        }
+        return CGSize(width: width, height: y + row)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX
+        var y = bounds.minY
+        var row: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > bounds.minX && x + size.width > bounds.maxX {
+                x = bounds.minX
+                y += row + spacing
+                row = 0
+            }
+            subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+            x += size.width + spacing
+            row = max(row, size.height)
         }
     }
 }

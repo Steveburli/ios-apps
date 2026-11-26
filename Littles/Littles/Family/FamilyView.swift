@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import LittlesKit
 
 /// The kids (names, birthdays, colors) and app-wide settings.
@@ -7,6 +8,9 @@ struct FamilyView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var editing: Kid?
     @State private var exportURL: URL?
+    @State private var syncURL: URL?
+    @State private var importingSync = false
+    @State private var editingChart: RoutineChart?
 
     var body: some View {
         NavigationStack {
@@ -30,6 +34,54 @@ struct FamilyView: View {
                         editing = Kid(name: "", birthday: Dates.key(Date()), color: model.state.kids.count % Theme.kidColors.count)
                     } label: {
                         Label("Add a kid", systemImage: "plus")
+                    }
+                }
+                Section {
+                    if let syncURL {
+                        ShareLink(item: syncURL) {
+                            Label("Send to the other phone", systemImage: "iphone.and.arrow.forward")
+                        }
+                    } else {
+                        Button {
+                            syncURL = model.syncFileURL()
+                        } label: {
+                            Label("Make a sync file", systemImage: "arrow.triangle.2.circlepath")
+                        }
+                    }
+                    Button {
+                        importingSync = true
+                    } label: {
+                        Label("Merge a file from the other phone", systemImage: "square.and.arrow.down")
+                    }
+                } header: {
+                    Text("Share with your partner or a sitter")
+                } footer: {
+                    Text("Send the sync file by AirDrop or Messages and open it in Littles on the other phone. Both phones end up with everything; the newer copy of an entry wins and deletions carry over. Do it both ways to stay matched.")
+                }
+                SettingsSections()
+                Section {
+                    ForEach(model.state.charts) { chart in
+                        Button { editingChart = chart } label: {
+                            HStack {
+                                Text("\(chart.emoji) \(chart.title)").foregroundStyle(Theme.ink)
+                                Spacer()
+                                Text("\(chart.steps.count) steps · \(model.names(chart.kidIDs))").font(.caption).foregroundStyle(Theme.muted)
+                            }
+                        }
+                    }
+                    Button {
+                        editingChart = RoutineChart(title: "", emoji: "✅", steps: [ChartStep(emoji: "⭐️", title: "")])
+                    } label: {
+                        Label("Add a chart", systemImage: "plus")
+                    }
+                } header: {
+                    Text("Picture charts")
+                } footer: {
+                    Text("Bedtime, morning or any routine. Kids tap each step on Today.")
+                }
+                Section("Reports for the pediatrician") {
+                    ForEach(model.state.kids) { kid in
+                        ReportButton(kid: kid)
                     }
                 }
                 Section {
@@ -63,6 +115,12 @@ struct FamilyView: View {
             .sheet(item: $editing) { kid in
                 KidEditor(kid: kid, isNew: model.kid(kid.id) == nil).environmentObject(model)
             }
+            .sheet(item: $editingChart) { chart in
+                ChartEditor(chart: chart, isNew: !model.state.charts.contains { $0.id == chart.id }).environmentObject(model)
+            }
+            .fileImporter(isPresented: $importingSync, allowedContentTypes: [UTType(exportedAs: "com.steveburlison.littles.family"), .json, .data]) { result in
+                if case .success(let url) = result { model.importSync(from: url) }
+            }
         }
     }
 }
@@ -93,6 +151,11 @@ struct KidEditor: View {
                 Section {
                     TextField("Name", text: $kid.name)
                     BirthdayPicker(birthday: $kid.birthday)
+                    Picker("Sex (for growth charts)", selection: $kid.sex) {
+                        Text("Not set").tag("")
+                        Text("Boy").tag("boy")
+                        Text("Girl").tag("girl")
+                    }
                     TextField("Emoji (optional)", text: Binding(get: { kid.emoji }, set: { kid.emoji = String($0.prefix(2)) }))
                 }
                 Section("Color") {

@@ -9,6 +9,9 @@ struct ScheduleView: View {
     @State private var editingRoutine: RoutineItem?
     @State private var editingEvent: OneOffEvent?
     @State private var editingPack: PackItem?
+    @State private var editingContact: Contact?
+    @State private var importing = Screenshots.shows("import")
+    @State private var pastingReport = false
 
     var body: some View {
         NavigationStack {
@@ -19,6 +22,8 @@ struct ScheduleView: View {
                     packList
                     routines
                     packItems
+                    ShoppingSection()
+                    ContactsSection(editing: $editingContact)
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
@@ -37,6 +42,10 @@ struct ScheduleView: View {
                         Button("Something to pack", systemImage: "backpack.fill") {
                             editingPack = PackItem(title: "", kidID: model.state.kids.last?.id ?? "")
                         }
+                        Divider()
+                        Button("Import a school calendar", systemImage: "calendar.badge.clock") { importing = true }
+                        Button("Paste a daily report", systemImage: "doc.on.clipboard") { pastingReport = true }
+                        Button("Add a person", systemImage: "person.crop.circle.badge.plus") { editingContact = Contact(name: "") }
                     } label: {
                         Image(systemName: "plus.circle.fill").font(.title3)
                     }
@@ -50,6 +59,16 @@ struct ScheduleView: View {
             .sheet(item: $editingEvent) { event in
                 EventEditor(event: event, isNew: !model.state.events.contains { $0.id == event.id })
                     .environmentObject(model)
+            }
+            .sheet(item: $editingContact) { contact in
+                ContactEditor(contact: contact, isNew: !model.state.contacts.contains { $0.id == contact.id })
+                    .environmentObject(model)
+            }
+            .sheet(isPresented: $importing) {
+                ImportCalendarSheet().environmentObject(model)
+            }
+            .sheet(isPresented: $pastingReport) {
+                DailyReportSheet().environmentObject(model)
             }
             .sheet(item: $editingPack) { item in
                 PackItemEditor(item: item, isNew: !model.state.packItems.contains { $0.id == item.id })

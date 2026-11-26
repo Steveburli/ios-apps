@@ -8,7 +8,7 @@ struct FoodView: View {
     @State private var search = ""
     @State private var category: FoodCategory?
     @State private var showHoldOffs = false
-    @State private var path: [String] = []
+    @State private var path = NavigationPath()
     @State private var logMeal: LogTarget?
 
     var body: some View {
@@ -35,6 +35,14 @@ struct FoodView: View {
                     FoodDetailView(food: food)
                 }
             }
+            .navigationDestination(for: FoodRoute.self) { route in
+                switch route {
+                case .plan: MealPlanView()
+                case .recipes: RecipesView()
+                case .recipe(let id): if let recipe = RecipeBook.recipe(id) { RecipeDetailView(recipe: recipe) }
+                case .dinner: DinnerView()
+                }
+            }
             .sheet(item: $logMeal) { target in
                 LogSheet(entry: target.entry, isNew: true).environmentObject(model)
             }
@@ -42,7 +50,9 @@ struct FoodView: View {
                 HoldOffSheet()
             }
             .onAppear {
-                if Screenshots.shows("fooddetail") { path = ["egg"] }
+                if Screenshots.shows("fooddetail") { path.append("egg") }
+                if Screenshots.shows("mealplan") { path.append(FoodRoute.plan) }
+                if Screenshots.shows("dinner") { path.append(FoodRoute.dinner) }
             }
         }
     }
@@ -61,11 +71,13 @@ struct FoodView: View {
             .card()
         } else {
             ProgressCard(kid: kid)
+            FoodLinks()
             AllergenCard(kid: kid)
             TodayIdeas(kid: kid) { ids in
                 logMeal = LogTarget(entry: LogEntry(kidID: kid.id, kind: .solids, start: Date(),
                                                     bites: ids.map { FoodBite(foodID: $0) }), isNew: true)
             }
+            PickyCard(kid: kid)
         }
         Button { showHoldOffs = true } label: {
             HStack {

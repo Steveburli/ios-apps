@@ -130,6 +130,24 @@ struct EventEditor: View {
                         MinutesPicker(title: "Starts", minutes: Binding(get: { event.start ?? 9 * 60 }, set: { event.start = $0 }))
                     }
                 }
+                if event.kind == .party {
+                    Section("Party") {
+                        Picker("RSVP", selection: $event.rsvp) {
+                            Text("Not yet").tag("")
+                            Text("Going").tag("yes")
+                            Text("Maybe").tag("maybe")
+                            Text("Can't go").tag("no")
+                        }
+                        .pickerStyle(.segmented)
+                        TextField("Gift idea", text: $event.gift)
+                        Button {
+                            if !event.gift.isEmpty { model.addShopping(event.gift, list: "Party") }
+                        } label: {
+                            Label("Add the gift to the shopping list", systemImage: "cart.badge.plus")
+                        }
+                        .disabled(event.gift.isEmpty)
+                    }
+                }
                 Section {
                     TextField("Bring or wear, like $5 for the book fair", text: $event.bring)
                     TextField("Note", text: $event.note, axis: .vertical)

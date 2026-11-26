@@ -3,7 +3,8 @@ import LittlesKit
 
 /// The cloud build launches the app with `-screenshots <screen>` to photograph
 /// each screen with sample data: today, bottle, meal, food, fooddetail,
-/// play, activity, schedule, grow, growth, tips, family or welcome.
+/// mealplan, dinner, play, activity, schedule, import, grow, growth, health,
+/// memories, tips, family, night or welcome.
 /// Nothing here runs in normal use, and it never saves.
 enum Screenshots {
     static let screen: String? = {
@@ -28,13 +29,24 @@ enum Screenshots {
         }
     }
 
+    /// Which Grow section a screen opens.
+    static var growSection: GrowSection {
+        switch screen {
+        case "tips": return .tips
+        case "growth": return .growth
+        case "health": return .health
+        case "memories": return .memories
+        default: return .milestones
+        }
+    }
+
     /// Which tab the screen lives on.
     static var tab: AppTab {
         switch screen {
-        case "food", "fooddetail": return .food
+        case "food", "fooddetail", "mealplan", "dinner": return .food
         case "play", "activity": return .play
-        case "schedule": return .schedule
-        case "grow", "growth", "tips": return .grow
+        case "schedule", "import": return .schedule
+        case "grow", "growth", "tips", "health", "memories": return .grow
         default: return .today
         }
     }

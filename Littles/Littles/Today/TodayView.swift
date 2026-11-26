@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import LittlesKit
 
 /// What a log sheet is opened for: a new entry of a kind, or an existing one.
@@ -76,6 +77,12 @@ struct TodayView: View {
                 RunningCard(entry: entry, kid: kid, now: now)
             }
             SinceRow(kid: kid, now: now)
+            CountdownCard(kid: kid, now: now)
+            MedicineCard(kid: kid, now: now)
+            SickCard(kid: kid, now: now)
+            NapCard(kid: kid, now: now)
+            PottyCard(kid: kid)
+            ChartsRow(kid: kid)
         }
         QuickLogGrid(kid: kid) { kind in quickLog(kind, kid: kid) }
         DayTotalsCard(kid: kid, day: day, now: now)
@@ -90,7 +97,7 @@ struct TodayView: View {
         } else {
             VStack(spacing: 0) {
                 ForEach(entries) { entry in
-                    TimelineRow(entry: entry, now: now)
+                    TimelineRow(entry: entry, now: now, units: model.units, photo: model.photo(entry.photo))
                         .contentShape(Rectangle())
                         .onTapGesture { target = LogTarget(entry: entry, isNew: false) }
                         .contextMenu {
@@ -165,6 +172,8 @@ struct TodayView: View {
         case .sleep:
             entry.end = entry.start.addingTimeInterval(3600)
             entry.start = entry.start.addingTimeInterval(-3600)
+        case .screen, .outside:
+            entry.minutes = 30
         case .growth:
             let latest = Summary.growth(model.state.logs, kidID: kid.id).last
             entry.weightLb = latest?.weightLb
@@ -383,7 +392,7 @@ struct DayTotalsCard: View {
 
     private func stats(_ s: DaySummary) -> [Stat] {
         var items: [Stat] = []
-        if s.bottles > 0 { items.append(Stat(label: "\(s.bottles) bottle\(s.bottles == 1 ? "" : "s")", value: Measure.oz(s.bottleOz))) }
+        if s.bottles > 0 { items.append(Stat(label: "\(s.bottles) bottle\(s.bottles == 1 ? "" : "s")", value: model.units.volume(s.bottleOz))) }
         if s.nursing > 0 { items.append(Stat(label: "nursing ×\(s.nursing)", value: "\(s.nursingMinutes)m")) }
         if s.diapers > 0 { items.append(Stat(label: "diapers · \(s.dirty) dirty", value: "\(s.diapers)")) }
         if s.sleepMinutes > 0 { items.append(Stat(label: "sleep · \(s.naps) nap\(s.naps == 1 ? "" : "s")", value: Dates.duration(Double(s.sleepMinutes) * 60))) }
@@ -425,6 +434,8 @@ struct NextUpCard: View {
 struct TimelineRow: View {
     let entry: LogEntry
     let now: Date
+    var units: Units = .us
+    var photo: UIImage? = nil
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -445,13 +456,20 @@ struct TimelineRow: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(Theme.muted)
                 }
-                let detail = entry.detail(now: now)
+                let detail = entry.detail(now: now, units: units)
                 if !detail.isEmpty {
                     Text(detail)
                         .font(.subheadline)
                         .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+            }
+            if let photo {
+                Image(uiImage: photo)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 44, height: 44)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
         }
         .padding(.vertical, 8)

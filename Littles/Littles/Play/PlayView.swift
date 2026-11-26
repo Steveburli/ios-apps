@@ -27,6 +27,20 @@ struct PlayView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    NavigationLink {
+                        NearbyView()
+                    } label: {
+                        HStack {
+                            Text("📍 Places to go nearby").font(.subheadline.weight(.bold)).foregroundStyle(Theme.ink)
+                            Spacer()
+                            Text("Parks, libraries, splash pads").font(.caption).foregroundStyle(Theme.muted)
+                            Image(systemName: "chevron.right").font(.caption).foregroundStyle(Theme.muted)
+                        }
+                        .card()
+                    }
+                    .buttonStyle(.plain)
+                    WorkingOnCard(kidIDs: kidIDs)
+                    TimeTotalsCard(kidIDs: kidIDs)
                     SectionTitle(text: "Ideas", trailing: "\(list.count)")
                     if list.isEmpty {
                         EmptyNote(emoji: "🧸", text: "Nothing fits all of that. Try more time, or anywhere.").card()

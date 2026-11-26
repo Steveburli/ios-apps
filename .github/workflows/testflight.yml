@@ -72,7 +72,9 @@ jobs:
               # The Lock Screen and Home Screen widgets, with their own App ID and profile.
               echo "WIDGETS_BUNDLE_ID=com.steveburlison.dothisnow.widgets" >> "$GITHUB_ENV" ;;
             MutualSwipe) bundle=com.steveburlison.mutualswipe ;;
-            Littles) bundle=com.steveburlison.littles ;;
+            Littles) bundle=com.steveburlison.littles
+              # The Live Activity extension, with its own App ID and profile.
+              echo "WIDGETS_BUNDLE_ID=com.steveburlison.littles.widgets" >> "$GITHUB_ENV" ;;
             *)
               echo "::error::Unknown app \"$app\". Name the tag testflight-OMM-1, testflight-DoThisNow-1, testflight-MutualSwipe-1 or testflight-Littles-1."
               exit 1 ;;
@@ -97,6 +99,18 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/tools"
           "$RUNNER_TEMP/tools/bin/pip" install --quiet codemagic-cli-tools
           echo "$RUNNER_TEMP/tools/bin" >> "$GITHUB_PATH"
+
+      - name: Make sure the App IDs exist
+        run: |
+          # A new app's App IDs are created on first ship; for an existing one this
+          # just reports that it's already there.
+          for bundle in "$BUNDLE_ID" ${WIDGETS_BUNDLE_ID:+"$WIDGETS_BUNDLE_ID"}; do
+            if app-store-connect bundle-ids list --bundle-id-identifier "$bundle" --strict-match-identifier --platform IOS 2>/dev/null | grep -q "$bundle"; then
+              echo "App ID $bundle already exists"
+            else
+              app-store-connect bundle-ids create "$bundle" --platform IOS || echo "::warning::Couldn't create the App ID $bundle"
+            fi
+          done
 
       - name: Get the signing certificate and profiles
         run: |
