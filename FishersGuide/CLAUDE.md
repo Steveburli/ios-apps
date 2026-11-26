@@ -64,11 +64,11 @@ Same as the other apps (see the repo README): code is edited without a local com
 
 ## Status (2026-11-25)
 
-The first version is written. Its logic was checked with a Python port of the engine (the demo drive reaches every main stop in order), but it hasn't been compiled yet.
+The cloud build is green (run 68): all 29 GuideKit tests pass, the app builds for the Simulator, and the screenshots run without a crash. The screenshots haven't been looked at yet. It hasn't run on a real iPhone.
 
 ## Next tasks, in order
 
-1. Get the cloud build green, then check the screenshots.
+1. Look at the screenshots in `report-FishersGuide` and fix anything that looks off.
 2. Register the App ID `com.steveburlison.fishersguide` and ship a TestFlight build (ask first).
 3. Drive the demo route for real: City Hall, then Allisonville Rd north past Conner Prairie, the Noblesville square, Potter's Bridge, Ruoff and Geist. Tune `radius`, `leadSeconds` and the stories.
 4. More stops (Fishers AgriPark, Saxony, Morse Reservoir, Cool Creek Park, the Carmel Arts & Design District, Westfield's Grand Park). Record real voice clips for the best ones.
