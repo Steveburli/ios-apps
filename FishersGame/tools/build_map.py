@@ -22,13 +22,35 @@ import sys
 
 LAT0 = 39.9725
 LON0 = -86.035
-KX = 111320.0 * math.cos(math.radians(LAT0))
-KZ = 110574.0
+H0 = 225.0  # approximate ellipsoidal height of the ground around Fishers, metres
 Q = 2.0  # units per metre
+
+# Local east/north/up tangent frame at the origin on the WGS84 ellipsoid. This is
+# the same frame the game puts Google's 3D tiles in, so the two line up.
+_A, _F = 6378137.0, 1 / 298.257223563
+_E2 = _F * (2 - _F)
+
+
+def _ecef(lat, lon, h):
+    la, lo = math.radians(lat), math.radians(lon)
+    s = math.sin(la)
+    n = _A / math.sqrt(1 - _E2 * s * s)
+    return ((n + h) * math.cos(la) * math.cos(lo), (n + h) * math.cos(la) * math.sin(lo), (n * (1 - _E2) + h) * s)
+
+
+_O = _ecef(LAT0, LON0, H0)
+_la0, _lo0 = math.radians(LAT0), math.radians(LON0)
+_EAST = (-math.sin(_lo0), math.cos(_lo0), 0.0)
+_NORTH = (-math.sin(_la0) * math.cos(_lo0), -math.sin(_la0) * math.sin(_lo0), math.cos(_la0))
 
 
 def proj(lat, lon):
-    return ((lon - LON0) * KX, (LAT0 - lat) * KZ)
+    """Game coordinates in metres: x east, z south of the origin."""
+    p = _ecef(lat, lon, H0)
+    d = (p[0] - _O[0], p[1] - _O[1], p[2] - _O[2])
+    e = d[0] * _EAST[0] + d[1] * _EAST[1] + d[2] * _EAST[2]
+    n = d[0] * _NORTH[0] + d[1] * _NORTH[1] + d[2] * _NORTH[2]
+    return (e, -n)
 
 
 def q(v):
@@ -513,10 +535,17 @@ def build_pois(osm):
     data = load(osm, "pois.json")
     pois = []
     places = []
+    bikes = []
     seen = set()
     for el in data["elements"]:
         tags = el.get("tags", {})
         name = tags.get("name")
+        if tags.get("amenity") == "bicycle_parking":
+            c = el if el["type"] == "node" else el.get("center")
+            if c:
+                x, z = proj(c["lat"], c["lon"])
+                bikes.append([round(x, 1), round(z, 1)])
+            continue
         if not name:
             continue
         if el["type"] == "node":
@@ -540,8 +569,8 @@ def build_pois(osm):
             continue
         seen.add(key)
         pois.append([name, kind, round(x, 1), round(z, 1)])
-    print("pois:", len(pois), "places:", len(places))
-    return pois, places
+    print("pois:", len(pois), "places:", len(places), "bike parking:", len(bikes))
+    return pois, places, bikes
 
 
 def main():
@@ -570,7 +599,7 @@ def main():
         old = os.path.join(out, k)
         if os.path.exists(old):
             os.remove(old)
-    pois, places = build_pois(osm)
+    pois, places, bikes = build_pois(osm)
     if not any(p[1] in ("city", "town", "village") for p in places):
         # fallback town centres when place data is missing
         for name, lat, lon in [("Fishers", 39.9556, -86.0139), ("Carmel", 39.9784, -86.1180),
@@ -583,11 +612,12 @@ def main():
     x0, z0 = proj(n, w)
     x1, z1 = proj(s, e)
     meta = {
-        "origin": {"lat": LAT0, "lon": LON0, "kx": KX, "kz": KZ, "q": Q},
+        "origin": {"lat": LAT0, "lon": LON0, "h": H0, "frame": "enu", "q": Q},
         "bounds": [round(x0), round(z0), round(x1), round(z1)],
         "names": names,
         "places": places,
         "pois": pois,
+        "bikeParking": bikes,
         "attribution": "Map data © OpenStreetMap contributors (ODbL)",
     }
     with open(os.path.join(out, "meta.json"), "w") as f:

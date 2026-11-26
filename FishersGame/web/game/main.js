@@ -14,6 +14,10 @@ import { clamp, smooth, wrapAngle, mulberry32 } from './util.js';
 const $ = (id) => document.getElementById(id);
 const SAVE_KEY = 'fishers-cruise-save-v1';
 const GFX_KEY = 'fishers-cruise-graphics';
+const GKEY = 'fishers-cruise-google-key';
+let googleKey = '';
+try { googleKey = localStorage.getItem(GKEY) || ''; } catch { /* storage blocked */ }
+let city = null; // RealCity when Google 3D tiles are on
 let gfx = 'high';
 try { gfx = localStorage.getItem(GFX_KEY) || (new URLSearchParams(location.search).has('low') ? 'low' : 'high'); } catch { /* storage blocked */ }
 
@@ -37,6 +41,7 @@ function applyGraphics() {
   renderer.setPixelRatio(low ? 1 : Math.min(window.devicePixelRatio, 1.5));
   renderer.shadowMap.enabled = !low;
   VIEW.load = low ? 800 : 1150; VIEW.unload = low ? 1100 : 1500;
+  if (city) { city.tiles.errorTarget = low ? 30 : 16; renderer.shadowMap.enabled = false; }
   if (scene.fog) { scene.fog.near = low ? 250 : 350; scene.fog.far = low ? 950 : 1350; }
   scene.traverse((o) => { if (o.material) o.material.needsUpdate = true; });
   for (const id of ['gfx', 'gfx-title']) {
@@ -86,7 +91,20 @@ const G = {
   scene, camera, sound: new Sound(), save: loadSave(), tex: makeTextures(),
   playerCar: null, waypoint: null, events: {},
   get car() { return this.playerCar; },
-  get pos() { return this.playerCar ? { x: this.playerCar.x, z: this.playerCar.z } : { x: player.x, z: player.z }; },
+  get pos() { return this.playerCar ? { x: this.playerCar.x, z: this.playerCar.z, y: this.playerCar.y } : { x: player.x, z: player.z, y: player.ground }; },
+  // Street-level height at a point: 0 in preview mode, from the 3D tiles otherwise.
+  floorAt(x, z) {
+    if (!city) return 0;
+    const k = `${Math.round(x / 3)},${Math.round(z / 3)}`;
+    const now = performance.now();
+    const c = floorCache.get(k);
+    if (c && now - c.t < 4000) return c.y;
+    const y = city.lowestGroundAt(x, z);
+    if (y == null) return c ? c.y : this.pos.y ?? 0;
+    floorCache.set(k, { y, t: now });
+    if (floorCache.size > 4000) floorCache.clear();
+    return y;
+  },
   addMoney(n) { this.save.money += n; this.hud.setMoney(this.save.money); },
   persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.save)); } catch { /* storage blocked */ } },
   spawnCar(type, x, z, heading, color) {
@@ -98,7 +116,7 @@ const G = {
   removeCar(c) { if (c === this.playerCar) return; this.traffic.remove(c); },
   spawnNPC(look, x, z, heading) {
     const mesh = buildPerson(look);
-    mesh.position.set(x, 0, z); mesh.rotation.y = heading;
+    mesh.position.set(x, this.floorAt(x, z), z); mesh.rotation.y = heading;
     scene.add(mesh);
     return { mesh, x, z };
   },
@@ -111,8 +129,10 @@ const G = {
 };
 
 window.fishersCruise = { G: null, player: null, enterCar: null };
+const floorCache = new Map();
 const PLAYER_LOOK = { shirt: 0x1f6fb2, pants: 0x2b3a55, hair: 0x3a2a1c, skin: 0xe0ac87, cap: 0xff8a3d };
-const player = { x: 0, z: 0, y: 0, vy: 0, heading: 0, speed: 0, mesh: buildPerson(PLAYER_LOOK) };
+// y is the height above the ground under the player (for jumping); ground is the ground height itself
+const player = { x: 0, z: 0, y: 0, vy: 0, ground: 0, heading: 0, speed: 0, mesh: buildPerson(PLAYER_LOOK) };
 scene.add(player.mesh);
 
 const cam = { yaw: 0, pitch: 0.32, dist: 6, lastMouse: -10, shake: 0 };
@@ -196,11 +216,23 @@ async function boot() {
     console.error(e);
     return;
   }
-  const world = new World(scene, map, G.tex);
+  let world = new World(scene, map, G.tex, { real: !!googleKey });
   G.world = world;
+  if (googleKey) {
+    const ok = await startRealCity(map);
+    if (!ok) { world = new World(scene, map, G.tex); G.world = world; }
+  }
+  G.real = !!city;
+  $('mode-note').textContent = city
+    ? 'Real 3D city: buildings, trees and ground are Google\'s 3D model of the real place.'
+    : 'Map preview: real street and building outlines; building heights are estimates. Add a Google key for the real 3D city.';
   await world.buildStatic((label, f) => setStatus(label, 0.5 + f * 0.4));
   G.nav = new Nav(world);
   G.traffic = new Traffic(scene, world, G.nav);
+  if (city) {
+    G.traffic.ground = Car.ground;
+    G.traffic.floor = Car.floor;
+  }
   G.hud = new Hud(world);
   G.hud.setMoney(G.save.money);
   G.hud.onWaypoint = (p) => { G.waypoint = p; routeState.key = ''; };
@@ -210,6 +242,7 @@ async function boot() {
   G.missions = new Missions(G);
   G.hud.setFish(G.save.fish.length, G.missions.fish.length);
   makeLabels();
+  if (city) await settleStart();
   world.updateTiles(player.x, player.z);
   while (world.pending) { world.pump(30); setStatus('Building the neighborhood', 0.92 + 0.08 * (1 - world.pending / 40)); await new Promise((r) => setTimeout(r, 0)); }
   G.traffic.updateParked(player.x, player.z);
@@ -225,11 +258,73 @@ async function boot() {
 function startGame() {
   $('title').hidden = true;
   $('hud').hidden = false;
+  $('credits').hidden = !city;
   playing = true;
   G.sound.start();
   lock();
   if (!G.save.done.includes('welcome')) G.hud.toast('Mom wants to talk to you. Walk over and press E.');
   else G.hud.toast('Welcome back! Press M for the map.');
+}
+
+// Loads Google's 3D tiles for the map area. Returns false (and explains why) if they can't be used.
+async function startRealCity(map) {
+  setStatus('Connecting to Google 3D tiles', 0.5);
+  let RealCity;
+  try {
+    ({ RealCity } = await import('./realcity.js'));
+  } catch (e) {
+    console.error(e);
+    realFailed('The 3D tiles code could not be downloaded.');
+    return false;
+  }
+  const o = map.meta.origin;
+  const params = new URLSearchParams(location.search);
+  city = new RealCity(scene, camera, renderer, { apiKey: googleKey, origin: { lat: o.lat, lon: o.lon, h: o.h || 0 }, rootURL: params.get('tiles') || null });
+  Car.ground = (x, z, fromY) => city.groundAt(x, z, fromY);
+  Car.floor = (x, z) => city.lowestGroundAt(x, z);
+  renderer.shadowMap.enabled = false;
+  applyGraphics();
+  // wait for the first tiles over the map centre to prove the key works
+  camera.position.set(0, 400, 300);
+  camera.lookAt(0, 0, 0);
+  const t0 = performance.now();
+  while (performance.now() - t0 < 45000) {
+    city.update();
+    if (city.loaded > 0) return true;
+    if (city.errors.length >= 3) break;
+    setStatus(`Connecting to Google 3D tiles (${Math.round((performance.now() - t0) / 1000)} s)`, 0.5);
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  realFailed(city.errors[0] || 'No tiles arrived within 45 seconds.');
+  city.dispose();
+  city = null;
+  Car.ground = null; Car.floor = null;
+  return false;
+}
+
+function realFailed(reason) {
+  console.warn('Real city unavailable:', reason);
+  const inArtifact = /claude\.ai|claudeusercontent/.test(location.host);
+  $('real-status').textContent = inArtifact
+    ? 'Google 3D tiles cannot load inside the Claude link. Run the game with play.bat on your PC to use the real city.'
+    : `Google 3D tiles did not load (${reason.slice(0, 140)}). Check that the Map Tiles API is enabled for this key. Showing the map preview instead.`;
+  $('real-status').hidden = false;
+}
+
+// After the real tiles load near home, put the player and parked cars on the real ground.
+async function settleStart() {
+  const h = G.homeSpot;
+  const t0 = performance.now();
+  while (performance.now() - t0 < 30000) {
+    camera.position.set(h.x, 150, h.z + 120);
+    camera.lookAt(h.x, 0, h.z);
+    city.update();
+    const y = city.lowestGroundAt(player.x, player.z);
+    if (y != null && city.bvhQueue.length === 0 && performance.now() - t0 > 3000) { player.ground = y; break; }
+    setStatus('Loading the real neighborhood in 3D', 0.92);
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  cam.yaw = player.heading;
 }
 
 // Picks a house with a driveway near the middle of Fishers.
@@ -291,12 +386,13 @@ function chooseHome() {
 
 // ---------------------------------------------------------------- trails and bike racks
 const TRAILS = [{ re: /monon/i, label: 'Monon Trail' }, { re: /nickel plate/i, label: 'Nickel Plate Trail' }];
-const rackGeo = new THREE.BoxGeometry(2.6, 0.08, 0.08);
-const rackMat = new THREE.MeshLambertMaterial({ color: 0x9aa3a8 });
+// Bikes wait at real bike-parking spots (from the map) within 80 m of each trail.
+// No racks or signs are drawn: the real ones are part of the 3D city.
 function placeBikeRacks() {
   const w = G.world, R = w.R;
   G.trails = [];
   let colorIdx = 0;
+  const parking = w.meta.bikeParking || [];
   for (const tr of TRAILS) {
     const pts = [];
     for (let e = 0; e < R.nEdges; e++) {
@@ -310,38 +406,21 @@ function placeBikeRacks() {
       }
     }
     if (pts.length < 2) continue;
-    // order the points along the trail's long direction
     const xs = pts.map((p) => p.x), zs = pts.map((p) => p.z);
     const alongZ = Math.max(...zs) - Math.min(...zs) > Math.max(...xs) - Math.min(...xs);
     pts.sort((a, b) => (alongZ ? a.z - b.z : a.x - b.x));
     const mid = pts[Math.floor(pts.length / 2)];
     const racks = [];
-    for (const p of pts) {
-      if (!racks.every((r) => Math.hypot(r.x - p.x, r.z - p.z) > 1100)) continue;
-      // a rack 3.5 m off the trail on whichever side is clear
-      let spot = null;
-      for (const side of [3.5, -3.5]) {
-        const x = p.x - p.dz * side, z = p.z + p.dx * side;
-        if (w.buildingAt(x, z, 1.5) >= 0 || w.inWater(x, z)) continue;
-        const nr = w.nearestRoad(x, z, (t, f) => !isTrail(t, f), 4);
-        if (nr) continue;
-        spot = { x, z, h: Math.atan2(p.dx, p.dz) };
-        break;
-      }
-      if (!spot) continue;
-      racks.push(spot);
-      const bar = new THREE.Mesh(rackGeo, rackMat);
-      bar.position.set(spot.x, 0.75, spot.z);
-      bar.rotation.y = spot.h;
-      scene.add(bar);
-      for (const off of [-0.6, 0.6]) {
-        const bx = spot.x + Math.sin(spot.h + Math.PI / 2) * off, bz = spot.z + Math.cos(spot.h + Math.PI / 2) * off;
-        const bike = G.spawnCar('bike', bx, bz, spot.h + Math.PI / 2, BIKE_COLORS[colorIdx++ % BIKE_COLORS.length]);
+    for (const [bx, bz] of parking) {
+      let near = null, nd = 80;
+      for (const p of pts) { const d = Math.hypot(p.x - bx, p.z - bz); if (d < nd) { nd = d; near = p; } }
+      if (!near || racks.some((r) => Math.hypot(r.x - bx, r.z - bz) < 30)) continue;
+      const h = Math.atan2(near.dx, near.dz) + Math.PI / 2;
+      racks.push({ x: bx, z: bz, h });
+      for (const off of [-0.5, 0.5]) {
+        const bike = G.spawnCar('bike', bx + Math.sin(h + Math.PI / 2) * off, bz + Math.cos(h + Math.PI / 2) * off, h, BIKE_COLORS[colorIdx++ % BIKE_COLORS.length]);
         bike.rack = true;
       }
-      const sign = textSprite(tr.label, { bg: '#0d6b47', color: '#fff', scale: 0.22, font: '700 40px "Barlow Condensed", "Arial Narrow", sans-serif' });
-      sign.position.set(spot.x, 2.4, spot.z);
-      scene.add(sign);
     }
     G.trails.push({ label: tr.label, re: tr.re, pts, mid, racks });
   }
@@ -352,7 +431,7 @@ function makeLabels() {
   const L = G.missions.L;
   for (const lm of Object.values(L)) {
     const s = textSprite(lm.label, { scale: 1, depthTest: false });
-    s.position.set(lm.x, 18, lm.z);
+    s.position.set(lm.x, 18 + G.floorAt(lm.x, lm.z), lm.z);
     s.visible = false;
     scene.add(s);
     labels.push({ s, x: lm.x, z: lm.z, base: s.scale.clone() });
@@ -381,7 +460,7 @@ function setBeacons(list) {
     const m = list[i];
     b.g.visible = !!m;
     if (!m) return;
-    b.g.position.set(m.x, 0, m.z);
+    b.g.position.set(m.x, G.floorAt(m.x, m.z), m.z);
     const mat = m.pink ? beaconMats.pink : beaconMats.yellow;
     b.cyl.material = mat; b.ring.material = mat;
     const r = m.radius || 6;
@@ -444,6 +523,7 @@ function exitCar() {
   G.world.collide(px, pz, 0.35, out);
   if (out.hit) { px = c.x - lx * (c.spec.w / 2 + 0.8); pz = c.z - lz * (c.spec.w / 2 + 0.8); }
   player.x = px; player.z = pz; player.y = 0; player.vy = 0;
+  player.ground = c.y;
   player.heading = c.heading;
   player.mesh.visible = true;
   c.driver = null;
@@ -461,6 +541,26 @@ function exitCar() {
     if (k.keep || k === c) continue;
     if (Math.hypot(k.x - player.x, k.z - player.z) > 300) { G.traffic.remove(k); }
   }
+}
+
+// Bumps the player's car off walls of the real 3D buildings. The ray runs at
+// 2.3 m so cars that are part of the 3D photo (about 1.5 m tall) don't block it.
+function realWalls(car) {
+  const sp = car.absSpeed;
+  if (sp < 0.3) return;
+  const dx = car.vx / sp, dz = car.vz / sp;
+  const reach = car.halfLen + 0.4 + sp * 0.03;
+  const hit = city.wall(car.x, car.y + (car.spec.bike ? 1.2 : 2.3), car.z, dx, dz, reach);
+  if (!hit) return;
+  const push = reach - hit.dist;
+  car.x += hit.nx * push; car.z += hit.nz * push;
+  const vn = car.vx * hit.nx + car.vz * hit.nz;
+  if (vn < 0) {
+    car.vx -= vn * hit.nx * 1.35; car.vz -= vn * hit.nz * 1.35;
+    car.vx *= 0.8; car.vz *= 0.8;
+    car.hitStrength = Math.max(car.hitStrength, -vn);
+  }
+  car.sync();
 }
 
 const bubbles = [];
@@ -490,6 +590,19 @@ function updatePlayer(dt, inp) {
   if (player.y === 0) player.vy = Math.max(0, player.vy);
   G.world.collide(player.x, player.z, 0.35, tmp);
   player.x = tmp.x; player.z = tmp.z;
+  if (city) {
+    // walls of the real buildings (also blocks fences and hedges)
+    if (player.speed > 0.1) {
+      const fx = Math.sin(player.heading), fz = Math.cos(player.heading);
+      const hit = city.wall(player.x, player.ground + player.y + 1.0, player.z, fx, fz, 0.6);
+      if (hit) { const push = 0.6 - hit.dist; player.x += hit.nx * push; player.z += hit.nz * push; }
+    }
+    const gy = city.groundAt(player.x, player.z, player.ground + player.y + 1.2);
+    if (gy != null) {
+      // step up kerbs and stairs; fall off ledges
+      if (gy > player.ground + player.y) { player.ground = gy; player.y = 0; } else { player.y += player.ground - gy; player.ground = gy; }
+    }
+  }
   // push out of cars
   for (const list of [G.traffic.cars, G.traffic.parked, G.traffic.extra]) {
     for (const c of list) {
@@ -500,7 +613,7 @@ function updatePlayer(dt, inp) {
       }
     }
   }
-  player.mesh.position.set(player.x, player.y, player.z);
+  player.mesh.position.set(player.x, player.ground + player.y, player.z);
   player.mesh.rotation.y = player.heading;
   animatePerson(player.mesh, player.speed, dt, player.y > 0.05);
 }
@@ -535,9 +648,10 @@ function updateSky(dt) {
   G.world.mats.bigWall.emissiveIntensity = night * 0.9;
   G.world.mats.leaves.color.setScalar(1);
   G.night = night > 0.55;
+  if (city) city.setDim(0.38 + 0.62 * day);
   const p = G.pos;
   sun.position.set(p.x + (el > -0.05 ? sunDir.x : -sunDir.x) * 250, Math.abs(sunDir.y) * 250 + 40, p.z + sunDir.z * 250);
-  sun.target.position.set(p.x, 0, p.z);
+  sun.target.position.set(p.x, p.y ?? 0, p.z);
   G.hud.setClock(hour);
 }
 
@@ -611,7 +725,9 @@ function step(dt) {
     ci.brake = inp.brake;
     ci.steer = inp.x; ci.handbrake = inp.handbrake ? 1 : 0;
     // two physics substeps for stability at speed
+    car.followSlope = !!city;
     car.update(dt / 2, G.world); car.update(dt / 2, G.world);
+    if (city) realWalls(car);
     if (car.hitStrength > 4) { G.sound.bump(car.hitStrength); cam.shake = Math.min(0.6, car.hitStrength * 0.04); G.missions.active?.onBump?.(car.hitStrength); }
     car.hitStrength = 0;
     if (inp.interact) exitCar();
@@ -698,10 +814,11 @@ function checkWater() {
   G.sound.splash();
   const off = c ? 0 : 3;
   if (c) {
-    c.x = hit.x; c.z = hit.z; c.vx = c.vz = 0; c.heading = Math.atan2(hit.dx, hit.dz); c.sync();
+    c.x = hit.x; c.z = hit.z; c.vx = c.vz = 0; c.heading = Math.atan2(hit.dx, hit.dz); c.settled = !city; c.followGround(); c.sync();
     G.hud.toast('Splash! A friendly tow truck pulled you out of the water.', 'warn');
   } else {
     player.x = hit.x - hit.dz * off; player.z = hit.z + hit.dx * off;
+    player.ground = G.floorAt(player.x, player.z); player.y = 0;
     G.hud.toast('Brrr, too cold for a swim. Back to dry land!', 'warn');
   }
 }
@@ -721,24 +838,31 @@ function renderFrame(dt) {
     const big = car.spec.l > 6 ? 1.6 : 1;
     if (car.spec.bike) {
       cam.dist = smooth(cam.dist, 4.6 + car.absSpeed * 0.08, 3, dt);
-      camTarget.set(car.x, 1.7, car.z);
+      camTarget.set(car.x, car.y + 1.7, car.z);
     } else {
       cam.dist = smooth(cam.dist, (8.5 + car.absSpeed * 0.06) * big, 3, dt);
-      camTarget.set(car.x, 1.6 * big, car.z);
+      camTarget.set(car.x, car.y + 1.6 * big, car.z);
     }
   } else {
     cam.dist = smooth(cam.dist, 5.5, 4, dt);
-    camTarget.set(player.x, player.y + 1.6, player.z);
+    camTarget.set(player.x, player.ground + player.y + 1.6, player.z);
   }
   // pull the camera in front of buildings that would block the view
   let d = cam.dist;
   const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
-  for (let i = 1; i <= 8; i++) {
-    const t = (i / 8) * cam.dist;
-    const x = camTarget.x - Math.sin(cam.yaw) * cp * t, z = camTarget.z - Math.cos(cam.yaw) * cp * t, y = camTarget.y + sp * t;
-    if (G.world.heightAt(x, z) > y - 0.5) { d = Math.max(1.5, t - 0.6); break; }
+  if (city) {
+    // keep the camera in front of real walls and above the ground
+    const hit = city.cast(camTarget.x, camTarget.y, camTarget.z, -Math.sin(cam.yaw) * cp, sp, -Math.cos(cam.yaw) * cp, cam.dist);
+    if (hit) d = Math.max(1.2, hit.distance - 0.4);
+  } else {
+    for (let i = 1; i <= 8; i++) {
+      const t = (i / 8) * cam.dist;
+      const x = camTarget.x - Math.sin(cam.yaw) * cp * t, z = camTarget.z - Math.cos(cam.yaw) * cp * t, y = camTarget.y + sp * t;
+      if (G.world.heightAt(x, z) > y - 0.5) { d = Math.max(1.5, t - 0.6); break; }
+    }
   }
-  camPos.set(camTarget.x - Math.sin(cam.yaw) * cp * d, Math.max(0.6, camTarget.y + sp * d), camTarget.z - Math.cos(cam.yaw) * cp * d);
+  const baseY = car ? car.y : player.ground;
+  camPos.set(camTarget.x - Math.sin(cam.yaw) * cp * d, Math.max(baseY + 0.6, camTarget.y + sp * d), camTarget.z - Math.cos(cam.yaw) * cp * d);
   if (cam.shake > 0) {
     cam.shake = Math.max(0, cam.shake - dt * 1.8);
     camPos.x += (Math.random() - 0.5) * cam.shake; camPos.y += (Math.random() - 0.5) * cam.shake;
@@ -749,8 +873,8 @@ function renderFrame(dt) {
   // headlight follows the player's car at night
   if (car && G.night) {
     headlight.intensity = 60;
-    headlight.position.set(car.x + car.fx * 2, 1.2, car.z + car.fz * 2);
-    headlight.target.position.set(car.x + car.fx * 25, 0, car.z + car.fz * 25);
+    headlight.position.set(car.x + car.fx * 2, car.y + 1.2, car.z + car.fz * 2);
+    headlight.target.position.set(car.x + car.fx * 25, car.y, car.z + car.fz * 25);
   } else headlight.intensity = 0;
   // markers
   const mk = G.missions ? G.missions.markers : [];
@@ -762,13 +886,13 @@ function renderFrame(dt) {
   for (const l of labels) {
     const dd = Math.hypot(l.x - camera.position.x, l.z - camera.position.z);
     l.s.visible = dd < 900 && dd > 40;
-    if (l.s.visible) { const k = clamp(dd / 90, 1, 8); l.s.scale.set(l.base.x * k, l.base.y * k, 1); l.s.position.y = 14 + k * 2; }
+    if (l.s.visible) { const k = clamp(dd / 90, 1, 8); l.s.scale.set(l.base.x * k, l.base.y * k, 1); l.s.position.y = G.floorAt(l.x, l.z) + 14 + k * 2; }
   }
   // speech bubble
   if (G.hud) {
     const b = bubbles[0];
     if (b) {
-      projV.set(b.ped.x, (b.ped.mesh.userData.height || 1.8) + 0.5, b.ped.z).project(camera);
+      projV.set(b.ped.x, (b.ped.y ?? 0) + (b.ped.mesh.userData.height || 1.8) + 0.5, b.ped.z).project(camera);
       if (projV.z < 1) G.hud.bubble(b.text, { x: (projV.x * 0.5 + 0.5) * window.innerWidth, y: (-projV.y * 0.5 + 0.5) * window.innerHeight });
       else G.hud.bubble(null);
     } else G.hud.bubble(null);
@@ -781,8 +905,14 @@ function renderFrame(dt) {
     if (playing) G.hud.drawMinimap(G.pos.x, G.pos.z, cam.yaw, heading, route, blips);
     if (G.hud.mapOpen) G.hud.drawBigMap(G.pos.x, G.pos.z, heading, route, blips, mapLabels());
   }
+  if (city) {
+    city.update();
+    creditTimer -= dt;
+    if (creditTimer <= 0) { creditTimer = 2; $('credit-text').textContent = city.attributions(); }
+  }
   renderer.render(scene, camera);
 }
+let creditTimer = 0;
 
 let _mapLabels = null;
 function mapLabels() {
@@ -797,5 +927,19 @@ function mapLabels() {
   return out;
 }
 
-window.fishersCruise = { G, player, enterCar: (c) => enterCar(c), cam, renderer, applyGraphics, setGfx: (v) => { gfx = v; applyGraphics(); } };
+// Google key box on the title screen. The key is kept only in this browser.
+$('gkey-clear').hidden = !googleKey;
+$('gkey-state').textContent = googleKey ? 'A key is saved in this browser.' : 'No key saved.';
+$('gkey-save').addEventListener('click', () => {
+  const v = $('gkey').value.trim();
+  if (!v) { $('gkey-state').textContent = 'Paste a key first.'; return; }
+  try { localStorage.setItem(GKEY, v); } catch { $('gkey-state').textContent = 'This browser blocked saving the key.'; return; }
+  location.reload();
+});
+$('gkey-clear').addEventListener('click', () => {
+  try { localStorage.removeItem(GKEY); } catch { /* ignore */ }
+  location.reload();
+});
+
+window.fishersCruise = { G, player, enterCar: (c) => enterCar(c), cam, renderer, applyGraphics, setGfx: (v) => { gfx = v; applyGraphics(); }, get city() { return city; }, realWalls: (c) => realWalls(c) };
 boot();

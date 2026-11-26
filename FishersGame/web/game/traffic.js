@@ -393,7 +393,12 @@ export class Traffic {
     const out = { x: 0, z: 0, nx: 0, nz: 0, hit: false };
     w.collide(p.x, p.z, 0.3, out);
     p.x = out.x; p.z = out.z;
+    if (this.ground) {
+      const gy = p.y == null ? this.floor(p.x, p.z) : this.ground(p.x, p.z, p.y + 1.5);
+      if (gy != null) p.y = gy;
+    }
     p.mesh.position.x = p.x; p.mesh.position.z = p.z;
+    p.mesh.position.y = (p.y ?? 0) + (p.dodge > 0 && !p.cyclist ? p.mesh.position.y : 0);
     p.mesh.rotation.y = p.heading;
   }
 
@@ -458,6 +463,8 @@ export class Traffic {
     // parked cars only move when bumped
     for (const c of this.parked.concat(this.extra)) {
       if (c.driver === 'ai' || c.driver === 'player') continue;
+      // drop newly placed cars onto the real ground once its tiles have loaded
+      if (!c.settled && Math.abs(c.x - px) < 300 && Math.abs(c.z - pz) < 300) { c.followGround(); if (c.settled) c.sync(); }
       if (Math.abs(c.vx) + Math.abs(c.vz) > 0.05) {
         c.input.throttle = 0; c.input.brake = 0.6; c.input.handbrake = 1; c.input.steer = 0;
         c.update(dt, this.w);

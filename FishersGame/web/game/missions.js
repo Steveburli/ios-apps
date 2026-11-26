@@ -136,8 +136,12 @@ export class Missions {
         async run(m) {
           await m.say(lines.map((t) => [giverName, t]));
           if (!self.g.car?.spec.bike) {
-            const rack = closest(trail.racks.length ? trail.racks : [start], self.g.pos);
-            m.objective('Hop on a bike. There is a rack along the trail.');
+            // no bike parked nearby: the coach brought a spare
+            const nearBike = self.g.traffic.extra.some((c) => c.spec.bike && !c.driver && Math.hypot(c.x - self.g.pos.x, c.z - self.g.pos.z) < 200);
+            if (!nearBike) m.car('bike', { x: self.g.pos.x + 2, z: self.g.pos.z + 1 }, 0x2f6fb5);
+            const bikes = self.g.traffic.extra.filter((c) => c.spec.bike && !c.driver);
+            const rack = closest(bikes.length ? bikes : [start], self.g.pos);
+            m.objective('Hop on a bike.');
             m.mark([rack], false);
             await m.until(() => self.g.car?.spec.bike);
           }
@@ -540,8 +544,12 @@ export class Missions {
   update(dt) {
     const m = this.active;
     if (this.flash > 0) this.flash = Math.max(0, this.flash - dt * 2.5);
+    const p0 = this.g.pos;
     for (const gv of this.givers) {
-      gv.sprite.position.y = 2.6 + Math.sin(performance.now() / 400 + gv.x) * 0.12;
+      if (Math.abs(gv.x - p0.x) > 600 || Math.abs(gv.z - p0.z) > 600) continue;
+      const by = this.g.floorAt(gv.x, gv.z);
+      gv.npc.mesh.position.y = by;
+      gv.sprite.position.y = by + 2.6 + Math.sin(performance.now() / 400 + gv.x) * 0.12;
     }
     this.updateFish(dt);
     if (!m) return;
@@ -578,7 +586,7 @@ export class Missions {
       const d = Math.hypot(f.x - p.x, f.z - p.z);
       f.sprite.visible = d < 120;
       if (!f.sprite.visible) continue;
-      f.sprite.position.y = 1.3 + Math.sin(t * 2 + f.id) * 0.25;
+      f.sprite.position.y = this.g.floorAt(f.x, f.z) + 1.3 + Math.sin(t * 2 + f.id) * 0.25;
       f.sprite.material.rotation = Math.sin(t * 1.5) * 0.2;
       if (d < 3) {
         f.got = true;
@@ -682,7 +690,7 @@ class MissionCtx {
     if (!this.passenger) return;
     const c = this.g.car || { x: this.g.pos.x, z: this.g.pos.z };
     this.passenger.npc.mesh.visible = true;
-    this.passenger.npc.mesh.position.set(c.x + 2, 0, c.z);
+    this.passenger.npc.mesh.position.set(c.x + 2, this.g.floorAt(c.x + 2, c.z), c.z);
     this.passenger = null;
     this.chat = null;
     this.g.sound.door();
@@ -708,7 +716,7 @@ class MissionCtx {
     return this.until(() => {
       const p = this.g.pos;
       for (const it of left()) {
-        it.obj.position.y = Math.abs(Math.sin(performance.now() / 200 + it.x)) * 0.15;
+        it.obj.position.y = this.g.floorAt(it.x, it.z) + Math.abs(Math.sin(performance.now() / 200 + it.x)) * 0.15;
         if (Math.hypot(it.x - p.x, it.z - p.z) < 2.8) {
           it.got = true; this.g.scene.remove(it.obj); this.g.sound.coin();
         }

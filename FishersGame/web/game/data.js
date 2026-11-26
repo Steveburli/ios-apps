@@ -164,7 +164,19 @@ export async function loadMap(base, onProgress) {
   };
 }
 
+// Same local east/north frame as tools/build_map.py (WGS84 tangent plane at the origin).
 export function lonLatToXZ(meta, lat, lon) {
   const o = meta.origin;
-  return { x: (lon - o.lon) * o.kx, z: (o.lat - lat) * o.kz };
+  if (o.frame !== 'enu') return { x: (lon - o.lon) * o.kx, z: (o.lat - lat) * o.kz };
+  const A = 6378137, F = 1 / 298.257223563, E2 = F * (2 - F), r = Math.PI / 180;
+  const ecef = (la, lo, h) => {
+    const s = Math.sin(la * r), n = A / Math.sqrt(1 - E2 * s * s);
+    return [(n + h) * Math.cos(la * r) * Math.cos(lo * r), (n + h) * Math.cos(la * r) * Math.sin(lo * r), (n * (1 - E2) + h) * s];
+  };
+  const p = ecef(lat, lon, o.h), c = ecef(o.lat, o.lon, o.h);
+  const d = [p[0] - c[0], p[1] - c[1], p[2] - c[2]];
+  const la0 = o.lat * r, lo0 = o.lon * r;
+  const e = -Math.sin(lo0) * d[0] + Math.cos(lo0) * d[1];
+  const n = -Math.sin(la0) * Math.cos(lo0) * d[0] - Math.sin(la0) * Math.sin(lo0) * d[1] + Math.cos(la0) * d[2];
+  return { x: e, z: -n };
 }

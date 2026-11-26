@@ -103,6 +103,8 @@ out tags geom qt;''', os.path.join(out, "lines.json"))
   relation["name"]["leisure"]({b});
   relation["name"]["tourism"]({b});
   relation["name"]["natural"="water"]({b});
+  node["amenity"="bicycle_parking"]({b});
+  way["amenity"="bicycle_parking"]({b});
 );
 out tags center qt;''', os.path.join(out, "pois.json"))
     # Buildings in a 3x3 grid; a cell that has not been fetched yet is

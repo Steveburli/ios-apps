@@ -69,7 +69,10 @@ const BIG_WALLS = [0xd6cdb8, 0xbfb6a3, 0xa9a7a1, 0x9c6b54, 0xc9c6bf, 0x8f8b85, 0
 const TREE_COLORS = [0x4f7f33, 0x5f8f3a, 0x6b9a3f, 0x3f6e2f, 0xc9a12a, 0xd98a2b, 0xb8452a, 0x8f6b2a, 0x7a8f35, 0xe0b440, 0x5a8a3c];
 
 export class World {
-  constructor(scene, map, tex) {
+  // opts.real: Google 3D tiles draw the city, so this class only keeps the map
+  // data for roads, collisions and lookups and draws nothing itself.
+  constructor(scene, map, tex, opts = {}) {
+    this.real = !!opts.real;
     this.scene = scene;
     this.map = map;
     this.meta = map.meta;
@@ -94,6 +97,7 @@ export class World {
       houseWall: new THREE.MeshLambertMaterial({ vertexColors: true, map: t.facade, emissiveMap: t.facadeLit, emissive: 0xffffff, emissiveIntensity: 0 }),
       bigWall: new THREE.MeshLambertMaterial({ vertexColors: true, map: t.office, emissiveMap: t.officeLit, emissive: 0xffffff, emissiveIntensity: 0 }),
       plainWall: new THREE.MeshLambertMaterial({ vertexColors: true, map: t.panel }),
+      previewWall: new THREE.MeshLambertMaterial({ vertexColors: true }),
       roof: new THREE.MeshLambertMaterial({ vertexColors: true, map: t.shingles }),
       flatRoof: new THREE.MeshLambertMaterial({ vertexColors: true }),
       trunk: new THREE.MeshLambertMaterial({ color: 0x5b4330 }),
@@ -165,6 +169,7 @@ export class World {
 
   // ------------------------------------------------------------ static meshes
   async buildStatic(progress) {
+    if (this.real) return;
     const scene = this.scene;
     const [minx, minz, maxx, maxz] = this.bounds;
     const W = maxx - minx + 3000, H = maxz - minz + 3000;
@@ -271,9 +276,8 @@ export class World {
       const b = getChunk(x0, z0);
       const hw = roadWidth(t, fl) / 2;
       ribbon(b.road, R.pts, R.start[e], R.count[e], hw, ROAD_Y(t, fl), ROAD_COLOR(t, fl));
-      if (t === 16 && fl & F.TRAIL) dashes(b.mark, R.pts, R.start[e], R.count[e], 0, 0.06, 0.13, 0xe8c547, 2.5, 6);
-      // markings on bigger roads
-      if (t <= 9 && t % 2 === 1) {
+      // Lane markings are not in the map data, so none are drawn (no invented details).
+      if (false) {
         if (fl & F.ONEWAY) {
           if (hw > 4.5) dashes(b.mark, R.pts, R.start[e], R.count[e], 0, 0.07, 0.17, 0xf2f2ee, 3, 9);
         } else {
@@ -322,8 +326,8 @@ export class World {
     const houseLike = kind === 1 || (kind === 0 && area >= 45 && area < 480) || kind === 9;
     if (houseLike) {
       style = 'house'; roof = 'pitched';
-      wall = kind === 9 ? 5 : r < 0.42 ? 3.1 : 5.6;
-      if (tagged) wall = Math.max(2.8, tagged * 0.72);
+      // no height in the map: one fixed estimate for every house (preview mode only)
+      wall = tagged || 6;
     } else if (kind === 7 || (kind === 0 && area < 45)) {
       style = 'plain'; wall = 2.7; roof = area < 80 ? 'pitched' : 'flat';
     } else {
@@ -402,29 +406,17 @@ export class World {
     const col = new THREE.Color();
     const houses = [];
     let count = 0;
-    for (const i of ids) {
+    for (const i of (this.real ? [] : ids)) {
       if (++count % 40 === 0) yield;
       const spec = this.buildingSpec(i);
       const s = B.start[i], n = B.count[i];
       const pts = [];
       for (let j = 0; j < n; j++) pts.push(B.pts[(s + j) * 2], B.pts[(s + j) * 2 + 1]);
-      const r = hash2(i, 3);
-      let wallColor;
-      if (spec.style === 'house') wallColor = HOUSE_WALLS[Math.floor(r * HOUSE_WALLS.length)];
-      else if (spec.style === 'plain') wallColor = [0xc8c6c0, 0xb0aea6, 0x9aa0a6, 0xd4cfc4][Math.floor(r * 4)];
-      else wallColor = BIG_WALLS[Math.floor(r * BIG_WALLS.length)];
-      col.setHex(wallColor);
-      const storey = spec.style === 'house' ? (spec.wall > 4 ? spec.wall / 2 : spec.wall) : 3.6;
-      walls(bufs[spec.style], pts, 0, spec.wall, col, spec.style === 'house' ? 4.2 : 4, storey);
-      if (spec.roof === 'pitched') {
-        const ok = hipRoof(bufs.roof, bufs[spec.style], pts, spec.wall, col.clone().setHex(ROOFS[Math.floor(hash2(i, 5) * ROOFS.length)]), col, hash2(i, 9) < 0.5, B.area[i]);
-        if (!ok) flatRoof(bufs.flat, pts, spec.wall, col.clone().setHex(0x55585c));
-        if (spec.style === 'house' && B.area[i] > 60) houses.push(i);
-      } else {
-        const rc = B.area[i] > 1500 ? (hash2(i, 11) < 0.6 ? 0xc4c7c9 : 0x8c8f92) : 0x6e7174;
-        flatRoof(bufs.flat, pts, spec.wall, col.clone().setHex(rc));
-        if (B.area[i] > 900 && spec.wall > 5) parapet(bufs.plain, pts, spec.wall, col.clone().setHex(wallColor));
-      }
+      // Preview mode: the real footprint, extruded in one neutral colour with a flat top.
+      // Wall colours, windows and roof shapes are not in the map data, so none are drawn.
+      col.setHex(0xc9c6bd);
+      walls(bufs.plain, pts, 0, spec.wall, col, 4, 100);
+      flatRoof(bufs.flat, pts, spec.wall, col.clone().setHex(0x8d8f91));
     }
     const add = (b, mat) => {
       if (!b.pos.length) return;
@@ -434,11 +426,12 @@ export class World {
     };
     add(bufs.house, this.mats.houseWall);
     add(bufs.big, this.mats.bigWall);
-    add(bufs.plain, this.mats.plainWall);
+    add(bufs.plain, this.mats.previewWall);
     add(bufs.roof, this.mats.roof);
     add(bufs.flat, this.mats.flatRoof);
     yield;
-    const trees = this.makeTrees(tx, tz, houses, group);
+    // Trees are not drawn in preview mode: the map does not record where real trees stand.
+    const trees = { x: new Float32Array(0), z: new Float32Array(0), grid: new Grid(16) };
     this.scene.add(group);
     const tile = { tx, tz, group, trees };
     this.tiles.set(k, tile);

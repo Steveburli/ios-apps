@@ -92,6 +92,16 @@
   #flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 12; }
   .crosshint { position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); top: calc(150px + env(safe-area-inset-top, 0px)); font-family: var(--body); font-size: 13px; color: rgba(255,255,255,0.7); text-align: right; line-height: 1.6; text-shadow: 0 1px 4px #000; }
 
+  .realbox { display: grid; gap: 8px; padding: 14px 16px; border: 1px solid rgba(255,255,255,0.16); border-radius: 10px; background: rgba(255,255,255,0.04); }
+  .realbox h3 { margin: 0; font-family: var(--display); font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; font-size: 14px; color: var(--muted); }
+  .realbox p { margin: 0; }
+  .realbox input { flex: 1 1 260px; min-width: 0; font: 15px var(--body); color: var(--paper); background: rgba(0,0,0,0.35); border: 2px solid rgba(255,255,255,0.25); border-radius: 8px; padding: 9px 12px; }
+  .realbox input:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+  .warnline { font-size: 14px; color: #ffcf9e; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  #credits { position: fixed; z-index: 11; left: 50%; transform: translateX(-50%); bottom: calc(4px + env(safe-area-inset-bottom, 0px)); max-width: min(560px, calc(100vw - 32px)); font: 11px var(--body); color: #fff; text-shadow: 0 1px 3px #000; text-align: center; pointer-events: none; }
+  #credits .glogo { font: 600 13px "Product Sans", var(--body); letter-spacing: 0.01em; }
+
   /* ------------------------------------------------ big map & pause */
   #mapwrap { position: fixed; inset: 0; z-index: 20; background: #1d2a1c; }
   #bigmap { width: 100%; height: 100%; display: block; cursor: grab; }
@@ -151,13 +161,25 @@
       <h3>Biking</h3>
       <div><kbd>W</kbd> pedal <kbd>Shift</kbd> pedal hard</div>
       <div><kbd>H</kbd> ring the bell</div>
-      <div>Bike racks line the Monon and Nickel Plate trails</div>
+      <div>Bikes wait at bike parking along the Monon and Nickel Plate trails</div>
       <h3>Everything else</h3>
       <div><kbd>Mouse</kbd> look around</div>
       <div><kbd>M</kbd> city map, click to set a waypoint</div>
       <div><kbd>X</kbd> quit the current job</div>
       <div><kbd>Esc</kbd> pause</div>
     </div>
+    <section class="realbox" aria-labelledby="real-h">
+      <h3 id="real-h">Real 3D city</h3>
+      <p id="mode-note" class="attrib"></p>
+      <p id="real-status" class="warnline" hidden></p>
+      <div class="row">
+        <label class="sr" for="gkey">Google Maps Platform API key</label>
+        <input id="gkey" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your Google Maps Platform API key">
+        <button class="ghost" id="gkey-save" type="button">Use real city</button>
+        <button class="ghost" id="gkey-clear" type="button" hidden>Remove key</button>
+      </div>
+      <p class="attrib"><span id="gkey-state"></span> The key is stored only in this browser and is sent only to Google. It needs the Map Tiles API turned on. The real city works when you run the game from play.bat, not inside the Claude link.</p>
+    </section>
     <div class="row">
       <button class="btn" id="start" type="button">Start driving</button>
       <button class="ghost" id="gfx-title" type="button">Graphics: detailed</button>
@@ -198,6 +220,7 @@
   </div>
 </div>
 
+<div id="credits" hidden><span class="glogo">Google</span> <span id="credit-text"></span></div>
 <div id="hud" hidden>
   <div class="tl">
     <div id="objective" hidden>
@@ -232,6 +255,14 @@
 </div>
 
 <script type="importmap">
-  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/examples/jsm/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+      "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.8.3/src/index.js",
+      "3d-tiles-renderer": "https://cdn.jsdelivr.net/npm/3d-tiles-renderer@0.4.4/src/index.js",
+      "3d-tiles-renderer/plugins": "https://cdn.jsdelivr.net/npm/3d-tiles-renderer@0.4.4/src/plugins/index.js"
+    }
+  }
 </script>
 <script type="module" src="game/main.js"></script>

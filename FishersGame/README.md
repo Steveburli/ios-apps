@@ -31,6 +31,36 @@ straight from disk):
 | Pedal hard on a bike | Shift + W | A + right trigger |
 | Quit the current job | X | |
 
+## Real 3D city (Google Photorealistic 3D Tiles)
+
+With a Google Maps Platform API key, the game draws the city from Google's photorealistic 3D model
+instead of the simplified preview: the real houses, trees, storefronts and terrain, to scale. OpenStreetMap
+data stays underneath for the road network (traffic, GPS, trail rides) and is projected into the same
+Earth-centred frame, so the two line up.
+
+1. In Google Cloud Console, enable the **Map Tiles API** for the project that owns your key.
+2. Restrict the key to the address you play from (Application restrictions: Websites, for example
+   `http://localhost:8000/*`) and to the Map Tiles API.
+3. Start the game with `play.bat` and paste the key into **Real 3D city** on the title screen.
+   The key is saved only in that browser's local storage and is sent only to Google.
+
+Notes:
+- The real city does not load inside the Claude artifact link (the link blocks requests to other sites).
+  Without a key, or if Google refuses it, the game says why and starts the map preview.
+- Google's credits are shown at the bottom of the screen while the tiles are on, as their terms require.
+  Their terms also ask for the Google logo image; the text "Google" stands in for it for now.
+- Tiles stream live and are not saved; usage beyond Google's free monthly allowance is billed to your project.
+- Interiors are not part of Google's tiles.
+
+### What is real and what is generated
+
+- **Real**: in real-city mode, everything you see of the city is Google's 3D model. In both modes, road and
+  trail positions, building outlines, parks, water and bike parking come from OpenStreetMap.
+- **Preview estimates**: without the 3D tiles, buildings are the real outlines extruded to an estimated
+  height in one neutral colour. Trees and lane markings are not drawn because the map does not record them.
+- **Generated on purpose**: the moving parts of the game: people, traffic, parked cars, bikes, the
+  characters who give out jobs, and the jobs themselves.
+
 ## Jobs
 
 1. **Welcome to Fishers**: Mom, at home. Pick up a cake and library books in the family minivan.
@@ -48,8 +78,8 @@ straight from disk):
 
 ## Biking
 
-The Monon Trail and Nickel Plate Trail are drawn as paved trails with a yellow center line (green on the maps).
-Bike racks sit about every kilometre along both, and there is a bike in your driveway. Other cyclists and walkers
+The Monon Trail and Nickel Plate Trail show green on the maps. Bikes wait at the real bike-parking spots
+along both trails (from OpenStreetMap), and there is a bike in your driveway. Other cyclists and walkers
 use the trails too. On a bike, the GPS routes you along trails and quieter roads.
 
 Progress (money, finished jobs, golden fish) is saved in the browser.

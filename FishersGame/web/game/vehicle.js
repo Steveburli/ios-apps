@@ -5,6 +5,11 @@ import { clamp, smooth, wrapAngle } from './util.js';
 const tmp = { x: 0, z: 0, nx: 0, nz: 0, hit: false };
 
 export class Car {
+  // Set by the game when real 3D tiles are on: ground(x, z, fromY) = first surface
+  // below fromY; floor(x, z) = lowest surface (street level). Both return null if unknown.
+  static ground = null;
+  static floor = null;
+
   constructor(scene, type, color, x, z, heading) {
     this.type = type;
     this.spec = CAR_TYPES[type];
@@ -13,6 +18,7 @@ export class Car {
     scene.add(this.mesh);
     this.scene = scene;
     this.x = x; this.z = z; this.heading = heading;
+    this.y = 0; this.slope = 0; this.settled = !Car.floor; this.followSlope = false;
     this.vx = 0; this.vz = 0; this.yawRate = 0;
     this.steer = 0; this.wheelSpin = 0;
     this.roll = 0; this.pitch = 0;
@@ -80,6 +86,7 @@ export class Car {
     this.z += this.vz * dt;
     // world collisions
     if (world) this.collideWorld(world, dt);
+    this.followGround();
     // body motion for looks
     const accelF = (vF - (this._lastVF ?? vF)) / Math.max(dt, 1e-3);
     this._lastVF = vF;
@@ -87,6 +94,25 @@ export class Car {
     this.roll = smooth(this.roll, clamp(-this.yawRate * vF * 0.004, -0.08, 0.08), 6, dt);
     this.wheelSpin += (vF / this.mesh.userData.wheelR) * dt;
     this.sync();
+  }
+
+  // Keeps the car on the real ground surface (no-op when there are no 3D tiles).
+  followGround() {
+    if (!Car.floor) return;
+    if (!this.settled) {
+      const y = Car.floor(this.x, this.z);
+      if (y == null) return;
+      this.y = y; this.settled = true;
+      return;
+    }
+    const y = Car.ground(this.x, this.z, this.y + 1.8);
+    if (y != null) this.y = y;
+    if (this.followSlope) {
+      const h = this.halfLen * 0.8;
+      const yf = Car.ground(this.x + this.fx * h, this.z + this.fz * h, this.y + 1.8);
+      const yb = Car.ground(this.x - this.fx * h, this.z - this.fz * h, this.y + 1.8);
+      if (yf != null && yb != null) this.slope = clamp(Math.atan2(yf - yb, 2 * h), -0.35, 0.35);
+    }
   }
 
   collideWorld(world, dt) {
@@ -117,8 +143,9 @@ export class Car {
 
   sync() {
     const m = this.mesh;
-    m.position.set(this.x, 0, this.z);
-    m.rotation.set(0, this.heading, 0);
+    m.position.set(this.x, this.y, this.z);
+    m.rotation.order = 'YXZ';
+    m.rotation.set(-this.slope, this.heading, 0);
     const body = m.userData.body;
     if (this.spec.bike) {
       const vF = this.speed;
