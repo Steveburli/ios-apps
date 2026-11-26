@@ -148,9 +148,16 @@ public struct OneOffEvent: Codable, Identifiable, Hashable {
     public var note: String
     /// Something to bring or wear ("Wear pajamas", "Bring $5").
     public var bring: String
+    /// For parties: "", "yes", "no" or "maybe".
+    public var rsvp: String
+    /// For parties: the gift idea, or what was bought.
+    public var gift: String
+    /// Where it came from: "" (typed in), "calendar" or "photo".
+    public var source: String
 
     public init(id: String = UUID().uuidString, title: String, kidIDs: [String] = [], day: String, start: Int? = nil,
-                end: Int? = nil, kind: EventKind, note: String = "", bring: String = "") {
+                end: Int? = nil, kind: EventKind, note: String = "", bring: String = "", rsvp: String = "", gift: String = "",
+                source: String = "") {
         self.id = id
         self.title = title
         self.kidIDs = kidIDs
@@ -160,6 +167,9 @@ public struct OneOffEvent: Codable, Identifiable, Hashable {
         self.kind = kind
         self.note = note
         self.bring = bring
+        self.rsvp = rsvp
+        self.gift = gift
+        self.source = source
     }
 
     public init(from decoder: Decoder) throws {
@@ -173,6 +183,9 @@ public struct OneOffEvent: Codable, Identifiable, Hashable {
         kind = (try? c.decodeIfPresent(EventKind.self, forKey: .kind)) ?? .other
         note = try c.decodeIfPresent(String.self, forKey: .note) ?? ""
         bring = try c.decodeIfPresent(String.self, forKey: .bring) ?? ""
+        rsvp = try c.decodeIfPresent(String.self, forKey: .rsvp) ?? ""
+        gift = try c.decodeIfPresent(String.self, forKey: .gift) ?? ""
+        source = try c.decodeIfPresent(String.self, forKey: .source) ?? ""
     }
 }
 
@@ -298,6 +311,19 @@ public enum Agenda {
                                   packed: state.packed.contains(packKey(day, id))))
         }
         return lines
+    }
+
+    /// When to leave for school on a day: the first drop-off (or school start,
+    /// if there's no drop-off) that isn't called off, minus the travel time.
+    /// Nil on days without school.
+    public static func leave(on day: String, state: FamilyState, travelMinutes: Int,
+                             calendar: Calendar = Dates.calendar) -> (minute: Int, entry: AgendaEntry, kidIDs: [String])? {
+        let entries = Agenda.entries(on: day, state: state, calendar: calendar).filter { !$0.cancelled && !$0.isEvent }
+        let kinds = Dictionary(state.routines.map { ($0.id, $0.kind) }, uniquingKeysWith: { first, _ in first })
+        let dropoff = entries.first { kinds[$0.id] == .dropoff } ?? entries.first { kinds[$0.id] == .school }
+        guard let dropoff, let start = dropoff.start else { return nil }
+        let kidIDs = dropoff.kidIDs.isEmpty ? state.kids.map { $0.id } : dropoff.kidIDs
+        return (start - travelMinutes, dropoff, kidIDs)
     }
 
     public static func packKey(_ day: String, _ id: String) -> String {

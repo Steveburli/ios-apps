@@ -11,13 +11,16 @@ public struct Kid: Codable, Identifiable, Hashable {
     /// Index into the app's kid palette.
     public var color: Int
     public var emoji: String
+    /// "boy", "girl" or "" (unknown). Only used to pick the growth percentile table.
+    public var sex: String
 
-    public init(id: String = UUID().uuidString, name: String, birthday: String, color: Int, emoji: String = "") {
+    public init(id: String = UUID().uuidString, name: String, birthday: String, color: Int, emoji: String = "", sex: String = "") {
         self.id = id
         self.name = name
         self.birthday = birthday
         self.color = color
         self.emoji = emoji
+        self.sex = sex
     }
 
     public init(from decoder: Decoder) throws {
@@ -27,6 +30,7 @@ public struct Kid: Codable, Identifiable, Hashable {
         birthday = try c.decodeIfPresent(String.self, forKey: .birthday) ?? ""
         color = try c.decodeIfPresent(Int.self, forKey: .color) ?? 0
         emoji = try c.decodeIfPresent(String.self, forKey: .emoji) ?? ""
+        sex = try c.decodeIfPresent(String.self, forKey: .sex) ?? ""
     }
 
     public func ageMonths(on date: Date, calendar: Calendar = Dates.calendar) -> Int {
@@ -45,6 +49,7 @@ public struct Kid: Codable, Identifiable, Hashable {
 /// What one log entry records.
 public enum LogKind: String, Codable, CaseIterable, Identifiable {
     case bottle, nursing, pump, diaper, sleep, solids, potty, meds, temperature, growth, bath, note
+    case symptom, tooth, brush, screen, outside, first, quote
 
     public var id: String { rawValue }
 
@@ -62,6 +67,13 @@ public enum LogKind: String, Codable, CaseIterable, Identifiable {
         case .growth: return "Growth"
         case .bath: return "Bath"
         case .note: return "Note"
+        case .symptom: return "Sick"
+        case .tooth: return "Tooth"
+        case .brush: return "Brush"
+        case .screen: return "Screen"
+        case .outside: return "Outside"
+        case .first: return "First"
+        case .quote: return "Quote"
         }
     }
 
@@ -79,12 +91,29 @@ public enum LogKind: String, Codable, CaseIterable, Identifiable {
         case .growth: return "📏"
         case .bath: return "🛁"
         case .note: return "📝"
+        case .symptom: return "🤒"
+        case .tooth: return "🦷"
+        case .brush: return "🪥"
+        case .screen: return "📺"
+        case .outside: return "🌳"
+        case .first: return "⭐️"
+        case .quote: return "💬"
         }
     }
 
     /// Kinds that run as a timer: the entry has no end until it's stopped.
     public var isTimed: Bool {
         self == .sleep || self == .nursing
+    }
+
+    /// Kinds logged as a number of minutes (screen time, time outside).
+    public var isMinutes: Bool {
+        self == .screen || self == .outside
+    }
+
+    /// Kinds kept as memories (firsts, quotes) on the Grow tab.
+    public var isMemory: Bool {
+        self == .first || self == .quote
     }
 
     /// Kinds that count as a feed for "last fed" and the feed gap.
@@ -222,12 +251,20 @@ public struct LogEntry: Codable, Identifiable, Hashable {
     public var heightIn: Double?
     public var headIn: Double?
     public var note: String
+    /// A photo's file name in Application Support/photos; empty for none.
+    public var photo: String
+    /// Symptoms for a sick-day entry ("Cough", "Runny nose").
+    public var symptoms: [String]
+    /// Minutes for screen time and time outside.
+    public var minutes: Int?
+    /// When it was last changed, so a sync from another phone keeps the newer copy.
+    public var updated: Date?
 
     public init(id: String = UUID().uuidString, kidID: String, kind: LogKind, start: Date, end: Date? = nil,
                 amountOz: Double? = nil, milk: MilkType? = nil, side: Side? = nil, diaper: DiaperKind? = nil,
                 potty: PottyKind? = nil, bites: [FoodBite] = [], medicine: String = "", dose: String = "",
                 temperatureF: Double? = nil, weightLb: Double? = nil, heightIn: Double? = nil, headIn: Double? = nil,
-                note: String = "") {
+                note: String = "", photo: String = "", symptoms: [String] = [], minutes: Int? = nil, updated: Date? = nil) {
         self.id = id
         self.kidID = kidID
         self.kind = kind
@@ -246,6 +283,10 @@ public struct LogEntry: Codable, Identifiable, Hashable {
         self.heightIn = heightIn
         self.headIn = headIn
         self.note = note
+        self.photo = photo
+        self.symptoms = symptoms
+        self.minutes = minutes
+        self.updated = updated
     }
 
     public init(from decoder: Decoder) throws {
@@ -269,6 +310,10 @@ public struct LogEntry: Codable, Identifiable, Hashable {
         heightIn = try c.decodeIfPresent(Double.self, forKey: .heightIn)
         headIn = try c.decodeIfPresent(Double.self, forKey: .headIn)
         note = try c.decodeIfPresent(String.self, forKey: .note) ?? ""
+        photo = try c.decodeIfPresent(String.self, forKey: .photo) ?? ""
+        symptoms = try c.decodeIfPresent([String].self, forKey: .symptoms) ?? []
+        minutes = try c.decodeIfPresent(Int.self, forKey: .minutes)
+        updated = try c.decodeIfPresent(Date.self, forKey: .updated)
     }
 
     public var isRunning: Bool {
@@ -281,11 +326,11 @@ public struct LogEntry: Codable, Identifiable, Hashable {
     }
 
     /// One line for the timeline: "4 oz formula", "Wet + dirty", "Banana, egg".
-    public func detail(now: Date) -> String {
+    public func detail(now: Date, units: Units = .us) -> String {
         var parts: [String] = []
         switch kind {
         case .bottle, .pump:
-            if let amountOz { parts.append(Measure.oz(amountOz)) }
+            if let amountOz { parts.append(units.volume(amountOz)) }
             if let milk, kind == .bottle { parts.append(milk.title.lowercased()) }
         case .nursing:
             if let side { parts.append(side.title) }
@@ -304,11 +349,18 @@ public struct LogEntry: Codable, Identifiable, Hashable {
             if !medicine.isEmpty { parts.append(medicine) }
             if !dose.isEmpty { parts.append(dose) }
         case .temperature:
-            if let temperatureF { parts.append(String(format: "%.1f°F", temperatureF)) }
+            if let temperatureF { parts.append(units.temperature(temperatureF)) }
         case .growth:
-            if let weightLb { parts.append(Measure.pounds(weightLb)) }
-            if let heightIn { parts.append(Measure.inches(heightIn)) }
-            if let headIn { parts.append("head " + Measure.inches(headIn)) }
+            if let weightLb { parts.append(units.weight(weightLb)) }
+            if let heightIn { parts.append(units.length(heightIn)) }
+            if let headIn { parts.append("head " + units.length(headIn)) }
+        case .symptom:
+            if !symptoms.isEmpty { parts.append(symptoms.joined(separator: ", ")) }
+            if let temperatureF { parts.append(units.temperature(temperatureF)) }
+        case .screen, .outside:
+            if let minutes { parts.append(Dates.duration(Double(minutes) * 60)) }
+        case .tooth, .brush, .first, .quote:
+            break
         case .bath:
             break
         case .note:
@@ -358,11 +410,26 @@ public struct FamilyState: Codable {
     public var milestones: [String: [String: MilestoneStatus]]
     /// True once the birthdays have been set on first launch.
     public var onboarded: Bool
+    public var settings: FamilySettings
+    /// Bedtime and morning picture charts.
+    public var charts: [RoutineChart]
+    /// "day|chartID|step" for each chart step done that day.
+    public var chartDone: [String]
+    public var contacts: [Contact]
+    public var shopping: [ShoppingItem]
+    /// kidID → vaccine dose ID → the day it was given (`yyyy-MM-dd`).
+    public var vaccines: [String: [String: String]]
+    /// kidID → the seed for that kid's weekly meal plan ("Shuffle" adds one).
+    public var mealSeeds: [String: Int]
+    /// IDs of things deleted on this phone, so a sync doesn't bring them back.
+    public var deleted: [String]
 
     public init(kids: [Kid] = [], logs: [LogEntry] = [], routines: [RoutineItem] = [], events: [OneOffEvent] = [],
                 packItems: [PackItem] = [], packed: [String] = [], activitiesDone: [ActivityDone] = [],
                 favoriteActivities: [String] = [], milestones: [String: [String: MilestoneStatus]] = [:],
-                onboarded: Bool = false) {
+                onboarded: Bool = false, settings: FamilySettings = FamilySettings(), charts: [RoutineChart] = [],
+                chartDone: [String] = [], contacts: [Contact] = [], shopping: [ShoppingItem] = [],
+                vaccines: [String: [String: String]] = [:], mealSeeds: [String: Int] = [:], deleted: [String] = []) {
         self.kids = kids
         self.logs = logs
         self.routines = routines
@@ -373,6 +440,14 @@ public struct FamilyState: Codable {
         self.favoriteActivities = favoriteActivities
         self.milestones = milestones
         self.onboarded = onboarded
+        self.settings = settings
+        self.charts = charts
+        self.chartDone = chartDone
+        self.contacts = contacts
+        self.shopping = shopping
+        self.vaccines = vaccines
+        self.mealSeeds = mealSeeds
+        self.deleted = deleted
     }
 
     public init(from decoder: Decoder) throws {
@@ -387,14 +462,23 @@ public struct FamilyState: Codable {
         favoriteActivities = try c.decodeIfPresent([String].self, forKey: .favoriteActivities) ?? []
         milestones = (try? c.decodeIfPresent([String: [String: MilestoneStatus]].self, forKey: .milestones)) ?? [:]
         onboarded = try c.decodeIfPresent(Bool.self, forKey: .onboarded) ?? false
+        settings = (try? c.decodeIfPresent(FamilySettings.self, forKey: .settings)) ?? FamilySettings()
+        charts = try c.decodeIfPresent([RoutineChart].self, forKey: .charts) ?? []
+        chartDone = try c.decodeIfPresent([String].self, forKey: .chartDone) ?? []
+        contacts = try c.decodeIfPresent([Contact].self, forKey: .contacts) ?? []
+        shopping = try c.decodeIfPresent([ShoppingItem].self, forKey: .shopping) ?? []
+        vaccines = try c.decodeIfPresent([String: [String: String]].self, forKey: .vaccines) ?? [:]
+        mealSeeds = try c.decodeIfPresent([String: Int].self, forKey: .mealSeeds) ?? [:]
+        deleted = try c.decodeIfPresent([String].self, forKey: .deleted) ?? []
     }
 
-    /// The first launch: Griffin and Blake, with birthdays to fill in.
+    /// The first launch: Griffin and Blake, with birthdays to fill in, and
+    /// starter bedtime and morning charts.
     public static func starter() -> FamilyState {
         FamilyState(kids: [
             Kid(id: "griffin", name: "Griffin", birthday: "", color: 0, emoji: "🦁"),
             Kid(id: "blake", name: "Blake", birthday: "", color: 1, emoji: "🐻"),
-        ])
+        ], charts: RoutineChart.starters)
     }
 
     public func kid(_ id: String) -> Kid? {
@@ -403,5 +487,9 @@ public struct FamilyState: Codable {
 
     public func logs(for kidID: String) -> [LogEntry] {
         logs.filter { $0.kidID == kidID }
+    }
+
+    public var units: Units {
+        settings.metric ? .metric : .us
     }
 }

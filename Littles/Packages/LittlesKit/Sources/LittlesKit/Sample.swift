@@ -15,8 +15,8 @@ public enum Sample {
         func at(_ dayOffset: Int, _ minutes: Int) -> Date {
             Dates.at(Dates.addDays(today, dayOffset, calendar: calendar), minutes: minutes, calendar: calendar) ?? now
         }
-        let baby = Kid(id: babyID, name: "Griffin", birthday: birthday(monthsAgo: 8), color: 0, emoji: "🦁")
-        let big = Kid(id: bigID, name: "Blake", birthday: birthday(monthsAgo: 40), color: 1, emoji: "🐻")
+        let baby = Kid(id: babyID, name: "Griffin", birthday: birthday(monthsAgo: 8), color: 0, emoji: "🦁", sex: "boy")
+        let big = Kid(id: bigID, name: "Blake", birthday: birthday(monthsAgo: 40), color: 1, emoji: "🐻", sex: "boy")
         let nowMinutes = Dates.minutes(now, calendar: calendar)
 
         var logs: [LogEntry] = []
@@ -82,6 +82,20 @@ public enum Sample {
                              note: "Low fever after school"))
         logs.append(LogEntry(kidID: bigID, kind: .temperature, start: at(-1, 19 * 60 + 50), temperatureF: 100.6))
 
+        // Teeth, brushing, screens, outside time, firsts and quotes.
+        logs.append(LogEntry(kidID: babyID, kind: .tooth, start: at(-20, 9 * 60), note: "Bottom front left"))
+        logs.append(LogEntry(kidID: babyID, kind: .tooth, start: at(-6, 8 * 60), note: "Bottom front right"))
+        logs.append(LogEntry(kidID: babyID, kind: .first, start: at(-3, 17 * 60), note: "Pulled up to stand on the couch"))
+        logs.append(LogEntry(kidID: babyID, kind: .first, start: at(-12, 18 * 60), note: "First laugh at the dog"))
+        logs.append(LogEntry(kidID: bigID, kind: .quote, start: at(-2, 19 * 60), note: "\"I'm not tired, my eyes are just resting.\""))
+        logs.append(LogEntry(kidID: bigID, kind: .first, start: at(-8, 10 * 60), note: "Wrote the B in Blake"))
+        for day in -6...0 {
+            logs.append(LogEntry(kidID: bigID, kind: .brush, start: at(day, 19 * 60 + 30)))
+            logs.append(LogEntry(kidID: bigID, kind: .screen, start: at(day, 16 * 60), minutes: [20, 45, 30, 15, 60, 25, 30][day + 6]))
+            logs.append(LogEntry(kidID: bigID, kind: .outside, start: at(day, 10 * 60), minutes: [60, 30, 90, 45, 20, 75, 40][day + 6]))
+        }
+        logs.append(LogEntry(kidID: babyID, kind: .symptom, start: at(-5, 18 * 60), temperatureF: 100.2, symptoms: ["Runny nose", "Teething"]))
+
         // Growth from checkups.
         for (monthsAgo, pounds, inches) in [(8, 7.6, 20.0), (6, 12.4, 23.5), (4, 15.1, 25.2), (2, 17.0, 26.6), (0, 18.4, 27.8)] {
             let date = calendar.date(byAdding: .month, value: -monthsAgo, to: now) ?? now
@@ -140,6 +154,25 @@ public enum Sample {
         for (index, item) in Milestones.list(for: 36).enumerated() { bigMarks[item.id] = index < 9 ? MilestoneStatus.yes : MilestoneStatus.notYet }
         milestones[bigID] = bigMarks
 
+        let contacts = [
+            Contact(id: "rivera", name: "Ms. Rivera", role: "Teacher", phone: "317-555-0142", email: "rivera@example.com", kidID: bigID),
+            Contact(id: "patel", name: "Dr. Patel", role: "Pediatrician", phone: "317-555-0199"),
+            Contact(id: "maya", name: "Maya's mom (Jen)", role: "Classmate's parent", phone: "317-555-0117", kidID: bigID),
+        ]
+        let shopping = [
+            ShoppingItem(id: "s1", title: "Glue sticks for class", list: "School"),
+            ShoppingItem(id: "s2", title: "Gift for Maya's party", list: "Party"),
+        ]
+        events.append(OneOffEvent(id: "maya", title: "Maya's birthday party", kidIDs: [bigID], day: Dates.addDays(today, 9, calendar: calendar),
+                                  start: 14 * 60, kind: .party, note: "Jump Zone", rsvp: "yes", gift: "Dinosaur puzzle"))
+        var vaccines: [String: [String: String]] = [:]
+        var babyShots: [String: String] = [:]
+        for dose in HealthSchedule.doses where dose.toMonths <= 4 { babyShots[dose.id] = baby.birthday }
+        vaccines[babyID] = babyShots
+        var bigShots: [String: String] = [:]
+        for dose in HealthSchedule.doses where dose.toMonths <= 41 && dose.id != "flu" { bigShots[dose.id] = big.birthday }
+        vaccines[bigID] = bigShots
+
         let done = [
             ActivityDone(activityID: "bubbles-baby", day: Dates.addDays(today, -1, calendar: calendar), kidIDs: [babyID, bigID]),
             ActivityDone(activityID: "playdough", day: Dates.addDays(today, -2, calendar: calendar), kidIDs: [bigID]),
@@ -147,6 +180,8 @@ public enum Sample {
 
         return FamilyState(kids: [baby, big], logs: logs, routines: routines, events: events, packItems: packItems,
                            packed: [], activitiesDone: done, favoriteActivities: ["board-books", "dance-freeze"],
-                           milestones: milestones, onboarded: true)
+                           milestones: milestones, onboarded: true,
+                           settings: FamilySettings(potty: [bigID: PottyPlan(on: true)]),
+                           charts: RoutineChart.starters, contacts: contacts, shopping: shopping, vaccines: vaccines)
     }
 }

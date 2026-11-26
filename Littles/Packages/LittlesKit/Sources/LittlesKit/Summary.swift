@@ -139,14 +139,17 @@ public enum Summary {
     /// bottles and diapers; a preschooler leads with potty and meals.
     public static func quickKinds(ageMonths: Int) -> [LogKind] {
         if ageMonths < 6 {
-            return [.bottle, .nursing, .diaper, .sleep, .pump, .meds, .temperature, .bath, .growth, .note]
+            return [.bottle, .nursing, .diaper, .sleep, .pump, .meds, .temperature, .symptom, .bath, .growth, .first, .note]
         }
         if ageMonths < 18 {
-            return [.bottle, .solids, .diaper, .sleep, .nursing, .meds, .temperature, .bath, .growth, .note]
+            return [.bottle, .solids, .diaper, .sleep, .nursing, .meds, .temperature, .symptom, .tooth, .brush, .bath, .growth,
+                    .outside, .first, .note]
         }
         if ageMonths < 30 {
-            return [.solids, .diaper, .sleep, .potty, .bottle, .meds, .temperature, .bath, .growth, .note]
+            return [.solids, .diaper, .sleep, .potty, .bottle, .meds, .temperature, .symptom, .brush, .screen, .outside, .bath,
+                    .growth, .first, .quote, .note]
         }
-        return [.solids, .potty, .sleep, .meds, .temperature, .bath, .growth, .note, .diaper]
+        return [.solids, .potty, .sleep, .meds, .temperature, .symptom, .brush, .screen, .outside, .bath, .growth, .first, .quote,
+                .note, .diaper]
     }
 }
