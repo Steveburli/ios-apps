@@ -1,7 +1,7 @@
 // Story missions, mission givers and the golden-fish collectibles.
 import * as THREE from 'three';
 import { textSprite } from './models.js';
-import { isDrivable, isTrafficRoad, F } from './world.js';
+import { isDrivable, isTrafficRoad, isTrail, F } from './world.js';
 import { mulberry32 } from './util.js';
 import { lonLatToXZ } from './data.js';
 
@@ -126,7 +126,65 @@ export class Missions {
     const school = this.findPOI((n, k) => k === 'amenity=school' && /elementary/i.test(n), L.cityHall) || { name: 'the elementary school', ...L.fishersHS };
     const park = this.findPOI((n, k) => k === 'leisure=park', L.cityHall, 3000) || L.cumberland;
     const self = this;
-    return [
+    // A timed ride along one of the trails, giver standing at a trailside spot near `near`.
+    const trailRide = (id, title, trailLabel, near, giverName, giverLook, pay, lines) => {
+      const trail = (self.g.trails || []).find((t) => t.label === trailLabel);
+      if (!trail) return null;
+      const start = closest(trail.pts, near);
+      return {
+        id, title, pay, giver: { name: giverName, at: { x: start.x, z: start.z }, look: giverLook, onTrail: true },
+        async run(m) {
+          await m.say(lines.map((t) => [giverName, t]));
+          if (!self.g.car?.spec.bike) {
+            const rack = closest(trail.racks.length ? trail.racks : [start], self.g.pos);
+            m.objective('Hop on a bike. There is a rack along the trail.');
+            m.mark([rack], false);
+            await m.until(() => self.g.car?.spec.bike);
+          }
+          // follow the trail ~3 km in whichever direction has more of it, using bike routing
+          const pts = trail.pts;
+          const here = self.g.pos;
+          const i0 = pts.indexOf(closest(pts, here));
+          const dir = i0 < pts.length / 2 ? 1 : -1;
+          let end = pts[i0];
+          for (let i = i0; i >= 0 && i < pts.length; i += dir) {
+            end = pts[i];
+            if (Math.hypot(end.x - here.x, end.z - here.z) > 3000) break;
+          }
+          const route = self.g.nav.route(here.x, here.z, end.x, end.z, true);
+          const cps = [];
+          let total = 0;
+          if (route) {
+            let run = 0;
+            const rp = route.pts;
+            for (let i = 2; i < rp.length && cps.length < 7; i += 2) {
+              const d = Math.hypot(rp[i] - rp[i - 2], rp[i + 1] - rp[i - 1]);
+              run += d; total += d;
+              if (run > 550) { cps.push({ x: rp[i], z: rp[i + 1] }); run = 0; }
+            }
+          }
+          if (cps.length < 2) throw new Fail('This stretch of trail is too short. Try again from the middle.');
+          m.timer(Math.round(total / 6 + 40));
+          for (let i = 0; i < cps.length; i++) {
+            await m.goto(cps[i], { text: `${trailLabel} checkpoint ${i + 1} of ${cps.length}. Stay on the trail!`, bike: true, radius: 10, next: cps[i + 1] });
+            self.g.sound.checkpoint();
+          }
+          m.bonus(Math.round(m.timeLeft()) * 2, 'Speedy pedaling');
+          await m.say([[giverName, 'Look at you go! Same time next week?']]);
+        },
+      };
+    };
+    const rides = [
+      trailRide('nickelride', 'Nickel Plate Pedal', 'Nickel Plate Trail', L.nickelPlate, 'Coach Rosa',
+        look({ shirt: 0xf2c037, cap: 0xf2f2f2, hair: 0x2a1c12 }), 350,
+        ['The Nickel Plate Trail used to be a railroad. Now it is the best ride in Fishers.',
+          'Grab a bike and hit every checkpoint before the clock runs out. Ring your bell at the walkers!']),
+      trailRide('mononride', 'Monon Mileage', 'Monon Trail', L.carmelArts, 'Dev',
+        look({ shirt: 0x2bb3b1, cap: 0x2b2f36 }), 400,
+        ['The Monon runs all the way from Indy up through Carmel. I ride it every morning.',
+          'Think you can keep up? Bike to every checkpoint before time runs out.']),
+    ].filter(Boolean);
+    return [...rides,
       {
         id: 'welcome', title: 'Welcome to Fishers', pay: 150, giver: { name: 'Mom', at: home, look: look({ shirt: 0x2bb3b1, longHair: true, hair: 0x5a3a22 }) }, first: true,
         async run(m) {
@@ -407,7 +465,9 @@ export class Missions {
       if (!def.first && !welcomeDone) continue;
       if (def.first && welcomeDone) continue;
       const at = def.giver.at;
-      const s = def.first ? { x: at.x, z: at.z } : this.spot(at, (t, f) => isDrivable(t, f) || t === 16, 250);
+      const s = def.first ? { x: at.x, z: at.z }
+        : def.giver.onTrail ? this.spot(at, isTrail, 60)
+        : this.spot(at, (t, f) => isDrivable(t, f) || t === 16, 250);
       const npc = this.g.spawnNPC(def.giver.look, s.x, s.z, Math.random() * 6);
       const sprite = textSprite(done.has(def.id) ? def.giver.name : `! ${def.title}`, {
         bg: done.has(def.id) ? 'rgba(20,30,40,0.75)' : '#ffd23f', color: done.has(def.id) ? '#fff' : '#13202b', scale: 0.24,
@@ -594,6 +654,7 @@ class MissionCtx {
       const pos = this.g.pos;
       const d = Math.hypot(p.x - pos.x, p.z - pos.z);
       if (d > r) return false;
+      if (opts.bike && !this.g.car?.spec.bike) { this.g.hud.setPrompt('You need to be on a bike for this.'); return false; }
       if (opts.car && !this.g.car) { this.g.hud.setPrompt('You need to be in a car for this.'); return false; }
       if (opts.stop && this.g.car && Math.abs(this.g.car.speed) > 2.5) { this.g.hud.setPrompt('<b>Slow down</b> and stop here.'); return false; }
       return true;

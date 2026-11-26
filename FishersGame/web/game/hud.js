@@ -7,7 +7,8 @@ const $ = (id) => document.getElementById(id);
 const MINI_COLORS = {
   major: '#f4f1e6', minor: '#c9cbc4', service: '#8b8f88', foot: '#7f8f75',
 };
-function roadStyle(t) {
+function roadStyle(t, f = 0) {
+  if (t === 16 && f & 128) return '#a6d86a';
   if (t <= 10) return MINI_COLORS.major;
   if (t <= 13) return MINI_COLORS.minor;
   if (t <= 15) return MINI_COLORS.service;
@@ -178,7 +179,7 @@ export class Hud {
       if (this.w.edgeStamp[e] === st) return;
       this.w.edgeStamp[e] = st;
       const t = R.type[e];
-      const key = roadStyle(t) + '|' + Math.max(2.5, roadWidth(t, R.flags[e]) * 0.9).toFixed(1);
+      const key = roadStyle(t, R.flags[e]) + '|' + Math.max(2.5, roadWidth(t, R.flags[e]) * 0.9).toFixed(1);
       let l = groups.get(key);
       if (!l) { l = []; groups.set(key, l); }
       l.push(e);
@@ -299,13 +300,14 @@ export class Hud {
     const R = this.w.R;
     c.lineCap = 'round'; c.lineJoin = 'round';
     for (const [pred, color, width] of [
+      [(t, f) => t === 16 && f & 128, '#9fd36a', 9],
       [(t) => t >= 11 && t <= 14, '#bdbfb7', 9],
       [(t) => t <= 10, '#f2dc8a', 18],
     ]) {
       c.strokeStyle = color; c.lineWidth = width;
       c.beginPath();
       for (let e = 0; e < R.nEdges; e++) {
-        if (!pred(R.type[e])) continue;
+        if (!pred(R.type[e], R.flags[e])) continue;
         if (R.type[e] === 14 && R.flags[e] & 32) continue;
         const s = R.start[e] * 2, n = R.count[e];
         c.moveTo(R.pts[s], R.pts[s + 1]);
@@ -390,7 +392,7 @@ export class Hud {
       if (sx < -100 || sy < -50 || sx > W + 100 || sy > H + 50) continue;
       c.font = `${l.big ? 700 : 600} ${(l.big ? 22 : 14) * dpr}px Barlow Condensed, sans-serif`;
       c.lineWidth = 4 * dpr; c.strokeStyle = 'rgba(10,18,14,0.85)';
-      c.strokeText(l.text, sx, sy); c.fillStyle = l.big ? '#ffffff' : '#e8e4d6'; c.fillText(l.text, sx, sy);
+      c.strokeText(l.text, sx, sy); c.fillStyle = l.big ? '#ffffff' : l.trail ? '#c4ef8e' : '#e8e4d6'; c.fillText(l.text, sx, sy);
     }
     for (const bl of blips) {
       const [sx, sy] = toS(bl.x, bl.z);

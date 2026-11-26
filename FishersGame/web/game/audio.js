@@ -64,6 +64,7 @@ export class Sound {
   }
 
   horn() { this.tone(392, 0.5, 'square', 0.12); this.tone(494, 0.5, 'square', 0.1); }
+  bell() { this.tone(2093, 0.5, 'sine', 0.12); this.tone(2637, 0.45, 'sine', 0.08, 0.02); this.tone(2093, 0.4, 'sine', 0.1, 0.18); }
   smallHorn() { this.tone(523, 0.18, 'square', 0.07); this.tone(523, 0.18, 'square', 0.07, 0.25); }
   coin() { this.tone(988, 0.12, 'square', 0.08); this.tone(1319, 0.3, 'square', 0.08, 0.08); }
   bump(s) { this.tone(90, 0.25, 'triangle', Math.min(0.4, s * 0.04), 0, 0.5); }

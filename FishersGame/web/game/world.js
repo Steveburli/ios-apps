@@ -8,10 +8,13 @@ export const VIEW = { load: 1150, unload: 1500 };
 
 // --------------------------------------------------------------- road classes
 export const RT = { MOTORWAY: 1, TRUNK: 3, PRIMARY: 5, SECONDARY: 7, TERTIARY: 9, RESIDENTIAL: 11, UNCLASSIFIED: 12, LIVING: 13, SERVICE: 14, TRACK: 15, FOOT: 16 };
-export const F = { ONEWAY: 1, BRIDGE: 2, TUNNEL: 4, ROUNDABOUT: 8, SIDEWALK: 16, DRIVEWAY: 32, PARKING: 64 };
+export const F = { ONEWAY: 1, BRIDGE: 2, TUNNEL: 4, ROUNDABOUT: 8, SIDEWALK: 16, DRIVEWAY: 32, PARKING: 64, TRAIL: 128 };
+export const isTrail = (t, flags) => t === 16 && (flags & 128) !== 0;
+// roads a bike may use: anything drivable plus paved trails
+export const isBikeable = (t, flags) => (t >= 3 && t <= 15 && !(flags & 32)) || isTrail(t, flags); // no interstates
 
 export function roadWidth(t, flags) {
-  if (t === 16) return 2.0;
+  if (t === 16) return flags & 128 ? 3.6 : 2.0;
   if (t === 15) return 3.2;
   if (t === 14) return flags & F.DRIVEWAY ? 3.2 : flags & F.PARKING ? 5.5 : 5;
   if (t % 2 === 0 && t <= 10) return 6.5; // links
@@ -34,8 +37,8 @@ export function speedLimit(t) {
 export const isDrivable = (t, flags) => t <= 15 && !(flags & F.DRIVEWAY);
 export const isTrafficRoad = (t, flags) => t <= 13 && !(flags & (F.DRIVEWAY | F.PARKING));
 
-const ROAD_COLOR = (t) => (t === 16 ? 0xc9c4b8 : t === 15 ? 0x9a8a68 : t === 14 ? 0x5b5e63 : t <= 10 ? 0x46494e : 0x515459);
-const ROAD_Y = (t) => (t === 16 ? 0.1 : t >= 14 ? 0.115 : t >= 11 ? 0.13 : 0.145);
+const ROAD_COLOR = (t, f = 0) => (t === 16 ? (f & 128 ? 0x3c4045 : 0xc9c4b8) : t === 15 ? 0x9a8a68 : t === 14 ? 0x5b5e63 : t <= 10 ? 0x46494e : 0x515459);
+const ROAD_Y = (t, f = 0) => (t === 16 ? (f & 128 ? 0.108 : 0.1) : t >= 14 ? 0.115 : t >= 11 ? 0.13 : 0.145);
 
 // --------------------------------------------------------------- area classes
 const AREA = {
@@ -165,7 +168,8 @@ export class World {
     const scene = this.scene;
     const [minx, minz, maxx, maxz] = this.bounds;
     const W = maxx - minx + 3000, H = maxz - minz + 3000;
-    const g = new THREE.PlaneGeometry(W, H);
+    // subdivided so no single triangle is kilometres across (keeps depth precise)
+    const g = new THREE.PlaneGeometry(W, H, Math.ceil(W / 250), Math.ceil(H / 250));
     g.rotateX(-Math.PI / 2);
     g.translate((minx + maxx) / 2, 0, (minz + maxz) / 2);
     const uv = g.attributes.uv;
@@ -266,7 +270,8 @@ export class World {
       const [x0, z0] = this.edgePoint(e, 0);
       const b = getChunk(x0, z0);
       const hw = roadWidth(t, fl) / 2;
-      ribbon(b.road, R.pts, R.start[e], R.count[e], hw, ROAD_Y(t), ROAD_COLOR(t));
+      ribbon(b.road, R.pts, R.start[e], R.count[e], hw, ROAD_Y(t, fl), ROAD_COLOR(t, fl));
+      if (t === 16 && fl & F.TRAIL) dashes(b.mark, R.pts, R.start[e], R.count[e], 0, 0.06, 0.13, 0xe8c547, 2.5, 6);
       // markings on bigger roads
       if (t <= 9 && t % 2 === 1) {
         if (fl & F.ONEWAY) {
@@ -284,7 +289,7 @@ export class World {
     }
     // round joints at intersections and dead ends
     for (let nIdx = 0; nIdx < R.nNodes; nIdx++) {
-      let maxHw = 0, maxT = 99, cnt = 0, types = 0;
+      let maxHw = 0, maxT = 99, cnt = 0, types = 0, maxF = 0;
       for (let k = this.adjStart[nIdx]; k < this.adjStart[nIdx + 1]; k++) {
         const e = this.adj[k];
         if (R.flags[e] & F.TUNNEL) continue;
@@ -292,12 +297,12 @@ export class World {
         const hw = roadWidth(t, R.flags[e]) / 2;
         cnt++; types |= 1 << (t % 31);
         if (hw > maxHw) { maxHw = hw; }
-        if (t < maxT) maxT = t;
+        if (t < maxT) { maxT = t; maxF = R.flags[e]; }
       }
       if (!cnt) continue;
       if (cnt === 2 && (types & (types - 1)) === 0) continue;
       const x = R.nodes[nIdx * 2], z = R.nodes[nIdx * 2 + 1];
-      disc(getChunk(x, z).road, x, z, maxHw, ROAD_Y(maxT) + 0.004, ROAD_COLOR(maxT));
+      disc(getChunk(x, z).road, x, z, maxHw, ROAD_Y(maxT, maxF) + 0.004, ROAD_COLOR(maxT, maxF));
     }
     for (const b of chunks.values()) {
       const m = new THREE.Mesh(toGeo(b.road), this.mats.road);

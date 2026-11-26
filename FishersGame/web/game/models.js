@@ -166,6 +166,7 @@ export const CAR_TYPES = {
   van:      { w: 2.0, l: 5.4, h: 2.4, clear: 0.4, cabin: [1.3, 4.6, -0.3], boxy: true, maxSpeed: 36, accel: 6.5, grip: 6.2, steer: 0.52, label: 'Delivery van' },
   icecream: { w: 2.1, l: 5.8, h: 2.8, clear: 0.42, cabin: [1.6, 4.8, -0.35], boxy: true, maxSpeed: 34, accel: 6.5, grip: 6.2, steer: 0.5, label: 'Ice cream truck' },
   bus:      { w: 2.45, l: 10.5, h: 3.0, clear: 0.45, cabin: [1.7, 9.6, -0.2], boxy: true, maxSpeed: 30, accel: 5, grip: 6.0, steer: 0.45, label: 'School bus' },
+  bike:     { w: 0.62, l: 1.8, h: 1.1, clear: 0.36, cabin: [0, 0, 0], bike: true, maxSpeed: 14, accel: 5, grip: 10, steer: 0.75, label: 'Bike' },
   golf:     { w: 1.25, l: 2.4, h: 1.8, clear: 0.2, cabin: [0.9, 1.4, -0.1], open: true, maxSpeed: 12, accel: 6, grip: 8.5, steer: 0.7, label: 'Golf cart' },
 };
 
@@ -245,7 +246,83 @@ function carBodyGeometry(typeName, color) {
   return out;
 }
 
+const BIKE_COLORS = [0x2f6fb5, 0xd94848, 0x3b9c5a, 0xf2c037, 0x2b2f36, 0xff8a3d, 0x2bb3b1, 0xe46aa7];
+export { BIKE_COLORS };
+
+// A bicycle with the same userData shape as a car, so the car physics drive it.
+function buildBike(color) {
+  const g = new THREE.Group();
+  const body = new THREE.Group();
+  g.add(body);
+  const b = new Baker();
+  const tube = (x0, y0, z0, x1, y1, z1, r, col) => {
+    const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
+    const len = Math.hypot(dx, dy, dz);
+    // a unit box stretched along y, then tilted in the y/z plane
+    b.add(unitBox, col, r, len, r, (x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2, Math.atan2(dz, dy), 0, 0);
+  };
+  const R = 0.34;
+  // frame (front of the bike is +z)
+  tube(0, R, -0.52, 0, 0.82, -0.12, 0.05, color);   // seat tube
+  tube(0, R, -0.52, 0, R + 0.02, 0.05, 0.045, color); // chain stay
+  tube(0, R + 0.02, 0.05, 0, 0.82, -0.12, 0.05, color); // down tube
+  tube(0, 0.82, -0.12, 0, 0.86, 0.42, 0.05, color);  // top tube
+  tube(0, 0.86, 0.42, 0, R, 0.55, 0.045, color);     // fork
+  tube(0, 0.86, 0.42, 0, 1.02, 0.45, 0.04, 0x2a2a2a); // stem
+  b.box(0x2a2a2a, 0.56, 0.04, 0.04, 0, 1.02, 0.45);    // handlebar
+  b.box(0x1c1c1c, 0.16, 0.05, 0.26, 0, 0.88, -0.16);   // seat
+  b.box(0x3a3a3a, 0.08, 0.08, 0.08, 0, R + 0.02, 0.05); // crank
+  g.add(new THREE.Mesh(b.geometry(), carMat));
+  body.add(g.children[1]);
+  body.children[0].castShadow = true;
+  const lights = new Baker().box(0xffffff, 0.09, 0.07, 0.05, 0, 0.92, 0.5).geometry();
+  const lm = new THREE.Mesh(lights, lightMats.off);
+  body.add(lm);
+  const wheelGeo = cached('bikewheel', () => {
+    const w = new Baker();
+    w.add(new THREE.TorusGeometry(1, 0.09, 6, 22), 0x1a1a1a, 1, 1, 1, 0, 0, 0, 0, Math.PI / 2, 0);
+    w.box(0xbfc4c9, 0.03, 1.9, 0.05, 0, 0, 0);
+    w.box(0xbfc4c9, 0.03, 0.05, 1.9, 0, 0, 0);
+    return w.geometry();
+  });
+  const wheels = [];
+  for (const sz of [1, -1]) {
+    const pivot = new THREE.Group();
+    pivot.position.set(0, R, sz > 0 ? 0.55 : -0.52);
+    const tire = new THREE.Mesh(wheelGeo, carMat);
+    tire.scale.setScalar(R);
+    tire.castShadow = true;
+    pivot.add(tire);
+    g.add(pivot);
+    wheels.push({ pivot, tire, front: sz > 0 });
+  }
+  g.userData = { body, wheels, wheelR: R, spec: CAR_TYPES.bike, lights: lm, rider: null };
+  return g;
+}
+
+// Seats a person on a bike and returns it. Call pedal() each frame to animate.
+export function mountRider(bike, person) {
+  const u = person.userData;
+  person.position.set(0, 0.02, -0.2);
+  person.rotation.set(0, 0, 0);
+  u.hips.rotation.x = 0.35;
+  u.armL.rotation.x = -1.15; u.armR.rotation.x = -1.15;
+  bike.userData.body.add(person);
+  bike.userData.rider = person;
+  return person;
+}
+
+export function pedal(bike, crank) {
+  const r = bike.userData.rider;
+  if (!r) return;
+  const u = r.userData;
+  u.hips.position.y = 0.9;
+  u.legL.rotation.x = -0.75 + Math.sin(crank) * 0.45;
+  u.legR.rotation.x = -0.75 - Math.sin(crank) * 0.45;
+}
+
 export function buildCar(typeName, color) {
+  if (typeName === 'bike') return buildBike(color);
   const t = CAR_TYPES[typeName];
   const g = new THREE.Group();
   const body = new THREE.Group();

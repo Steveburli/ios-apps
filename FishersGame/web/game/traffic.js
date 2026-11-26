@@ -1,13 +1,13 @@
 // Traffic that drives the real road network, parked cars, and people on the sidewalks.
 import * as THREE from 'three';
 import { Car, carVsCar } from './vehicle.js';
-import { buildPerson, animatePerson, resetPose, CAR_COLORS } from './models.js';
-import { isTrafficRoad, speedLimit, roadWidth, F, TILE } from './world.js';
+import { buildPerson, animatePerson, resetPose, CAR_COLORS, buildCar, mountRider, pedal, BIKE_COLORS } from './models.js';
+import { isTrafficRoad, isTrail, speedLimit, roadWidth, F, TILE } from './world.js';
 import { clamp, wrapAngle, mulberry32, hash2, pointInRing } from './util.js';
 
 const TRAFFIC_TYPES = ['sedan', 'sedan', 'suv', 'suv', 'suv', 'minivan', 'pickup', 'pickup', 'hatch', 'sedan', 'van', 'sports'];
 const PARKED_TYPES = ['sedan', 'suv', 'suv', 'minivan', 'pickup', 'hatch', 'sedan', 'minivan'];
-const MAX_TRAFFIC = 26, MAX_PEDS = 26, MAX_PARKED = 70;
+const MAX_TRAFFIC = 26, MAX_PEDS = 30, MAX_PARKED = 70;
 
 export const PED_LINES = [
   'Beautiful day in Fishers!', 'Have you tried the food hall at the Nickel Plate?', 'I heard the farmers market is open Saturday.',
@@ -297,23 +297,34 @@ export class Traffic {
   // ---------------------------------------------------------------- pedestrians
   spawnPed(px, pz) {
     const filter = (t, f) => t === 16 || t === 11 || t === 12 || t === 13 || t === 9 || (t === 14 && !(f & F.DRIVEWAY));
-    const hit = this.nav.randomRoadSpot(px, pz, 30, 150, this.rnd, filter);
+    // trails get extra attention so they feel busy with riders and walkers
+    const onTrail = this.rnd() < 0.45;
+    const hit = onTrail
+      ? this.nav.randomRoadSpot(px, pz, 40, 220, this.rnd, isTrail)
+      : this.nav.randomRoadSpot(px, pz, 30, 150, this.rnd, filter);
     if (!hit) return;
     if (this.peds.some((p) => Math.hypot(p.x - hit.x, p.z - hit.z) < 20)) return;
     const R = this.R;
     const foot = R.type[hit.edge] === 16;
+    const trail = isTrail(R.type[hit.edge], R.flags[hit.edge]);
+    const cyclist = trail && this.rnd() < 0.6;
     const side = this.rnd() < 0.5 ? 1 : -1;
-    const off = foot ? 0 : (roadWidth(R.type[hit.edge], R.flags[hit.edge]) / 2 + 1.4) * side;
+    const off = cyclist ? 0.9 : trail ? 1.4 * side : foot ? 0 : (roadWidth(R.type[hit.edge], R.flags[hit.edge]) / 2 + 1.4) * side;
     const x = hit.x - hit.dz * off, z = hit.z + hit.dx * off;
     if (this.w.buildingAt(x, z, 0.5) >= 0 || this.w.inWater(x, z)) return;
     const kid = this.rnd() < 0.25;
-    const mesh = buildPerson({ scale: kid ? 0.68 : 0.95 + this.rnd() * 0.1, longHair: this.rnd() < 0.4, backpack: kid && this.rnd() < 0.6 ? 0x3d6bd1 : undefined, cap: this.rnd() < 0.15 ? 0xbd2c2c : undefined });
+    const person = buildPerson({ scale: kid ? 0.68 : 0.95 + this.rnd() * 0.1, longHair: this.rnd() < 0.4, backpack: kid && this.rnd() < 0.6 ? 0x3d6bd1 : undefined, cap: this.rnd() < (cyclist ? 0.7 : 0.15) ? (cyclist ? 0xf2f2f2 : 0xbd2c2c) : undefined });
+    let mesh = person;
+    if (cyclist) {
+      mesh = buildCar('bike', BIKE_COLORS[Math.floor(this.rnd() * BIKE_COLORS.length)]);
+      mountRider(mesh, person);
+    }
     mesh.position.set(x, 0, z);
     this.scene.add(mesh);
     const dir = this.rnd() < 0.5 ? 1 : -1;
     this.peds.push({
-      mesh, x, z, edge: hit.edge, dir, seg: hit.seg, off, foot,
-      speed: kid ? 1.5 : 1.1 + this.rnd() * 0.5, heading: Math.atan2(hit.dx * dir, hit.dz * dir),
+      mesh, x, z, edge: hit.edge, dir, seg: hit.seg, off, foot, cyclist, crank: 0,
+      speed: cyclist ? 4.5 + this.rnd() * 2.5 : kid ? 1.5 : 1.1 + this.rnd() * 0.5, heading: Math.atan2(hit.dx * dir, hit.dz * dir),
       dodge: 0, dodgeX: 0, dodgeZ: 0, pause: 0, line: PED_LINES[Math.floor(this.rnd() * PED_LINES.length)],
       talk: 0,
     });
@@ -321,16 +332,22 @@ export class Traffic {
 
   updatePed(p, dt, threats) {
     const R = this.R, w = this.w;
+    const anim = (speed, air) => {
+      if (!p.cyclist) { animatePerson(p.mesh, speed, dt, air); return; }
+      p.crank += (speed / 0.34) * dt * 0.45;
+      pedal(p.mesh, p.crank);
+      for (const wh of p.mesh.userData.wheels) wh.tire.rotation.x += (speed / 0.34) * dt;
+    };
     if (p.talk > 0) {
       p.talk -= dt;
-      animatePerson(p.mesh, 0, dt);
+      anim(0);
       return;
     }
     if (p.dodge > 0) {
       p.dodge -= dt;
       p.x += p.dodgeX * dt; p.z += p.dodgeZ * dt;
-      animatePerson(p.mesh, 6, dt, p.dodge > 0.25);
-      p.mesh.position.y = Math.max(0, Math.sin(clamp(p.dodge / 0.6, 0, 1) * Math.PI) * 0.6);
+      anim(6, p.dodge > 0.25);
+      if (!p.cyclist) p.mesh.position.y = Math.max(0, Math.sin(clamp(p.dodge / 0.6, 0, 1) * Math.PI) * 0.6);
     } else {
       p.mesh.position.y = 0;
       // walk along the current edge segment
@@ -351,10 +368,11 @@ export class Traffic {
           if (p.seg < 0 || p.seg >= c - 1) this.pedNextEdge(p);
         } else {
           p.x += (dx / d) * p.speed * dt; p.z += (dz / d) * p.speed * dt;
-          p.heading = Math.atan2(dx, dz);
+          const h = Math.atan2(dx, dz);
+          p.heading = p.cyclist ? p.heading + wrapAngle(h - p.heading) * Math.min(1, dt * 6) : h;
         }
       }
-      animatePerson(p.mesh, p.speed, dt);
+      anim(p.speed);
     }
     // jump out of the way of fast cars
     for (const t of threats) {
@@ -388,16 +406,22 @@ export class Traffic {
       const t = R.type[e];
       if (e === p.edge) continue;
       if (!(t === 16 || t === 11 || t === 12 || t === 13 || t === 9 || (t === 14 && !(R.flags[e] & F.DRIVEWAY)))) continue;
+      if (p.cyclist && t === 16 && !isTrail(t, R.flags[e])) continue; // riders stay off sidewalks
       opts.push(e);
     }
     if (!opts.length) { p.dir = -p.dir; p.seg = p.dir > 0 ? 0 : R.count[p.edge] - 1; return; }
-    const e = opts[Math.floor(this.rnd() * opts.length)];
+    // riders and walkers who are on a trail mostly keep following it
+    const trailOpts = opts.filter((e) => isTrail(R.type[e], R.flags[e]));
+    const pool = trailOpts.length && isTrail(R.type[p.edge], R.flags[p.edge]) && this.rnd() < 0.9 ? trailOpts : opts;
+    const e = pool[Math.floor(this.rnd() * pool.length)];
     p.dir = R.a[e] === n ? 1 : -1;
     p.edge = e;
     p.seg = p.dir > 0 ? 0 : R.count[e] - 1;
     const foot = R.type[e] === 16;
     const side = p.off >= 0 ? 1 : -1;
-    p.off = foot ? 0 : (roadWidth(R.type[e], R.flags[e]) / 2 + 1.4) * side;
+    const trail = isTrail(R.type[e], R.flags[e]);
+    if (p.cyclist) p.off = trail ? 0.9 : roadWidth(R.type[e], R.flags[e]) / 2 - 1;
+    else p.off = trail ? 1.4 * side : foot ? 0 : (roadWidth(R.type[e], R.flags[e]) / 2 + 1.4) * side;
   }
 
   // ---------------------------------------------------------------- main update
@@ -463,7 +487,7 @@ export class Traffic {
     const threats = all.filter((c) => Math.hypot(c.x - px, c.z - pz) < 160 && c.absSpeed > 3);
     for (let i = this.peds.length - 1; i >= 0; i--) {
       const p = this.peds[i];
-      if (Math.hypot(p.x - px, p.z - pz) > 230) {
+      if (Math.hypot(p.x - px, p.z - pz) > (p.cyclist ? 320 : 230)) {
         this.scene.remove(p.mesh); this.peds.splice(i, 1); continue;
       }
       this.updatePed(p, dt, threats);

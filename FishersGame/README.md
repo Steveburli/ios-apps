@@ -1,7 +1,7 @@
 # Fishers Cruise
 
 An open-world driving game for the PC browser, set on the real map of Fishers, Indiana and the edges of
-Carmel, Noblesville, McCordsville and Lawrence. Walk around, borrow cars, drive the real roads, talk to
+Carmel, Noblesville, McCordsville and Lawrence. Walk around, borrow cars, drive the real roads, ride bikes on the Monon and Nickel Plate trails, talk to
 people, take on ten jobs around town and hunt for 30 golden fish. No weapons and no violence: cars bump,
 people jump out of the way, and nobody gets hurt.
 
@@ -27,7 +27,8 @@ straight from disk):
 | Get in or out, talk | E | X or Y |
 | Look around | Mouse | Right stick |
 | Map (click to set a waypoint) | M | Back/View |
-| Horn | H | Right stick click |
+| Horn (bell on a bike) | H | Right stick click |
+| Pedal hard on a bike | Shift + W | A + right trigger |
 | Quit the current job | X | |
 
 ## Jobs
@@ -42,6 +43,14 @@ straight from disk):
 8. **Ice Cream Emergency**: catch the ice cream truck.
 9. **Farmers Market Run**: collect produce from farms on the edge of town.
 10. **Picture Perfect**: photograph six landmarks.
+11. **Nickel Plate Pedal**: a timed bike ride down the Nickel Plate Trail.
+12. **Monon Mileage**: a timed bike ride on the Monon Trail through Carmel.
+
+## Biking
+
+The Monon Trail and Nickel Plate Trail are drawn as paved trails with a yellow center line (green on the maps).
+Bike racks sit about every kilometre along both, and there is a bike in your driveway. Other cyclists and walkers
+use the trails too. On a bike, the GPS routes you along trails and quieter roads.
 
 Progress (money, finished jobs, golden fish) is saved in the browser.
 

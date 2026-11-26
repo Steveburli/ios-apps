@@ -1,8 +1,8 @@
 // Fishers Cruise: boots the map, runs the game loop, and handles the player.
 import * as THREE from 'three';
 import { loadMap, lonLatToXZ } from './data.js';
-import { World, isDrivable, F, VIEW } from './world.js';
-import { makeTextures, buildPerson, animatePerson, resetPose, waveAnim, textSprite, CAR_TYPES, lightMats } from './models.js';
+import { World, isDrivable, isTrail, F, VIEW } from './world.js';
+import { makeTextures, buildPerson, animatePerson, resetPose, waveAnim, textSprite, CAR_TYPES, lightMats, mountRider, BIKE_COLORS } from './models.js';
 import { Car } from './vehicle.js';
 import { Nav } from './nav.js';
 import { Traffic, PED_LINES } from './traffic.js';
@@ -111,7 +111,8 @@ const G = {
 };
 
 window.fishersCruise = { G: null, player: null, enterCar: null };
-const player = { x: 0, z: 0, y: 0, vy: 0, heading: 0, speed: 0, mesh: buildPerson({ shirt: 0x1f6fb2, pants: 0x2b3a55, hair: 0x3a2a1c, skin: 0xe0ac87, cap: 0xff8a3d }) };
+const PLAYER_LOOK = { shirt: 0x1f6fb2, pants: 0x2b3a55, hair: 0x3a2a1c, skin: 0xe0ac87, cap: 0xff8a3d };
+const player = { x: 0, z: 0, y: 0, vy: 0, heading: 0, speed: 0, mesh: buildPerson(PLAYER_LOOK) };
 scene.add(player.mesh);
 
 const cam = { yaw: 0, pitch: 0.32, dist: 6, lastMouse: -10, shake: 0 };
@@ -205,6 +206,7 @@ async function boot() {
   G.hud.onWaypoint = (p) => { G.waypoint = p; routeState.key = ''; };
   setStatus('Finding your new house', 0.92);
   chooseHome();
+  placeBikeRacks();
   G.missions = new Missions(G);
   G.hud.setFish(G.save.fish.length, G.missions.fish.length);
   makeLabels();
@@ -274,10 +276,75 @@ function chooseHome() {
   G.home = { x: best.x + best.ux * 4.5 + best.uz * 2.5, z: best.z + best.uz * 4.5 - best.ux * 2.5, name: 'Home' };
   G.traffic.reserved.push({ x: best.x, z: best.z, r: 16 });
   G.familyCar = G.spawnCar('minivan', best.x, best.z, best.heading, 0x8b9096);
+  // the family bike leans next to the minivan
+  for (const side of [2.4, -2.4]) {
+    const bx = best.x + best.uz * side, bz = best.z - best.ux * side;
+    if (w.buildingAt(bx, bz, 0.8) >= 0) continue;
+    G.homeBike = G.spawnCar('bike', bx, bz, best.heading, 0x2bb3b1);
+    break;
+  }
   G.spawnHomeCars();
   player.x = G.home.x + best.uz * 1.5; player.z = G.home.z - best.ux * 1.5;
   player.heading = Math.atan2(best.ux, best.uz);
   cam.yaw = player.heading;
+}
+
+// ---------------------------------------------------------------- trails and bike racks
+const TRAILS = [{ re: /monon/i, label: 'Monon Trail' }, { re: /nickel plate/i, label: 'Nickel Plate Trail' }];
+const rackGeo = new THREE.BoxGeometry(2.6, 0.08, 0.08);
+const rackMat = new THREE.MeshLambertMaterial({ color: 0x9aa3a8 });
+function placeBikeRacks() {
+  const w = G.world, R = w.R;
+  G.trails = [];
+  let colorIdx = 0;
+  for (const tr of TRAILS) {
+    const pts = [];
+    for (let e = 0; e < R.nEdges; e++) {
+      if (!isTrail(R.type[e], R.flags[e]) || !tr.re.test(w.roadName(e))) continue;
+      for (let k = 0; k < R.count[e]; k++) {
+        const [x, z] = w.edgePoint(e, k);
+        const [x2, z2] = w.edgePoint(e, Math.min(k + 1, R.count[e] - 1));
+        const [x0, z0] = w.edgePoint(e, Math.max(k - 1, 0));
+        const L = Math.hypot(x2 - x0, z2 - z0) || 1;
+        pts.push({ x, z, dx: (x2 - x0) / L, dz: (z2 - z0) / L });
+      }
+    }
+    if (pts.length < 2) continue;
+    // order the points along the trail's long direction
+    const xs = pts.map((p) => p.x), zs = pts.map((p) => p.z);
+    const alongZ = Math.max(...zs) - Math.min(...zs) > Math.max(...xs) - Math.min(...xs);
+    pts.sort((a, b) => (alongZ ? a.z - b.z : a.x - b.x));
+    const mid = pts[Math.floor(pts.length / 2)];
+    const racks = [];
+    for (const p of pts) {
+      if (!racks.every((r) => Math.hypot(r.x - p.x, r.z - p.z) > 1100)) continue;
+      // a rack 3.5 m off the trail on whichever side is clear
+      let spot = null;
+      for (const side of [3.5, -3.5]) {
+        const x = p.x - p.dz * side, z = p.z + p.dx * side;
+        if (w.buildingAt(x, z, 1.5) >= 0 || w.inWater(x, z)) continue;
+        const nr = w.nearestRoad(x, z, (t, f) => !isTrail(t, f), 4);
+        if (nr) continue;
+        spot = { x, z, h: Math.atan2(p.dx, p.dz) };
+        break;
+      }
+      if (!spot) continue;
+      racks.push(spot);
+      const bar = new THREE.Mesh(rackGeo, rackMat);
+      bar.position.set(spot.x, 0.75, spot.z);
+      bar.rotation.y = spot.h;
+      scene.add(bar);
+      for (const off of [-0.6, 0.6]) {
+        const bx = spot.x + Math.sin(spot.h + Math.PI / 2) * off, bz = spot.z + Math.cos(spot.h + Math.PI / 2) * off;
+        const bike = G.spawnCar('bike', bx, bz, spot.h + Math.PI / 2, BIKE_COLORS[colorIdx++ % BIKE_COLORS.length]);
+        bike.rack = true;
+      }
+      const sign = textSprite(tr.label, { bg: '#0d6b47', color: '#fff', scale: 0.22, font: '700 40px "Barlow Condensed", "Arial Narrow", sans-serif' });
+      sign.position.set(spot.x, 2.4, spot.z);
+      scene.add(sign);
+    }
+    G.trails.push({ label: tr.label, re: tr.re, pts, mid, racks });
+  }
 }
 
 const labels = [];
@@ -333,11 +400,12 @@ function updateRoute(dt) {
   else if (G.waypoint) target = G.waypoint;
   if (!target) { routeState.route = null; return; }
   const p = G.pos;
-  const key = `${Math.round(target.x)},${Math.round(target.z)}`;
+  const bike = !!G.car?.spec.bike;
+  const key = `${Math.round(target.x)},${Math.round(target.z)},${bike}`;
   const moved = routeState.from ? Math.hypot(p.x - routeState.from.x, p.z - routeState.from.z) : 1e9;
   if (key !== routeState.key || (routeState.t <= 0 && moved > 12)) {
     routeState.key = key; routeState.t = 1.2; routeState.from = { ...p };
-    routeState.route = G.nav.route(p.x, p.z, target.x, target.z);
+    routeState.route = G.nav.route(p.x, p.z, target.x, target.z, bike);
   }
   if (G.waypoint && !G.missions.active && Math.hypot(p.x - G.waypoint.x, p.z - G.waypoint.z) < 20) {
     G.waypoint = null; G.hud.waypoint = null; G.hud.toast('You have arrived.');
@@ -360,8 +428,9 @@ function enterCar(c) {
   c.keep = true;
   G.playerCar = c;
   player.mesh.visible = false;
-  G.sound.door();
-  if (G.lastCar && G.lastCar !== c && G.lastCar !== G.familyCar && G.lastCar !== G.sportsCar) G.lastCar.keep = false;
+  if (c.spec.bike) mountRider(c.mesh, buildPerson(PLAYER_LOOK));
+  else G.sound.door();
+  if (G.lastCar && G.lastCar !== c && G.lastCar !== G.familyCar && G.lastCar !== G.sportsCar && G.lastCar !== G.homeBike && !G.lastCar.rack) G.lastCar.keep = false;
   G.lastCar = c;
 }
 
@@ -379,9 +448,11 @@ function exitCar() {
   player.mesh.visible = true;
   c.driver = null;
   c.input = { throttle: 0, brake: 0, steer: 0, handbrake: 1 };
+  const rider = c.mesh.userData.rider;
+  if (rider) { c.mesh.userData.body.remove(rider); c.mesh.userData.rider = null; c.sync(); }
   G.traffic.extra.push(c);
   G.playerCar = null;
-  G.sound.door();
+  if (!c.spec.bike) G.sound.door();
   G.sound.engine(false, 0, 0, false);
   // only keep a few personal cars around
   const ex = G.traffic.extra;
@@ -535,15 +606,18 @@ function step(dt) {
   if (inp.cancel && G.missions.active) G.missions.cancel();
   if (car) {
     const ci = car.input;
-    ci.throttle = inp.throttle; ci.brake = inp.brake;
+    // on a bike, W pedals at a steady pace and Shift pedals hard
+    ci.throttle = car.spec.bike ? inp.throttle * (inp.sprint ? 1 : 0.55) : inp.throttle;
+    ci.brake = inp.brake;
     ci.steer = inp.x; ci.handbrake = inp.handbrake ? 1 : 0;
     // two physics substeps for stability at speed
     car.update(dt / 2, G.world); car.update(dt / 2, G.world);
     if (car.hitStrength > 4) { G.sound.bump(car.hitStrength); cam.shake = Math.min(0.6, car.hitStrength * 0.04); G.missions.active?.onBump?.(car.hitStrength); }
     car.hitStrength = 0;
     if (inp.interact) exitCar();
-    if (inp.horn) { G.sound.horn(); hornNearby(); }
-    G.sound.engine(true, car.speed, ci.throttle, ci.handbrake && car.absSpeed > 6);
+    if (inp.horn) { if (car.spec.bike) G.sound.bell(); else G.sound.horn(); hornNearby(); }
+    if (car.spec.bike) G.sound.engine(false, 0, 0, false);
+    else G.sound.engine(true, car.speed, ci.throttle, ci.handbrake && car.absSpeed > 6);
     car.setHeadlights(G.night);
   } else {
     updatePlayer(dt, inp);
@@ -555,7 +629,7 @@ function step(dt) {
       if (inp.interact) G.missions.start(gv);
     } else if (nearCar && !hud.dialog) {
       const label = CAR_TYPES[nearCar.type].label;
-      prompt = nearCar.driver === 'ai' ? `<kbd>E</kbd> Ask to borrow the ${label.toLowerCase()}` : `<kbd>E</kbd> Get in the ${label.toLowerCase()}`;
+      prompt = nearCar.driver === 'ai' ? `<kbd>E</kbd> Ask to borrow the ${label.toLowerCase()}` : nearCar.spec.bike ? '<kbd>E</kbd> Hop on the bike' : `<kbd>E</kbd> Get in the ${label.toLowerCase()}`;
       if (inp.interact) enterCar(nearCar);
     } else if (ped && !hud.dialog) {
       prompt = '<kbd>E</kbd> Say hi';
@@ -645,8 +719,13 @@ function renderFrame(dt) {
       cam.pitch = smooth(cam.pitch, 0.22, 2, dt);
     }
     const big = car.spec.l > 6 ? 1.6 : 1;
-    cam.dist = smooth(cam.dist, (8.5 + car.absSpeed * 0.06) * big, 3, dt);
-    camTarget.set(car.x, 1.6 * big, car.z);
+    if (car.spec.bike) {
+      cam.dist = smooth(cam.dist, 4.6 + car.absSpeed * 0.08, 3, dt);
+      camTarget.set(car.x, 1.7, car.z);
+    } else {
+      cam.dist = smooth(cam.dist, (8.5 + car.absSpeed * 0.06) * big, 3, dt);
+      camTarget.set(car.x, 1.6 * big, car.z);
+    }
   } else {
     cam.dist = smooth(cam.dist, 5.5, 4, dt);
     camTarget.set(player.x, player.y + 1.6, player.z);
@@ -713,9 +792,10 @@ function mapLabels() {
   for (const p of G.world.hoods) out.push({ text: p[0], x: p[2], z: p[3], minScale: 0.22 });
   for (const l of Object.values(G.missions.L)) out.push({ text: l.label, x: l.x, z: l.z, minScale: 0.07 });
   out.push({ text: 'Home', x: G.home.x, z: G.home.z + 30, minScale: 0.05 });
+  for (const t of G.trails) out.push({ text: t.label, x: t.mid.x, z: t.mid.z, minScale: 0.05, trail: true });
   _mapLabels = out;
   return out;
 }
 
-window.fishersCruise = { G, player, enterCar: (c) => enterCar(c), cam };
+window.fishersCruise = { G, player, enterCar: (c) => enterCar(c), cam, renderer, applyGraphics, setGfx: (v) => { gfx = v; applyGraphics(); } };
 boot();

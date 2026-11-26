@@ -216,6 +216,9 @@ def build_roads(osm, names, name_idx):
             flags |= 32
         if tags.get("service") in ("parking_aisle", "drive-through"):
             flags |= 64
+        nm_l = (tags.get("name") or "").lower()
+        if t == 16 and (tags.get("highway") == "cycleway" or "trail" in nm_l or tags.get("bicycle") == "designated"):
+            flags |= 128  # paved trail / bike path
         nm = tags.get("name") or tags.get("ref") or ""
         ways.append((t, flags, nm, nodes))
         for i, n in enumerate(nodes):

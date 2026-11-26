@@ -1,5 +1,5 @@
 // Arcade car physics shared by the player's car, traffic and parked cars.
-import { buildCar, CAR_TYPES, lightMats } from './models.js';
+import { buildCar, CAR_TYPES, lightMats, pedal } from './models.js';
 import { clamp, smooth, wrapAngle } from './util.js';
 
 const tmp = { x: 0, z: 0, nx: 0, nz: 0, hit: false };
@@ -19,7 +19,9 @@ export class Car {
     this.driver = null; // 'player' | 'ai' | null
     this.input = { throttle: 0, brake: 0, steer: 0, handbrake: 0 };
     this.lastHit = 0; this.hitStrength = 0;
-    this.radius = this.spec.w * 0.52;
+    this.radius = this.spec.bike ? 0.35 : this.spec.w * 0.52;
+    this.mass = this.spec.bike ? 0.12 : this.type === 'bus' ? 3 : 1;
+    this.crank = 0;
     this.halfLen = this.spec.l / 2;
     this.sync();
   }
@@ -118,7 +120,13 @@ export class Car {
     m.position.set(this.x, 0, this.z);
     m.rotation.set(0, this.heading, 0);
     const body = m.userData.body;
-    body.rotation.set(this.pitch, 0, this.roll);
+    if (this.spec.bike) {
+      const vF = this.speed;
+      const lean = m.userData.rider ? -clamp(this.yawRate * vF * 0.07, -0.5, 0.5) : 0.13; // parked on its kickstand
+      body.rotation.set(0, 0, lean);
+      this.crank += (vF / 0.34) * 0.016 * 0.45 * (this.input.throttle > 0 ? 1 : 0.15);
+      pedal(m, this.crank);
+    } else body.rotation.set(this.pitch, 0, this.roll);
     for (const w of m.userData.wheels) {
       w.pivot.rotation.y = w.front ? -this.steer * this.spec.steer * 0.8 : 0;
       w.tire.rotation.x = this.wheelSpin;

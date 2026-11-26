@@ -1,6 +1,6 @@
 // Road graph routing (GPS) and helpers for finding spots on the road network.
 import { Heap } from './util.js';
-import { isDrivable, isTrafficRoad, speedLimit, roadWidth, F } from './world.js';
+import { isDrivable, isTrafficRoad, isBikeable, isTrail, speedLimit, roadWidth, F } from './world.js';
 
 export class Nav {
   constructor(world) {
@@ -15,21 +15,27 @@ export class Nav {
   }
 
   // Edges leaving node `n` that may be driven: returns [edge, other node] pairs via callback.
-  forEachOut(n, fn, filter = isDrivable) {
+  forEachOut(n, fn, filter = isDrivable, ignoreOneway = false) {
     const R = this.R, w = this.w;
     for (let k = w.adjStart[n]; k < w.adjStart[n + 1]; k++) {
       const e = w.adj[k];
       if (!filter(R.type[e], R.flags[e])) continue;
       if (R.a[e] === n) fn(e, R.b[e], 1);
-      else if (!(R.flags[e] & F.ONEWAY)) fn(e, R.a[e], -1);
+      else if (ignoreOneway || !(R.flags[e] & F.ONEWAY)) fn(e, R.a[e], -1);
     }
   }
 
   // Returns {pts:[x,z,...], length} following roads from (sx,sz) to (tx,tz), or null.
-  route(sx, sz, tx, tz) {
+  // bike = true routes over paved trails too and prefers them.
+  route(sx, sz, tx, tz, bike = false) {
     const R = this.R;
-    const s = this.w.nearestRoad(sx, sz, isDrivable, 250);
-    const t = this.w.nearestRoad(tx, tz, isDrivable, 400);
+    const filter = bike ? isBikeable : isDrivable;
+    // travel speed in m/s used as the cost of each edge
+    const pace = bike
+      ? (e) => (isTrail(R.type[e], R.flags[e]) ? 9 : R.type[e] <= 6 ? 4 : 6)
+      : (e) => speedLimit(R.type[e]);
+    const s = this.w.nearestRoad(sx, sz, filter, 250);
+    const t = this.w.nearestRoad(tx, tz, filter, 400);
     if (!s || !t) return null;
     if (s.edge === t.edge) return { pts: [sx, sz, s.x, s.z, t.x, t.z, tx, tz], length: Math.hypot(t.x - s.x, t.z - s.z) };
     const run = ++this.run;
@@ -42,9 +48,9 @@ export class Nav {
     };
     // partial distances along the start edge
     const along = this.alongEdge(s);
-    const sp = speedLimit(R.type[s.edge]);
+    const sp = pace(s.edge);
     seedNode(R.b[s.edge], (R.length[s.edge] - along) / sp);
-    if (!(R.flags[s.edge] & F.ONEWAY)) seedNode(R.a[s.edge], along / sp);
+    if (bike || !(R.flags[s.edge] & F.ONEWAY)) seedNode(R.a[s.edge], along / sp);
     const goalA = R.a[t.edge], goalB = R.b[t.edge];
     let found = -1, expansions = 0;
     while (heap.size && expansions < 250000) {
@@ -52,15 +58,15 @@ export class Nav {
       if (closed[n] === run) continue;
       closed[n] = run;
       expansions++;
-      if (n === goalA || (n === goalB && !(R.flags[t.edge] & F.ONEWAY))) { found = n; break; }
+      if (n === goalA || (n === goalB && (bike || !(R.flags[t.edge] & F.ONEWAY)))) { found = n; break; }
       this.forEachOut(n, (e, m) => {
         if (closed[m] === run) return;
-        const c = g[n] + R.length[e] / speedLimit(R.type[e]) + (R.type[e] >= 14 ? 4 : 0);
+        const c = g[n] + R.length[e] / pace(e) + (!bike && R.type[e] >= 14 ? 4 : 0);
         if (seen[m] !== run || c < g[m]) {
           seen[m] = run; g[m] = c; prev[m] = e;
           heap.push(m, c + h(m));
         }
-      });
+      }, filter, bike);
     }
     if (found < 0) return null;
     // walk back through prev edges
