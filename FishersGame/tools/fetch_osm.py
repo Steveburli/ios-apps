@@ -21,6 +21,9 @@ SERVERS = ["https://overpass.kumi.systems/api/interpreter",
            "https://overpass.private.coffee/api/interpreter"]
 
 
+FAILED = []
+
+
 def bbox_str(b):
     return f"{b[0]},{b[1]},{b[2]},{b[3]}"
 
@@ -31,7 +34,7 @@ def run(query, path):
         return
     body = urllib.parse.urlencode({"data": query}).encode()
     last = None
-    for attempt in range(9):
+    for attempt in range(4):
         url = SERVERS[attempt % len(SERVERS)]
         try:
             print("fetch", os.path.basename(path), "from", url, flush=True)
@@ -48,7 +51,8 @@ def run(query, path):
             last = e
             print("  failed:", e, flush=True)
             time.sleep(5 + attempt * 5)
-    raise SystemExit(f"could not fetch {path}: {last}")
+    print(f"could not fetch {os.path.basename(path)}: {last}", flush=True)
+    FAILED.append(path)
 
 
 def main():
@@ -57,19 +61,25 @@ def main():
     b = bbox_str(BBOX)
     run(f'[out:json][timeout:300];way["highway"]({b});out body geom qt;',
         os.path.join(out, "roads.json"))
-    run(f'''[out:json][timeout:300];
+    # Areas in four quarters so each request finishes before the server gives up.
+    s0, w0, n0, e0 = BBOX
+    for a in range(2):
+        for c in range(2):
+            qb = bbox_str((s0 + (n0 - s0) * a / 2, w0 + (e0 - w0) * c / 2,
+                           s0 + (n0 - s0) * (a + 1) / 2, w0 + (e0 - w0) * (c + 1) / 2))
+            run(f'''[out:json][timeout:300];
 (
-  way["natural"~"^(water|wood|scrub|wetland|grassland|beach|sand)$"]({b});
-  relation["natural"~"^(water|wood|wetland)$"]({b});
-  way["landuse"~"^(forest|farmland|meadow|grass|recreation_ground|cemetery|commercial|retail|industrial|reservoir|basin|orchard|farmyard|village_green|construction)$"]({b});
-  relation["landuse"~"^(forest|farmland|reservoir|basin|retail|commercial)$"]({b});
-  way["leisure"~"^(park|golf_course|pitch|playground|garden|nature_reserve|sports_centre|stadium|track|dog_park|swimming_pool)$"]({b});
-  relation["leisure"~"^(park|golf_course|nature_reserve)$"]({b});
-  way["amenity"~"^(parking|school)$"]({b});
-  way["water"]({b});
-  relation["water"]({b});
+  way["natural"~"^(water|wood|scrub|wetland|grassland|beach|sand)$"]({qb});
+  relation["natural"~"^(water|wood|wetland)$"]({qb});
+  way["landuse"~"^(forest|farmland|meadow|grass|recreation_ground|cemetery|commercial|retail|industrial|reservoir|basin|orchard|farmyard|village_green|construction)$"]({qb});
+  relation["landuse"~"^(forest|farmland|reservoir|basin|retail|commercial)$"]({qb});
+  way["leisure"~"^(park|golf_course|pitch|playground|garden|nature_reserve|sports_centre|stadium|track|dog_park|swimming_pool)$"]({qb});
+  relation["leisure"~"^(park|golf_course|nature_reserve)$"]({qb});
+  way["amenity"~"^(parking|school)$"]({qb});
+  way["water"]({qb});
+  relation["water"]({qb});
 );
-out tags geom qt;''', os.path.join(out, "areas.json"))
+out tags geom qt;''', os.path.join(out, f"areas_{a}{c}.json"))
     run(f'''[out:json][timeout:300];
 (
   way["waterway"~"^(river|stream|canal|drain|ditch)$"]({b});
@@ -115,3 +125,5 @@ out tags center qt;''', os.path.join(out, "pois.json"))
 
 if __name__ == "__main__":
     main()
+    if FAILED:
+        raise SystemExit(f"{len(FAILED)} downloads failed; run again to retry them")

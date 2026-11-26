@@ -410,7 +410,16 @@ def load(osm, name):
 
 
 def build_areas(osm):
-    data = load(osm, "areas.json")
+    seen = set()
+    elements = []
+    for path in sorted(glob.glob(os.path.join(osm, "areas*.json"))):
+        with open(path) as f:
+            for el in json.load(f)["elements"]:
+                key = (el["type"], el["id"])
+                if key not in seen:
+                    seen.add(key)
+                    elements.append(el)
+    data = {"elements": elements}
     polys = []
     for el in data["elements"]:
         tags = el.get("tags", {})
