@@ -5,6 +5,7 @@ Usage: python3 build_map.py <osm-dir> <out-dir>
 
 Outputs (all little-endian, coordinates are int16 in half-metres from the
 map origin, +x east, +z south):
+  (each .bin below is written base64-encoded as <name>.b64.txt)
   roads.bin      road graph: nodes, then edges with polylines
   buildings.bin  building footprints with height and kind
   areas.bin      polygons (water, parks, woods, parking, fields ...)
@@ -558,10 +559,23 @@ def main():
         "areas.bin": build_areas(osm),
         "lines.bin": build_lines(osm),
     }
+    import base64
     for k, v in files.items():
-        with open(os.path.join(out, k), "wb") as f:
-            f.write(v)
+        # stored as base64 text so any static host (including Claude artifacts) serves it
+        with open(os.path.join(out, k.replace(".bin", ".b64.txt")), "wb") as f:
+            f.write(base64.b64encode(v))
+        old = os.path.join(out, k)
+        if os.path.exists(old):
+            os.remove(old)
     pois, places = build_pois(osm)
+    if not any(p[1] in ("city", "town", "village") for p in places):
+        # fallback town centres when place data is missing
+        for name, lat, lon in [("Fishers", 39.9556, -86.0139), ("Carmel", 39.9784, -86.1180),
+                               ("Noblesville", 40.0456, -86.0086), ("McCordsville", 39.9081, -85.9228),
+                               ("Lawrence", 39.8387, -86.0253), ("Castleton", 39.9081, -86.0525),
+                               ("Geist", 39.9356, -85.9497)]:
+            x, z = proj(lat, lon)
+            places.append([name, "town" if name in ("Castleton", "Geist") else "city", round(x, 1), round(z, 1)])
     s, w, n, e = 39.875, -86.165, 40.070, -85.905
     x0, z0 = proj(n, w)
     x1, z1 = proj(s, e)

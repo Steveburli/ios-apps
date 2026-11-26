@@ -51,7 +51,7 @@ The game reads compact binary map files from `web/data/`. To regenerate them fro
 
 ```bash
 python3 tools/fetch_osm.py /tmp/osm          # downloads from the Overpass API (takes a while)
-python3 tools/build_map.py /tmp/osm web/data # writes roads.bin, buildings.bin, areas.bin, lines.bin, meta.json
+python3 tools/build_map.py /tmp/osm web/data # writes roads, buildings, areas and lines (.b64.txt) plus meta.json
 ```
 
 The map area is set by `BBOX` in `fetch_osm.py`. If you change it, update the bounds in `build_map.py` too.

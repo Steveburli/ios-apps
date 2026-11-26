@@ -233,7 +233,7 @@ function startGame() {
 // Picks a house with a driveway near the middle of Fishers.
 function chooseHome() {
   const w = G.world, R = w.R;
-  const center = lonLatToXZ(w.meta, 39.9585, -85.9905);
+  const center = lonLatToXZ(w.meta, 39.9505, -86.0045);
   const rnd = mulberry32(2024);
   let best = null;
   const cands = [];

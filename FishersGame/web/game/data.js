@@ -136,13 +136,23 @@ function decodeLines(buf, q) {
   return lines;
 }
 
+function fromBase64(buf) {
+  const text = new TextDecoder().decode(buf).trim();
+  if (Uint8Array.fromBase64) return Uint8Array.fromBase64(text).buffer;
+  const bin = atob(text);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out.buffer;
+}
+
 export async function loadMap(base, onProgress) {
-  const files = ['meta.json', 'roads.bin', 'buildings.bin', 'areas.bin', 'lines.bin'];
+  const files = ['meta.json', 'roads.b64.txt', 'buildings.b64.txt', 'areas.b64.txt', 'lines.b64.txt'];
   // rough sizes so the bar moves sensibly even without Content-Length
   let loaded = 0;
-  const expect = 9e6;
+  const expect = 1.1e7;
   const tick = (n) => { loaded += n; onProgress(Math.min(0.99, loaded / expect)); };
   const bufs = await Promise.all(files.map((f) => fetchWithProgress(base + f, tick)));
+  for (let i = 1; i < bufs.length; i++) bufs[i] = fromBase64(bufs[i]);
   const meta = JSON.parse(new TextDecoder().decode(bufs[0]));
   const q = meta.origin.q;
   return {
