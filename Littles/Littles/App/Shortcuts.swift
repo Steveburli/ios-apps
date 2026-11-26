@@ -63,7 +63,7 @@ struct LogBottleIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let model = AppModel.shared
-        let last = Summary.last(model.state.logs, kidID: kid.id, kinds: [.bottle])
+        let last = LittlesKit.Summary.last(model.state.logs, kidID: kid.id, kinds: [.bottle])
         model.save(LogEntry(kidID: kid.id, kind: .bottle, start: Date(), amountOz: ounces, milk: last?.milk ?? .formula))
         return .result(dialog: "Logged a \(model.units.volume(ounces)) bottle for \(kid.name).")
     }
@@ -102,7 +102,7 @@ struct WakeUpIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let model = AppModel.shared
-        guard let running = Summary.running(model.state.logs, kidID: kid.id).first(where: { $0.kind == .sleep }) else {
+        guard let running = LittlesKit.Summary.running(model.state.logs, kidID: kid.id).first(where: { $0.kind == .sleep }) else {
             return .result(dialog: "\(kid.name) doesn't have a sleep timer running.")
         }
         model.stop(running.id)
@@ -121,14 +121,14 @@ struct LastTimeIntent: AppIntent {
         let logs = AppModel.shared.state.logs
         let entry: LogEntry?
         switch what {
-        case .fed: entry = Summary.last(logs, kidID: kid.id, kinds: [.bottle, .nursing])
-        case .ate: entry = Summary.last(logs, kidID: kid.id, kinds: [.solids])
-        case .diaper: entry = Summary.last(logs, kidID: kid.id, kinds: [.diaper])
+        case .fed: entry = LittlesKit.Summary.last(logs, kidID: kid.id, kinds: [.bottle, .nursing])
+        case .ate: entry = LittlesKit.Summary.last(logs, kidID: kid.id, kinds: [.solids])
+        case .diaper: entry = LittlesKit.Summary.last(logs, kidID: kid.id, kinds: [.diaper])
         case .pooped:
             entry = logs.filter { $0.kidID == kid.id && ($0.diaper?.isDirty == true || $0.potty == .poop || $0.potty == .both) }
                 .max { $0.start < $1.start }
-        case .slept: entry = Summary.last(logs, kidID: kid.id, kinds: [.sleep])
-        case .medicine: entry = Summary.last(logs, kidID: kid.id, kinds: [.meds])
+        case .slept: entry = LittlesKit.Summary.last(logs, kidID: kid.id, kinds: [.sleep])
+        case .medicine: entry = LittlesKit.Summary.last(logs, kidID: kid.id, kinds: [.meds])
         }
         guard let entry else { return .result(dialog: "I don't see that logged for \(kid.name) yet.") }
         let time = entry.start.formatted(date: .omitted, time: .shortened)
