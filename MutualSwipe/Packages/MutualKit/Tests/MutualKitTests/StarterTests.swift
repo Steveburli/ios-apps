@@ -74,4 +74,25 @@ final class StarterTests: XCTestCase {
         XCTAssertTrue(draft.details.contains("\nWhat to do: "))
         XCTAssertEqual(draft.subtitle, "Downtown · $$$$ · Steak")
     }
+
+    func testHomeMovieDeckIsGroupedByServiceWithUniqueLinks() {
+        let deck = Starter.homeMovies
+        XCTAssertTrue(Starter.decks.contains(deck))
+        XCTAssertEqual(deck.kind, .movies)
+        XCTAssertEqual(deck.cards.count, 113)
+        XCTAssertEqual(deck.sections, ["Netflix", "Disney+", "Hulu", "HBO Max", "Apple TV+", "Prime Video", "Peacock",
+                                       "Paramount+"])
+        let links = deck.cards.map(\.website)
+        XCTAssertEqual(Set(links).count, links.count)
+        for card in deck.cards {
+            XCTAssertTrue(card.website.hasPrefix("https://www.justwatch.com/us/search?q="), card.id)
+            XCTAssertEqual(card.tags.first, card.section, card.id)
+            XCTAssertTrue(card.facts.contains("RT "), card.id)
+        }
+    }
+
+    func testCheckNoteFitsTheDeck() {
+        XCTAssertTrue(Starter.checkNote(for: Starter.homeMovies.cards[0]).contains("where it’s on now"))
+        XCTAssertTrue(Starter.checkNote(for: Starter.dinners.cards[0]).contains("check hours"))
+    }
 }

@@ -1,7 +1,7 @@
 import SwiftUI
 import MutualKit
 
-/// "Start from a ready-made deck": pick one of the built-in Indianapolis decks,
+/// "Start from a ready-made deck": pick one of the built-in decks,
 /// look through its cards, leave out what you don't want, and copy the rest
 /// into a new deck in your group. The copy is an ordinary deck you can edit.
 struct StarterSheet: View {
@@ -20,7 +20,7 @@ struct StarterSheet: View {
                         }
                     }
                 } footer: {
-                    Text("Places around Indianapolis, checked open in \(Starter.lastChecked). Photos come from each place’s own website.")
+                    Text("Places around Indianapolis checked open, and streaming movies checked, in \(Starter.lastChecked). Photos come from each place’s own website.")
                 }
             }
             .scrollContentBackground(.hidden)

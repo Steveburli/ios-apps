@@ -249,8 +249,8 @@ struct CardSheet: View {
                     }
                     .buttonStyle(.mutual(.quiet))
                 }
-                if starter?.website.isEmpty == false {
-                    Text("From Mutual’s ready-made decks. Last checked \(Starter.lastChecked), so check hours before you go.")
+                if let starter, !starter.website.isEmpty {
+                    Text(Starter.checkNote(for: starter))
                         .font(.footnote)
                         .foregroundStyle(Theme.muted)
                 }

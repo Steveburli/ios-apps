@@ -74,7 +74,16 @@ public enum Starter {
     /// winner's title (say, "Pizza") narrows Dinners to cards tagged with it.
     public static let mealsID = "meals"
 
-    public static let decks: [StarterDeck] = [meals, dinners, dates, movies, trips]
+    public static let decks: [StarterDeck] = [meals, dinners, dates, movies, homeMovies, trips]
+
+    /// The reminder under a ready-made card: places can change their hours,
+    /// and streaming movies can move to another service.
+    public static func checkNote(for card: StarterCard) -> String {
+        if homeMovies.cards.contains(where: { $0.id == card.id }) {
+            return "From Mutual’s ready-made decks. Streaming services checked \(lastChecked), so tap the link to see where it’s on now."
+        }
+        return "From Mutual’s ready-made decks. Last checked \(lastChecked), so check hours before you go."
+    }
 
     /// The starter card a deck's card came from, matched by its website, or by
     /// its title when it has no link. Used to show the bundled photo.
